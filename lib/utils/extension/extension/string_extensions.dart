@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:autopeepalApp/api/dev/methods.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/api/dev/methods.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/app_logs.dart';
 import 'package:flutter/material.dart';
 
 

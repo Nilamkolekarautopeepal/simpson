@@ -1,9 +1,9 @@
-import 'package:autopeepalApp/common_widgets/text_field.dart';
-import 'package:autopeepalApp/services/connectivity/connectivity_service.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/app_constants.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/common_widgets/text_field.dart';
+import 'package:simpson/services/connectivity/connectivity_service.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/app_constants.dart';
+import 'package:simpson/utils/sizes.dart';
 import 'package:connectivity_wrapper/connectivity_wrapper.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';

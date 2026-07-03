@@ -1,12 +1,12 @@
-import 'package:autopeepalApp/AppPreferences/app_areferences.dart';
-import 'package:autopeepalApp/api/app_api.dart';
-import 'package:autopeepalApp/api/app_urls.dart';
-import 'package:autopeepalApp/services/auth/auth_service.dart';
-import 'package:autopeepalApp/services/permission_service.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
-import 'package:autopeepalApp/utils/extension/extension/map_extensions.dart';
-import 'package:autopeepalApp/utils/keys/api_keys.dart';
-import 'package:autopeepalApp/utils/ui_helper.dart/app_tost.dart';
+import 'package:simpson/AppPreferences/app_areferences.dart';
+import 'package:simpson/api/app_api.dart';
+import 'package:simpson/api/app_urls.dart';
+import 'package:simpson/services/auth/auth_service.dart';
+import 'package:simpson/services/permission_service.dart';
+import 'package:simpson/utils/app_logs.dart';
+import 'package:simpson/utils/extension/extension/map_extensions.dart';
+import 'package:simpson/utils/keys/api_keys.dart';
+import 'package:simpson/utils/ui_helper.dart/app_tost.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 

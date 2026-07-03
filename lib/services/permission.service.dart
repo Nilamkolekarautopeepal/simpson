@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/services/auth/auth_service.dart';
+import 'package:simpson/services/auth/auth_service.dart';
 import 'package:get/get.dart';
 
 class PermissionService extends GetxService {

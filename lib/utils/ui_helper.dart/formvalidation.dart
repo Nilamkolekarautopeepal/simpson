@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/utils/strings.dart';
+import 'package:simpson/utils/strings.dart';
 
 String? requiredValidation(val) {
   if (val == null || val.isEmpty) {

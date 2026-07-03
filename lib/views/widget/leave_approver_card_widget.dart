@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/modals/leaveApproverRequest.modal.dart';
-import 'package:autopeepalApp/services/permission_service.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
+import 'package:simpson/modals/leaveApproverRequest.modal.dart';
+import 'package:simpson/services/permission_service.dart';
+import 'package:simpson/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

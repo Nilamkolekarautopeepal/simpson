@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/themes/app_colors.dart';
+import 'package:simpson/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class CustomLoader extends StatelessWidget {

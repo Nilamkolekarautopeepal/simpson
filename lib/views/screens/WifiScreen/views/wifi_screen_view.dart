@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/views/screens/WifiScreen/controllers/wifi_screen_controller.dart';
+import 'package:simpson/views/screens/WifiScreen/controllers/wifi_screen_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

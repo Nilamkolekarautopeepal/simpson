@@ -1,8 +1,8 @@
-import 'package:autopeepalApp/common_widgets/buttons.dart';
-import 'package:autopeepalApp/common_widgets/text_field.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
-import 'package:autopeepalApp/views/screens/login/controllers/login_controller.dart';
+import 'package:simpson/common_widgets/buttons.dart';
+import 'package:simpson/common_widgets/text_field.dart';
+import 'package:simpson/themes/app_theme.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
+import 'package:simpson/views/screens/login/controllers/login_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

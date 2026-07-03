@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/routes/app_pages.dart';
+import 'package:simpson/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_navigation/get_navigation.dart';

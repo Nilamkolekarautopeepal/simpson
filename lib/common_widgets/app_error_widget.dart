@@ -1,8 +1,8 @@
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/assets.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
-import 'package:autopeepalApp/utils/strings.dart';
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/assets.dart';
+import 'package:simpson/utils/sizes.dart';
+import 'package:simpson/utils/strings.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
 import 'package:flutter/material.dart';
 
 

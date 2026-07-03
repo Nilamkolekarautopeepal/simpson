@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/utils/assets.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/utils/assets.dart';
+import 'package:simpson/utils/sizes.dart';
 ///[AppErrorWidget] an Custom Error widget
 ///
 ///Only If [App.instance.devMode] is enabled error details are shown

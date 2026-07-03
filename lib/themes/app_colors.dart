@@ -3,9 +3,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/api/app_envirments.dart';
-import 'package:autopeepalApp/app.dart';
-import 'package:autopeepalApp/utils/app_enums.dart';
+import 'package:simpson/api/app_envirments.dart';
+import 'package:simpson/app.dart';
+import 'package:simpson/utils/app_enums.dart';
 
 class AppColors {
   static const Color subtitleColor = Color(0xFF667085);

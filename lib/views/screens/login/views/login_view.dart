@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
-import 'package:autopeepalApp/views/screens/login/controllers/login_controller.dart';
-import 'package:autopeepalApp/routes/app_pages.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
+import 'package:simpson/views/screens/login/controllers/login_controller.dart';
+import 'package:simpson/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 

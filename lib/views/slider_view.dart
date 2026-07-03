@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'package:autopeepalApp/api/app_api.dart';
-import 'package:autopeepalApp/services/app_setting_services.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/extension/app_extensions.dart';
+import 'package:simpson/api/app_api.dart';
+import 'package:simpson/services/app_setting_services.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/extension/app_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cached_network_image/cached_network_image.dart';

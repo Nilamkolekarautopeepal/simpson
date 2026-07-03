@@ -1,8 +1,8 @@
-import 'package:autopeepalApp/common_widgets/background_widget.dart';
-import 'package:autopeepalApp/common_widgets/text_field.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
+import 'package:simpson/common_widgets/background_widget.dart';
+import 'package:simpson/common_widgets/text_field.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/sizes.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
 import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
 import 'custom_clipper_widget.dart';

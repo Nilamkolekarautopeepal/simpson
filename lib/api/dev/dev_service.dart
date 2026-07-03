@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/app.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
-import 'package:autopeepalApp/utils/strings.dart';
+import 'package:simpson/app.dart';
+import 'package:simpson/utils/app_logs.dart';
+import 'package:simpson/utils/strings.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get_core/get_core.dart';
 import 'package:get/get_navigation/get_navigation.dart';

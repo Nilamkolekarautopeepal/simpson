@@ -2,7 +2,7 @@
 
 import 'dart:convert';
 import 'dart:math';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/utils/app_logs.dart';
 import 'package:crossplat_objectid/crossplat_objectid.dart'
     as crossplat_objectid;
 import 'package:flutter/cupertino.dart';

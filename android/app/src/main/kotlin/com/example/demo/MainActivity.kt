@@ -1,4 +1,4 @@
-package example.autopeepalApp.com
+package example.simpson.com
 
 import android.content.Context
 import androidx.annotation.NonNull

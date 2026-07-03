@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/modals/expenseApproval.model.dart';
-import 'package:autopeepalApp/services/permission_service.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
+import 'package:simpson/modals/expenseApproval.model.dart';
+import 'package:simpson/services/permission_service.dart';
+import 'package:simpson/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class ExpenseCard extends StatelessWidget {
