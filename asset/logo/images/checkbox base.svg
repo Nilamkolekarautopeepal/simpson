@@ -1,0 +1,7 @@
+<svg width="16" height="17" viewBox="0 0 16 17" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="_Checkbox base">
+<rect x="0.5" y="0.533203" width="15" height="15" rx="7.5" fill="#F1F8E9"/>
+<rect x="0.5" y="0.533203" width="15" height="15" rx="7.5" stroke="#43A047"/>
+<circle id="Check" cx="8" cy="8.0332" r="3" fill="#43A047"/>
+</g>
+</svg>

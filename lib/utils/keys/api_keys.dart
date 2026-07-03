@@ -1,0 +1,53 @@
+///[APIKeys] holds all the API keys
+class APIKeys {
+  static String statusCode = "statusCode";
+  // static String clientAddressID = "ClientAddressID";
+  // static String id = "ID";
+  static String email = "email";
+  static String username = "username";
+  static String password = "password";
+  static String message = "statusCode";
+  static String data = "data";
+  static String exception = "exception";
+  static String errorDetails = "errorDetails";
+  static String webImages = "webImages";
+  static String authorization = "Authorization";
+  static String contentType = "Content-Type";
+  static String contentTypeValue = "application/json";
+  static String empId = "emp_id";
+  static String org = "org";
+  static String otp = "otp";
+  static String eventName = "event_name";
+  static String attendanceType = "attendance_type";
+  static String attendanceDate = "attendance_date";
+  static String currentAddress = "current_address";
+  static String permanentAddress = "permanent_address";
+  static String sameAsPermanent = "same_as_permanent";
+  static String fromDate = "from_date";
+  static String toDate = "to_date";
+  static String leaveType = "leave_type";
+  static String halfDay = "half_day";
+  static String reason = "reason";
+  static String expenseType="expense_type";
+  static String planAmount="plan_amount";
+  static String amount="amount";
+  static String expenseStartDate="expense_start_date";
+  static String docNo="doc_no";
+  static String approvalStatus="approval_status";
+  static String approverEmpId="approver_emp_id";
+  static String currentStatus="current_status";
+  static String leaveId="leave_id";
+  static String status="status";
+  static String payableAccount="payable_account";
+  static String expenseApprover="expense_approver";
+  static String tourPurpose = "tour_purpose";
+  static String travelType = "travel_type";
+  static String itinerary = "itinerary";
+  static String travelFrom = "travel_from";
+  static String travelTo = "travel_to";
+  static String modeOfTravel = "mode_of_travel";
+  static String departureDate = "departure_date";
+  static String arrivalDate = "arrival_date";
+  static String downloadUrl = "download_url";
+
+}
