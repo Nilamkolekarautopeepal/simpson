@@ -1,132 +1,166 @@
-import 'package:simpson/AppPreferences/app_areferences.dart';
-import 'package:simpson/api/app_api.dart';
-import 'package:simpson/api/app_urls.dart';
-import 'package:simpson/services/auth/auth_service.dart';
-import 'package:simpson/services/permission_service.dart';
-import 'package:simpson/utils/app_logs.dart';
-import 'package:simpson/utils/extension/extension/map_extensions.dart';
-import 'package:simpson/utils/keys/api_keys.dart';
-import 'package:simpson/utils/ui_helper.dart/app_tost.dart';
-import 'package:flutter/widgets.dart';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:simpson/AppPreferences/app_areferences.dart';
+import 'package:simpson/api/app_urls.dart';
+import 'package:simpson/common_widgets/popup.dart';
+import 'package:simpson/modals/user.model.dart';
+import 'package:simpson/routes/app_pages.dart';
+import 'package:simpson/services/androidOperationservice.dart';
+import 'package:simpson/services/apiServices.dart';
+
 
 class LoginController extends GetxController {
+  final AuthService _authService = AuthService();
+
+  // Form fields — kept as Rx<TextEditingController> to match your existing usage
+  // (controller.usernameController.value in the widget tree)
+  final Rx<TextEditingController> usernameController =
+      TextEditingController().obs;
+  final Rx<TextEditingController> passwordController =
+      TextEditingController().obs;
+
+  // State
+  final RxBool hidePassword = true.obs;
+  final RxBool isLoading = false.obs;
+  final RxBool rememberMe = false.obs;
+  final RxString errorMessage = ''.obs;
+  final Rx<User?> currentUser = Rx<User?>(null);
+
+  // Station selection dropdown
+  final List<String> stationOptions = const ['PFS Station', 'Test Station'];
+  final RxString selectedStation = 'PFS Station'.obs;
+
   @override
   void onInit() {
     super.onInit();
+    _loadSavedCredentials();
   }
 
-  Rx<TextEditingController> usernameController = TextEditingController(text:"abc@autopeepal.com").obs;
-  Rx<TextEditingController> passwordController = TextEditingController(text:"Test@123").obs;
-  Rx<TextEditingController> forgetEmailController = TextEditingController().obs;
-  Rx<TextEditingController> verifyOTPController = TextEditingController().obs;
-  RxBool hidePassword = true.obs;
-  RxString verifyEmail = "".obs;
+  /// Pre-fills the form with the last saved credentials, but only if the
+  /// user had "Remember Me" checked last time.
+  Future<void> _loadSavedCredentials() async {
+    final wasRemembered = await SecureStorageService.getRememberMe();
+    rememberMe.value = wasRemembered;
 
-  login() async {
-    Map<String, dynamic> postData = Map();
-    postData.add(key: APIKeys.username, value: usernameController.value.text);
-    postData.add(key: APIKeys.password, value: passwordController.value.text);
-    Map<String, dynamic> responseData =
-        await AppAPIs.post(AppURLs.login, data: postData);
+    if (!wasRemembered) return;
+
+    final savedUsername = await SecureStorageService.getSavedUsername();
+    final savedPassword = await SecureStorageService.getSavedPassword();
+
+    if (savedUsername != null) {
+      usernameController.value.text = savedUsername;
+    }
+    if (savedPassword != null) {
+      passwordController.value.text = savedPassword;
+    }
+  }
+
+  Future<void> login() async {
+    debugPrint("🔵 [Login] Button pressed");
+
+    final username = usernameController.value.text.trim();
+    final password = passwordController.value.text.trim();
+    debugPrint("🔵 [Login] username='$username' password_length=${password.length}");
+
+    if (username.isEmpty || password.isEmpty) {
+      debugPrint("🔴 [Login] Validation failed: empty username or password");
+      errorMessage.value = "Username and password are required";
+      _showErrorPopup(errorMessage.value);
+      return;
+    }
 
     try {
-      if (responseData.getMap("message").getBool("success")) {
-        String tokenGet = responseData
-            .getMap("message")
-            .getMap("data")
-            .getString("Authorization");
+      isLoading.value = true;
+      errorMessage.value = '';
+      debugPrint("🔵 [Login] Fetching macId and deviceType...");
 
-        await AppPreferences.setToken(tokenGet);
-        await AppPreferences.setUserData(
-            responseData.getMap("message").getMap("data").getMap("user_data"));
-        await auth.loadUser();
-        getPermission(auth.currentUser.name!);
-        // Get.offAndToNamed(Routes.dashboardScreen);
+      final macId = await _getMacId();
+      final deviceType = _getDeviceType();
+      debugPrint("🔵 [Login] macId=$macId deviceType=$deviceType");
+
+      debugPrint("🔵 [Login] Calling AuthService.login() -> ${ApiUrls.login}");
+      final user = await _authService.login(
+        username: username,
+        password: password,
+        macId: macId,
+        deviceType: deviceType,
+      );
+      debugPrint("🟢 [Login] Success. user=${user.user} role=${user.role} userId=${user.userId}");
+
+      currentUser.value = user;
+
+      // Persist everything needed to stay "logged in" / pre-fill next time.
+      await SecureStorageService.setRememberMe(rememberMe.value);
+      if (rememberMe.value) {
+        await SecureStorageService.saveCredentials(
+          username: username,
+          password: password,
+        );
       } else {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("error"));
+        await SecureStorageService.clearCredentials();
       }
-    } catch (e) {
-      AppTostMassage.showTostMassage(massage: e.toString());
+      await SecureStorageService.saveTokens(
+        accessToken: user.token?.access,
+        refreshToken: user.token?.refresh,
+      );
+      //await AppPreferences.setUserData(user.toJson());
+      debugPrint("🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
+
+      debugPrint("🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
+      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+    } catch (e, stackTrace) {
+      debugPrint("🔴 [Login] Failed: $e");
+      debugPrint("🔴 [Login] StackTrace: $stackTrace");
+      errorMessage.value = e.toString().replaceFirst('Exception: ', '');
+      _showErrorPopup(errorMessage.value);
+    } finally {
+      isLoading.value = false;
+      debugPrint("🔵 [Login] isLoading reset to false");
     }
   }
 
-  forgetpassword() async {
-    Map<String, dynamic> postData = Map();
-    postData.add(key: APIKeys.email, value: forgetEmailController.value.text);
-    Map<String, dynamic> responseData =
-        await AppAPIs.post(AppURLs.forgetpassword, data: postData);
-
-    try {
-      if (responseData.getMap("message").getInt("status_code") == 200) {
-        appLogs(responseData.toPretty());
-        await AppPreferences.setToken(responseData
-            .getMap("message")
-            .getMap("data")
-            .getString("Authorization"));
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-        verifyEmail.value =
-            responseData.getMap("message").getMap("data").getString("email");
-
-        // Get.offAndToNamed(Routes.VERIFY_OTP, arguments: {
-        //   'email': verifyEmail.value,
-        // });
-      } else if (responseData.getMap("message").getInt("status_code") == 404) {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      } else {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      }
-    } catch (e) {
-      AppTostMassage.showTostMassage(massage: e.toString());
-    }
+  void _showErrorPopup(String message) {
+    Get.dialog(
+      CustomPopup(
+        title: "Login Failed",
+        message: message,
+        confirmText: "OK",
+      ),
+      barrierDismissible: true,
+    );
   }
 
-  verifyOTP(String email) async {
-    Map<String, dynamic> postData = Map();
-    postData.add(key: APIKeys.email, value: email);
-    postData.add(key: APIKeys.otp, value: verifyOTPController.value.text);
-    Map<String, dynamic> responseData =
-        await AppAPIs.post(AppURLs.verifyOTP, data: postData);
+  /// Uses your existing device-id utility, which returns a 2-element
+  /// array matching the C# GetDeviceUniqueId() shape:
+  /// ["true", "<mac>"] on success, ["false", "<reason>"] on failure.
+  Future<String> _getMacId() async {
+    final result = await AndroidOperationsService.getDeviceUniqueId();
 
-    try {
-      if (responseData.getMap("message").getInt("status_code") == 200) {
-        appLogs(responseData.toPretty());
-        await AppPreferences.setToken(responseData
-            .getMap("message")
-            .getMap("data")
-            .getString("Authorization"));
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      } else if (responseData.getMap("message").getInt("status_code") == 400) {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      } else if (responseData.getMap("message").getInt("status_code") == 401) {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      } else {
-        AppTostMassage.showTostMassage(
-            massage: responseData.getMap("message").getString("msg"));
-      }
-    } catch (e) {
-      AppTostMassage.showTostMassage(massage: e.toString());
+    if (result.length < 2) {
+      throw Exception("Could not determine device id.");
     }
+    if (result[0] != "true") {
+      throw Exception(result[1]);
+    }
+
+    return result[1];
   }
 
-  Future<void> getPermission(String emp_id) async {
-    Map<String, dynamic> responseData =
-        await AppAPIs.get(AppURLs.permission(emp_id: emp_id));
-    print(responseData.toPretty());
-    try {
-      await AppPreferences.savePermissionData(responseData.getMap("message"));
+  String _getDeviceType() {
+    if (Platform.isWindows) return "windows";
+    if (Platform.isMacOS) return "mac";
+    if (Platform.isLinux) return "linux";
+    if (Platform.isAndroid) return "android";
+    if (Platform.isIOS) return "ios";
+    return "unknown";
+  }
 
-      await permissionService.loadPermissions();
-//  Get.offAndToNamed(Routes.dashboardScreen);
-    } catch (e) {
-      print("$e");
-    }
+  @override
+  void onClose() {
+    usernameController.value.dispose();
+    passwordController.value.dispose();
+    super.onClose();
   }
 }

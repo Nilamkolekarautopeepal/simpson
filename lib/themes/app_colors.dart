@@ -10,6 +10,7 @@ import 'package:simpson/utils/app_enums.dart';
 class AppColors {
   static const Color subtitleColor = Color(0xFF667085);
   static const Color primaryLight = Color(0xFFa5f0ba);
+  static const Color themeColor = Color(0xFF003874);
   static const Color green = Color(0xFF618264);
   static const Color grrenButtonn = Color(0xFf39A657);
   static const Color darkGrey = Color(0xFFE697D95);

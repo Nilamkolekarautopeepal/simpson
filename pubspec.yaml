@@ -51,6 +51,8 @@ dependencies:
   network_info_plus: ^4.1.0
   connectivity_plus: ^7.1.1
   connectivity_wrapper: ^1.0.6
+  device_info_plus: ^10.0.0
+  flutter_secure_storage: ^9.0.0
 
 
 dev_dependencies:
@@ -68,6 +70,7 @@ flutter:
 
   assets:
     - asset/logo/
+    - asset/images/
     - asset/fonts/
     - asset/logo/erphrms.png
 
