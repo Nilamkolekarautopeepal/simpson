@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/AppPreferences/app_areferences.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/AppPreferences/app_areferences.dart';
+import 'package:simpson/utils/app_logs.dart';
 
 final PermissionService permissionService = PermissionService();
 

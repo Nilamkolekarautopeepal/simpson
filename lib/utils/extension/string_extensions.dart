@@ -2,8 +2,8 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/app_logs.dart';
 
 extension StringExtensions on String {
   ///JSON String to Map using[json.decode]

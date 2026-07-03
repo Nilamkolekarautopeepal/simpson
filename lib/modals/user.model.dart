@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/modals/role.model.dart';
+import 'package:simpson/modals/role.model.dart';
 
 class User {
   final String? userId;

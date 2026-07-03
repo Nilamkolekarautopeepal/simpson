@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/services/auth/auth_service.dart';
+import 'package:simpson/services/auth/auth_service.dart';
 import 'package:intl/intl.dart';
 
 class AppURLs {

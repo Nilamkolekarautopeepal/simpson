@@ -1,9 +1,9 @@
 // ignore_for_file: deprecated_member_use
 
-import 'package:autopeepalApp/api/app_api.dart';
-import 'package:autopeepalApp/common_widgets/ui_helper_widgets.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/extension/extension/map_extensions.dart';
+import 'package:simpson/api/app_api.dart';
+import 'package:simpson/common_widgets/ui_helper_widgets.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/extension/extension/map_extensions.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:io' show Platform;
@@ -70,7 +70,7 @@ class FroceUpdateView extends StatelessWidget {
                 Get.back();
                 if (Platform.isAndroid) {
                   const url =
-                      'https://play.google.com/store/apps/details?id=example.autopeepalApp.com.prod&hl=en';
+                      'https://play.google.com/store/apps/details?id=example.simpson.com.prod&hl=en';
 
                   if (await canLaunch(url)) {
                     await launch(url, forceSafariVC: false);

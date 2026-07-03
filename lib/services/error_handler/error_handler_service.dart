@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/utils/app_logs.dart';
 
 ///[ErrorHandlerService] which  logs any exception occurred at run time
 ///

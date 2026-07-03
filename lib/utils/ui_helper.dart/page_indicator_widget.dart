@@ -1,8 +1,8 @@
 // Flutter imports:
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/app_constants.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/app_constants.dart';
+import 'package:simpson/utils/sizes.dart';
 
 class PageIndicator extends StatelessWidget {
   final int currentPage;

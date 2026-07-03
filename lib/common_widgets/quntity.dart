@@ -1,4 +1,4 @@
-    import 'package:autopeepalApp/themes/app_theme.dart';
+    import 'package:simpson/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class QuantitySelector extends StatelessWidget {

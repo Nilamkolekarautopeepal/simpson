@@ -17,10 +17,10 @@ plugins {
 
 
 android {
-    namespace = "example.autopeepalApp.com"
+    namespace = "example.simpson.com"
     compileSdk = 35
     defaultConfig {
-        applicationId = "example.autopeepalApp.com"
+        applicationId = "example.simpson.com"
         minSdk = 21
         targetSdk = 35
         versionCode = 1

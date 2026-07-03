@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/api/app_api.dart';
-import 'package:autopeepalApp/utils/extension/extension/map_extensions.dart';
+import 'package:simpson/api/app_api.dart';
+import 'package:simpson/utils/extension/extension/map_extensions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppSettingsManager {

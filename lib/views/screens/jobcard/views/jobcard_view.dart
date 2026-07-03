@@ -1,7 +1,7 @@
-import 'package:autopeepalApp/common_widgets/jobCard_widget.dart';
+import 'package:simpson/common_widgets/jobCard_widget.dart';
 
-import 'package:autopeepalApp/views/screens/jobcard/controllers/jobcard_controller.dart';
-import 'package:autopeepalApp/routes/app_pages.dart';
+import 'package:simpson/views/screens/jobcard/controllers/jobcard_controller.dart';
+import 'package:simpson/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_core/src/get_main.dart';
 import 'package:get/get_instance/get_instance.dart';

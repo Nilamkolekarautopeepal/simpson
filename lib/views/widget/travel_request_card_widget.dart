@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/modals/travelRequest.modal.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
+import 'package:simpson/modals/travelRequest.modal.dart';
+import 'package:simpson/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

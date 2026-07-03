@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/app_constants.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/app_constants.dart';
 
 InputDecoration getInputDecoration(
   String text,

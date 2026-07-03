@@ -1,15 +1,15 @@
 // import 'dart:async';
-// import 'package:autopeepalApp/routes/routes_string.dart';
+// import 'package:simpson/routes/routes_string.dart';
 // import 'package:flutter/material.dart';
 // import 'package:flutter/services.dart';
 // import 'package:get/get_navigation/src/root/get_material_app.dart';
 // import 'package:get_storage/get_storage.dart';
-// import 'package:autopeepalApp/api/app_envirments.dart';
-// import 'package:autopeepalApp/routes/routes.dart';
-// import 'package:autopeepalApp/services/error_handler/error_handler_service.dart';
-// import 'package:autopeepalApp/themes/app_theme.dart';
-// import 'package:autopeepalApp/utils/app_logs.dart';
-// import 'package:autopeepalApp/views/widget/app_error_widget.dart';
+// import 'package:simpson/api/app_envirments.dart';
+// import 'package:simpson/routes/routes.dart';
+// import 'package:simpson/services/error_handler/error_handler_service.dart';
+// import 'package:simpson/themes/app_theme.dart';
+// import 'package:simpson/utils/app_logs.dart';
+// import 'package:simpson/views/widget/app_error_widget.dart';
 
 // class App {
 //   static App instance = App();
@@ -145,12 +145,12 @@
 // }
 import 'dart:async';
 import 'dart:io';
-import 'package:autopeepalApp/api/app_envirments.dart';
-import 'package:autopeepalApp/common_widgets/app_error_widget.dart';
-import 'package:autopeepalApp/services/error_handler/error_handler_service.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
-import 'package:autopeepalApp/routes/app_pages.dart';
+import 'package:simpson/api/app_envirments.dart';
+import 'package:simpson/common_widgets/app_error_widget.dart';
+import 'package:simpson/services/error_handler/error_handler_service.dart';
+import 'package:simpson/themes/app_theme.dart';
+import 'package:simpson/utils/app_logs.dart';
+import 'package:simpson/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get_navigation/src/root/get_material_app.dart';

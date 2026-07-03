@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/app_logs.dart';
+import 'package:simpson/utils/sizes.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:get/get.dart';

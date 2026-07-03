@@ -1,8 +1,8 @@
-import 'package:autopeepalApp/modals/leavelist.model.dart';
-import 'package:autopeepalApp/services/permission_service.dart';
+import 'package:simpson/modals/leavelist.model.dart';
+import 'package:simpson/services/permission_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
+import 'package:simpson/themes/app_theme.dart';
 
 class LeaveCard extends StatelessWidget {
   final Leave leave;

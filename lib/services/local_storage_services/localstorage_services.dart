@@ -1,7 +1,7 @@
 import 'package:get_storage/get_storage.dart';
-import 'package:autopeepalApp/services/local_storage_services/local_storage_model.dart';
-import 'package:autopeepalApp/services/local_storage_services/local_storages_string.dart';
-import 'package:autopeepalApp/utils/strings.dart';
+import 'package:simpson/services/local_storage_services/local_storage_model.dart';
+import 'package:simpson/services/local_storage_services/local_storages_string.dart';
+import 'package:simpson/utils/strings.dart';
 
 class LocalServices {
 

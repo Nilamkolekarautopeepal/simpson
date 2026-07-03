@@ -1,7 +1,7 @@
-import 'package:autopeepalApp/AppPreferences/app_areferences.dart';
-import 'package:autopeepalApp/modals/user.model.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
-import 'package:autopeepalApp/routes/app_pages.dart';
+import 'package:simpson/AppPreferences/app_areferences.dart';
+import 'package:simpson/modals/user.model.dart';
+import 'package:simpson/utils/app_logs.dart';
+import 'package:simpson/routes/app_pages.dart';
 import 'package:get/get.dart';
 ///[auth] to access current authenticated user
 ///

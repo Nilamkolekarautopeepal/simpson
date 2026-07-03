@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/common_widgets/input_decoration_widget.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
+import 'package:simpson/common_widgets/input_decoration_widget.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/themes/app_textstyles.dart';
 import 'package:flutter/material.dart';
 
 

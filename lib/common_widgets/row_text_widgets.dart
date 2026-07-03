@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
 import 'package:flutter/material.dart';
 
 class BillingRow extends StatelessWidget {
