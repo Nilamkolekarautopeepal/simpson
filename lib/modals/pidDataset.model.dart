@@ -156,6 +156,103 @@ class Code {
       };
 }
 
+// class PiCodeVariable {
+//   int? id;
+//   String? shortName;
+//   String? longName;
+//   int? bytePosition;
+//   int? length;
+//   bool? bitcoded;
+//   dynamic startBitPosition;
+//   dynamic endBitPosition;
+//   double? resolution;
+//   double? offset;
+//   int? min;
+//   double? max;
+//   MessageType? messageType;
+//   String? unit;
+//   Endian? endian;
+//   NumType? numType;
+//   List<Group>? group;
+//   int? priority;
+//   List<Message>? messages;
+
+//   PiCodeVariable({
+//     this.id,
+//     this.shortName,
+//     this.longName,
+//     this.bytePosition,
+//     this.length,
+//     this.bitcoded,
+//     this.startBitPosition,
+//     this.endBitPosition,
+//     this.resolution,
+//     this.offset,
+//     this.min,
+//     this.max,
+//     this.messageType,
+//     this.unit,
+//     this.endian,
+//     this.numType,
+//     this.group,
+//     this.priority,
+//     this.messages,
+//   });
+
+//   factory PiCodeVariable.fromJson(Map<String, dynamic> json) => PiCodeVariable(
+//         id: json["id"],
+//         shortName: json["short_name"],
+//         longName: json["long_name"],
+//         bytePosition: json["byte_position"],
+//         length: json["length"],
+//         bitcoded: json["bitcoded"],
+//         startBitPosition: json["start_bit_position"],
+//         endBitPosition: json["end_bit_position"],
+//         resolution: json["resolution"]?.toDouble(),
+//         offset: json["offset"]?.toDouble(),
+//         min: json["min"],
+//         max: json["max"]?.toDouble(),
+//         messageType: messageTypeValues.map[json["message_type"]]!,
+//         unit: json["unit"],
+//         endian: endianValues.map[json["endian"]]!,
+//         numType: numTypeValues.map[json["num_type"]]!,
+//         group: json["group"] == null
+//             ? []
+//             : List<Group>.from(json["group"]!.map((x) => Group.fromJson(x))),
+//         priority: json["priority"],
+//         messages: json["messages"] == null
+//             ? []
+//             : List<Message>.from(
+//                 json["messages"]!.map((x) => Message.fromJson(x))),
+//       );
+
+//   Map<String, dynamic> toJson() => {
+//         "id": id,
+//         "short_name": shortName,
+//         "long_name": longName,
+//         "byte_position": bytePosition,
+//         "length": length,
+//         "bitcoded": bitcoded,
+//         "start_bit_position": startBitPosition,
+//         "end_bit_position": endBitPosition,
+//         "resolution": resolution,
+//         "offset": offset,
+//         "min": min,
+//         "max": max,
+//         "message_type": messageTypeValues.reverse[messageType],
+//         "unit": unit,
+//         "endian": endianValues.reverse[endian],
+//         "num_type": numTypeValues.reverse[numType],
+//         "group": group == null
+//             ? []
+//             : List<dynamic>.from(group!.map((x) => x.toJson())),
+//         "priority": priority,
+//         "messages": messages == null
+//             ? []
+//             : List<dynamic>.from(messages!.map((x) => x.toJson())),
+//       };
+// }
+
 class PiCodeVariable {
   int? id;
   String? shortName;
@@ -167,7 +264,7 @@ class PiCodeVariable {
   dynamic endBitPosition;
   double? resolution;
   double? offset;
-  int? min;
+  double? min;
   double? max;
   MessageType? messageType;
   String? unit;
@@ -210,7 +307,7 @@ class PiCodeVariable {
         endBitPosition: json["end_bit_position"],
         resolution: json["resolution"]?.toDouble(),
         offset: json["offset"]?.toDouble(),
-        min: json["min"],
+        min: json["min"]?.toDouble(),
         max: json["max"]?.toDouble(),
         messageType: messageTypeValues.map[json["message_type"]]!,
         unit: json["unit"],

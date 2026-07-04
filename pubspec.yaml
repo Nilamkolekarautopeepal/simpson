@@ -71,6 +71,7 @@ flutter:
   assets:
     - asset/logo/
     - asset/images/
+    - asset/new/
     - asset/fonts/
     - asset/logo/erphrms.png
 
