@@ -33,5 +33,6 @@ class ApiUrls {
   static const String listNumber = "$baseUrl/variant/list/";
   static const String pidDataset = "$baseUrl/datasets/get-pid-datasets/";
   static const String dtcDataset = "$baseUrl/datasets/get-dtc-datasets/";
-  static const String engineSerialNumber = "$baseUrl/analyze_prodbud/engslno/list/";
+  static const String engineSerialNumber =
+ "$baseUrl/analyze_prodbud/engslno/list/";
 }
