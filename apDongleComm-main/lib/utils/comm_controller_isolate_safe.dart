@@ -23,12 +23,14 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/helper/crc16_ccitt_kermit.dart';
+
 import 'package:convert/convert.dart';
 import 'i_comm_controller.dart';
 
 class CommControllerIsolateSafe implements ICommController {
   @override
-  Connectivity connectivity = Connectivity.none;
+  Connectivity
+   connectivity = Connectivity.none;
   bool isConnected = false;
   Socket? _socket;
   StreamSubscription? _socketSub;
