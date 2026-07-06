@@ -135,7 +135,7 @@ class HomePageController extends GetxController {
 
   void _showErrorPopup(String message, {String title = 'Error'}) {
     if (Get.isDialogOpen == true) {
-      Get.back(); // close any existing dialog first so they don't stack
+      Get.back(); 
     }
     Get.dialog(
       CustomPopup(
