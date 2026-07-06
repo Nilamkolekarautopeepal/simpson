@@ -10,7 +10,9 @@
 // spawned Isolate for true parallel flashing) interchangeably.
 // ════════════════════════════════════════════════════════════
 import 'dart:typed_data';
+
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
+
 
 abstract class ICommController {
   Connectivity get connectivity;

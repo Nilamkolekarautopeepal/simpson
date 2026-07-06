@@ -484,7 +484,7 @@ packages:
     source: hosted
     version: "0.14.4"
   flutter_libserialport:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: flutter_libserialport
       sha256: f24b5fe6f1821d1c1b3bf2be737ca53f6b0ae78657032a790aa00abb810c8759

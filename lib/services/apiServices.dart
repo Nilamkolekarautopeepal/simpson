@@ -402,6 +402,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:simpson/api/app_urls.dart';
 import 'package:simpson/modals/all.models.dart';
+import 'package:simpson/modals/esn.model.dart' as esn_ds;
 import 'package:simpson/modals/flashRecord.model.dart';
 import 'package:simpson/modals/listNumber.model.dart';
 import 'package:simpson/modals/pidDataset.model.dart'; // adjust to wherever PidDataset actually lives
@@ -720,6 +721,64 @@ class AuthService {
       debugPrint(
           "🔴 [DatasetsService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
       debugPrint("🔴 [DatasetsService] response.data=${e.response?.data}");
+
+      final data = e.response?.data;
+      String? serverMessage;
+      if (data is Map) {
+        serverMessage =
+            (data["detail"] ?? data["message"] ?? data["error"])?.toString();
+      } else if (data is String && data.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(data);
+          if (decoded is Map) {
+            serverMessage =
+                (decoded["detail"] ?? decoded["message"] ?? decoded["error"])
+                    ?.toString();
+          }
+        } catch (_) {
+          // response wasn't JSON, ignore and fall back below
+        }
+      }
+
+      throw Exception(serverMessage ?? _friendlyMessage(e));
+    }
+  }
+
+  /// GET analyze_prodbud/engslno/list/?eng_slno={engSlno} — the real ESN
+  /// validation endpoint, replacing the old always-matches stub in
+  /// HomePageController. The server filters by eng_slno itself, so a
+  /// non-empty results list generally means the ESN exists; callers
+  /// should still check is_active on the matched result.
+  Future<esn_ds.EsnNumber> getEsnList({
+    required String engSlno,
+    String? accessToken,
+  }) async {
+    try {
+      debugPrint(
+          "🔵 [EsnService] GET ${ApiUrls.engineSerialNumber}?eng_slno=$engSlno");
+
+      final response = await _dio.get(
+        ApiUrls.engineSerialNumber,
+        queryParameters: {"eng_slno": engSlno},
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint("🔵 [EsnService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [EsnService] response.data=${response.data}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return esn_ds.EsnNumber.fromJson(_asMap(response.data));
+      }
+
+      throw Exception("Failed to load ESN list with status ${response.statusCode}");
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [EsnService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [EsnService] response.data=${e.response?.data}");
 
       final data = e.response?.data;
       String? serverMessage;

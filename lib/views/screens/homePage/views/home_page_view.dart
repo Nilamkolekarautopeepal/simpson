@@ -150,30 +150,10 @@ class HomePageView extends GetView<HomePageController> {
             onChanged: (_) => controller.onFieldChanged(index),
             onSubmitted: (_) => controller.submitStep(index),
           ),
-          if (step.key == 'esn')
-            Obx(
-              () => controller.esnError.value.isEmpty
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        controller.esnError.value,
-                        style: const TextStyle(color: Colors.red, fontSize: 11),
-                      ),
-                    ),
-            ),
-          if (step.key == 'list')
-            Obx(
-              () => controller.listError.value.isEmpty
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        controller.listError.value,
-                        style: const TextStyle(color: Colors.red, fontSize: 11),
-                      ),
-                    ),
-            ),
+          // NOTE: ESN/List validation errors are surfaced via the popup
+          // dialog only (see controller._showErrorPopup). No inline error
+          // text is rendered here anymore to avoid showing the same
+          // message twice (popup + inline).
         ],
       ),
     );
