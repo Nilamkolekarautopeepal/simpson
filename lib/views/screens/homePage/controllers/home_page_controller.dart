@@ -90,8 +90,6 @@ class HomePageController extends GetxController {
   // ── PID ──
   final RxBool pidExpanded = true.obs;
   final RxList<String> pidList = <String>[].obs;
-
-  // ── Activity log (newest first) ──
   final RxList<String> activityLog = <String>[].obs;
 
   @override
