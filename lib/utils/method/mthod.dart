@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/utils/ui_helper.dart/app_tost.dart';
+import 'package:simpson/utils/ui_helper.dart/app_tost.dart';
 import 'package:flutter/services.dart';
 
 class Methods {

@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
+import 'package:simpson/themes/app_colors.dart';
 
 // final List<String> defaultList = [Strings.select];
 

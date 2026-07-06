@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/themes/app_theme.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/themes/app_theme.dart';
+import 'package:simpson/utils/sizes.dart';
 import 'package:flutter/material.dart';
 
 class TwoInlineText extends StatelessWidget {

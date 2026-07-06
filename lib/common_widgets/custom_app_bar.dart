@@ -1,8 +1,8 @@
-import 'package:autopeepalApp/common_widgets/background_widget.dart';
-import 'package:autopeepalApp/common_widgets/text_field.dart';
-import 'package:autopeepalApp/themes/app_textstyles.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
-import 'package:autopeepalApp/utils/ui_helper_widgets.dart';
+import 'package:simpson/common_widgets/background_widget.dart';
+import 'package:simpson/common_widgets/text_field.dart';
+import 'package:simpson/themes/app_textstyles.dart';
+import 'package:simpson/utils/sizes.dart';
+import 'package:simpson/utils/ui_helper_widgets.dart';
 import 'package:flutter/material.dart';
 import '../themes/app_theme.dart';
 import 'custom_clipper_widget.dart';
@@ -11,7 +11,7 @@ double get extendedWidgetHeight => (screenWidth * 9) / 16;
 int get maxTitleLine => 1;
 
 AppBar appBarWithTitle({
- required String? title,
+  required String? title,
   List<Widget>? actions,
   bool titleAction = false,
 }) {
@@ -30,8 +30,8 @@ AppBar appBarWithTitle({
 }
 
 AppBar appBarWithTwoTitle({
- required String title,
- required String subTitle,
+  required String title,
+  required String subTitle,
   Function? onTap,
   List<Widget>? actions,
   bool titleAction = false,
@@ -56,7 +56,7 @@ AppBar appBarWithTwoTitle({
     titleSpacing: 0.0,
     title: Container(
       child: GestureDetector(
-        onTap:()=> titleAction ? onTap : null,
+        onTap: () => titleAction ? onTap : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
@@ -108,9 +108,9 @@ AppBar appBarWithTwoTitle({
 }
 
 AppBar appBarWithSearch({
- required TextEditingController? searchTEC,
- required String? hintText,
- required Function onSubmitted,
+  required TextEditingController? searchTEC,
+  required String? hintText,
+  required Function onSubmitted,
   List<Widget>? actions,
 }) {
   return AppBar(
@@ -150,7 +150,7 @@ class CustomAppBar extends StatelessWidget {
 
   CustomAppBar(
       {required this.title,
-     required this.subTitle,
+      required this.subTitle,
       this.showBackButton = true,
       this.showLogoutButton = false,
       this.onBack,
@@ -165,7 +165,7 @@ class CustomAppBar extends StatelessWidget {
           subTitle: subTitle,
           showBackButton: showBackButton,
           showLogoutButton: showLogoutButton,
-          onBack:()=> onBack,
+          onBack: () => onBack,
           loginVerification: loginVerification),
     );
   }
@@ -180,8 +180,8 @@ class CustomAppBarDelegate extends SliverPersistentHeaderDelegate {
   final bool? loginVerification;
 
   CustomAppBarDelegate({
-   required this.title,
-   required this.subTitle,
+    required this.title,
+    required this.subTitle,
     this.showBackButton = true,
     this.showLogoutButton = false,
     this.loginVerification,
@@ -247,7 +247,7 @@ class CustomAppBarDelegate extends SliverPersistentHeaderDelegate {
                 top: Sizes.s30 - shrinkOffset,
                 child: BackButton(
                   color: Colors.white,
-                  onPressed:()=> onBack,
+                  onPressed: () => onBack,
                 )),
           if (showLogoutButton)
             Align(
@@ -255,13 +255,13 @@ class CustomAppBarDelegate extends SliverPersistentHeaderDelegate {
               child: Padding(
                 padding: EdgeInsets.only(top: Sizes.s20),
                 child: IconButton(
-                  icon: Icon(
-                    Icons.settings_power,
-                    color: Colors.white,
-                    size: Sizes.s40,
-                  ),
-                  onPressed: () => {}//auth.logout(context),
-                ),
+                    icon: Icon(
+                      Icons.settings_power,
+                      color: Colors.white,
+                      size: Sizes.s40,
+                    ),
+                    onPressed: () => {} //auth.logout(context),
+                    ),
               ),
             )
         ],
@@ -277,4 +277,82 @@ class CustomAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(SliverPersistentHeaderDelegate oldDelegate) => true;
+}
+
+class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final bool showBackButton;
+  final bool showLogo;
+  final List<Widget>? actions;
+  final Widget? leadingOverride;
+  final VoidCallback? onBackPressed;
+
+  const CommonAppBar({
+    Key? key,
+    required this.title,
+    this.showBackButton = false,
+    this.showLogo = true,
+    this.actions,
+    this.leadingOverride,
+    this.onBackPressed,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AppBar(
+      backgroundColor: AppColors.themeColor,
+      elevation: 2,
+      centerTitle: false,
+      automaticallyImplyLeading: false,
+      titleSpacing: showBackButton || leadingOverride != null ? 0 : 20,
+      toolbarHeight: 64,
+      leading: leadingOverride ??
+          (showBackButton
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed:
+                      onBackPressed ?? () => Navigator.of(context).maybePop(),
+                )
+              : null),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showLogo) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Image.asset(
+                'asset/images/ic_sidialogo1.png',
+                height: 24,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(),
+              ),
+            ),
+            const SizedBox(width: 14),
+          ],
+          Flexible(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        ...?actions,
+        const SizedBox(width: 12),
+      ],
+    );
+  }
+
+  @override
+  Size get preferredSize => const Size.fromHeight(64);
 }

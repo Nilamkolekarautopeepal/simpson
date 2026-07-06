@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/common_widgets/ui_helper_widgets.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
+import 'package:simpson/common_widgets/ui_helper_widgets.dart';
+import 'package:simpson/themes/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class NoInternetView extends StatelessWidget {

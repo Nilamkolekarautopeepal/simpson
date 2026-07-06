@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:autopeepalApp/themes/app_colors.dart';
-import 'package:autopeepalApp/utils/strings.dart';
+import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/utils/strings.dart';
 
 class AppSnackBar {
   static showSnackBarMassage(

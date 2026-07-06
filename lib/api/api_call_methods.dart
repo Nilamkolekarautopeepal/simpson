@@ -1,12 +1,12 @@
 import 'package:get/get.dart';
-import 'package:autopeepalApp/api/api_status_code.dart';
-import 'package:autopeepalApp/api/app_envirments.dart';
-import 'package:autopeepalApp/api/response_model.dart';
-import 'package:autopeepalApp/services/local_storage_services/local_storages_string.dart';
-import 'package:autopeepalApp/services/local_storage_services/localstorage_services.dart';
-import 'package:autopeepalApp/utils/keys/api_keys.dart';
-import 'package:autopeepalApp/utils/strings.dart';
-import 'package:autopeepalApp/utils/ui_helper.dart/app_snack_bar.dart';
+import 'package:simpson/api/api_status_code.dart';
+import 'package:simpson/api/app_envirments.dart';
+import 'package:simpson/api/response_model.dart';
+import 'package:simpson/services/local_storage_services/local_storages_string.dart';
+import 'package:simpson/services/local_storage_services/localstorage_services.dart';
+import 'package:simpson/utils/keys/api_keys.dart';
+import 'package:simpson/utils/strings.dart';
+import 'package:simpson/utils/ui_helper.dart/app_snack_bar.dart';
 
 class ApiService extends GetConnect {
 

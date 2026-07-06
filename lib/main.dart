@@ -1,5 +1,5 @@
-import 'package:autopeepalApp/api/app_envirments.dart';
-import 'package:autopeepalApp/app.dart';
+import 'package:simpson/api/app_envirments.dart';
+import 'package:simpson/app.dart';
 
 void main() async {
   App.instance.initAndRunApp(

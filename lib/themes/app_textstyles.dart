@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/utils/sizes.dart';
 import 'app_colors.dart';
 
 class TextStyles {

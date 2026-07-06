@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/app.dart';
+import 'package:simpson/app.dart';
 
 class AtomURLType {
   static const String LOCAL = "LOCAL";

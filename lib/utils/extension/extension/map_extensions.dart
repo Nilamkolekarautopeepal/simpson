@@ -1,8 +1,8 @@
 // ignore_for_file: unnecessary_null_comparison, duplicate_ignore
 
 import 'dart:convert';
-import 'package:autopeepalApp/api/dev/methods.dart';
-import 'package:autopeepalApp/utils/app_logs.dart';
+import 'package:simpson/api/dev/methods.dart';
+import 'package:simpson/utils/app_logs.dart';
 import 'package:flutter/material.dart';
 
 const bool defaultBool = false;

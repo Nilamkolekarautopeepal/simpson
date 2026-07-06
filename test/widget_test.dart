@@ -7,7 +7,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:autopeepalApp/app.dart';
+import 'package:simpson/app.dart';
 
 
 void main() {

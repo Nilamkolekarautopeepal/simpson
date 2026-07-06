@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/themes/app_textstyles.dart';
+import 'package:simpson/themes/app_textstyles.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 

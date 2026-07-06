@@ -1,6 +1,6 @@
-import 'package:autopeepalApp/common_widgets/ui_helper_widgets.dart';
-import 'package:autopeepalApp/themes/app_theme.dart';
-import 'package:autopeepalApp/utils/fonts.dart';
+import 'package:simpson/common_widgets/ui_helper_widgets.dart';
+import 'package:simpson/themes/app_theme.dart';
+import 'package:simpson/utils/fonts.dart';
 import 'package:flutter/material.dart';
 
 class TitleAndSubtitleText extends StatelessWidget {

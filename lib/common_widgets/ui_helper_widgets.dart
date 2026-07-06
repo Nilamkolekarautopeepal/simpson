@@ -1,4 +1,4 @@
-import 'package:autopeepalApp/utils/sizes.dart';
+import 'package:simpson/utils/sizes.dart';
 import 'package:flutter/material.dart';
 
 

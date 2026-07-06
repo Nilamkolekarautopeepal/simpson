@@ -1,0 +1,28 @@
+name: ap_diagnostic
+description: "A Flutter package for ECU diagnostics."
+version: 0.0.1
+publish_to: none
+homepage:
+
+environment:
+  sdk: ^3.12.0
+  flutter: ">=3.7.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ap_dongle_comm:
+    path: ../apDongleComm-main
+  ecu_seedkey:
+    path: ../ecuSeedkey-main
+  convert: ^3.1.1
+  test: ^1.24.0
+  mockito: ^5.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  # Add assets/fonts if needed

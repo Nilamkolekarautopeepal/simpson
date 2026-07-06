@@ -1,69 +1,82 @@
-import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
+/// Wraps flutter_secure_storage for anything sensitive: username, password,
+/// access token, refresh token. Unlike SharedPreferences (used in
+/// AppPreferences for non-sensitive cached data), this is encrypted at rest.
+///
+/// Add to pubspec.yaml:
+///   flutter_secure_storage: ^9.0.0
+class SecureStorageService {
+  SecureStorageService._();
 
-class AppPreferences {
-  
-  static const _tokenKey = 'token';
-  static const _userDataKey = 'user_data';
-  
+  static const _storage = FlutterSecureStorage();
 
-  static Future<void> setToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+  static const _usernameKey = 'saved_username';
+  static const _passwordKey = 'saved_password';
+  static const _accessTokenKey = 'access_token';
+  static const _refreshTokenKey = 'refresh_token';
+  static const _rememberMeKey = 'remember_me';
+
+  // ── Remember Me flag ──
+
+  static Future<void> setRememberMe(bool value) =>
+      _storage.write(key: _rememberMeKey, value: value.toString());
+
+  static Future<bool> getRememberMe() async {
+    final value = await _storage.read(key: _rememberMeKey);
+    return value == 'true';
   }
 
-  static Future<String?> getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_tokenKey);
+  // ── Credentials (for pre-filling the login form / optional auto-login) ──
+
+  static Future<void> saveCredentials({
+    required String username,
+    required String password,
+  }) async {
+    await _storage.write(key: _usernameKey, value: username);
+    await _storage.write(key: _passwordKey, value: password);
   }
 
+  static Future<String?> getSavedUsername() =>
+      _storage.read(key: _usernameKey);
 
+  static Future<String?> getSavedPassword() =>
+      _storage.read(key: _passwordKey);
 
-  /// Store user data map as JSON string
-  static Future<void> setUserData(Map<String, dynamic> userData) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = jsonEncode(userData);
-    await prefs.setString(_userDataKey, jsonString);
+  static Future<void> clearCredentials() async {
+    await _storage.delete(key: _usernameKey);
+    await _storage.delete(key: _passwordKey);
   }
 
-  /// Retrieve user data map
-  static Future<Map<String, dynamic>?> getUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_userDataKey);
-    if (jsonString != null) {
-      return jsonDecode(jsonString);
+  // ── Tokens ──
+
+  static Future<void> saveTokens({
+    required String? accessToken,
+    required String? refreshToken,
+  }) async {
+    if (accessToken != null) {
+      await _storage.write(key: _accessTokenKey, value: accessToken);
     }
-    return null;
+    if (refreshToken != null) {
+      await _storage.write(key: _refreshTokenKey, value: refreshToken);
+    }
   }
 
-  /// Clear all stored preferences
+  static Future<String?> getAccessToken() =>
+      _storage.read(key: _accessTokenKey);
+
+  static Future<String?> getRefreshToken() =>
+      _storage.read(key: _refreshTokenKey);
+
+  static Future<void> clearTokens() async {
+    await _storage.delete(key: _accessTokenKey);
+    await _storage.delete(key: _refreshTokenKey);
+  }
+
+  /// Call on logout.
   static Future<void> clearAll() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-  }
-
-
-  // 🔹 GET: Load Permission Data
-  static Future<Map<String, dynamic>?> getPermissionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString('permission_data');
-    if (jsonString != null) {
-      return jsonDecode(jsonString);
-    }
-    return null;
-  }
-
-  // 🔹 SAVE: Save Permission Data
-  static Future<void> savePermissionData(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = jsonEncode(data);
-    await prefs.setString('permission_data', jsonString);
-  }
-
-  // 🔹 CLEAR: Remove Permission Data
-  static Future<void> clearPermissionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('permission_data');
+    await clearCredentials();
+    await clearTokens();
+    await _storage.delete(key: _rememberMeKey);
   }
 }

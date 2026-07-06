@@ -1,7 +1,7 @@
 
-import 'package:autopeepalApp/utils/app_constants.dart';
-import 'package:autopeepalApp/routes/app_pages.dart';
-// import 'package:autopeepalApp/utils/app_constants.dart';
+import 'package:simpson/utils/app_constants.dart';
+import 'package:simpson/routes/app_pages.dart';
+// import 'package:simpson/utils/app_constants.dart';
 import 'package:get/get.dart';
 
 // class SplashScreenDartController extends GetxController {
