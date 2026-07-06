@@ -108,8 +108,8 @@ class LoginController extends GetxController {
       //await AppPreferences.setUserData(user.toJson());
       debugPrint("🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
 
-      debugPrint("🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+      debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
+      Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");
       debugPrint("🔴 [Login] StackTrace: $stackTrace");

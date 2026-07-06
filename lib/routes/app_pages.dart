@@ -4,6 +4,8 @@ import '../views/screens/homePage/bindings/home_page_binding.dart';
 import '../views/screens/homePage/views/home_page_view.dart';
 import '../views/screens/login/bindings/login_binding.dart';
 import '../views/screens/login/views/login_view.dart';
+import '../views/screens/psf_homeScreen/bindings/psf_home_screen_binding.dart';
+import '../views/screens/psf_homeScreen/views/psf_home_screen_view.dart';
 import '../views/screens/splash_screen.dart/bindings/splash_screen_dart_binding.dart';
 import '../views/screens/splash_screen.dart/views/splash_screen_dart_view.dart';
 
@@ -29,6 +31,12 @@ class AppPages {
       name: _Paths.HOME_PAGE,
       page: () => const HomePageView(),
       binding: HomePageBinding(),
+    ),
+    
+    GetPage(
+      name: _Paths.PSF_HOME_SCREEN,
+      page: () => const PsfHomeScreenView(),
+      binding: PsfHomeScreenBinding(),
     ),
   ];
 }

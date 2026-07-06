@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:simpson/api/app_urls.dart';
@@ -9,7 +8,6 @@ import 'package:simpson/modals/listNumber.model.dart';
 import 'package:simpson/modals/pidDataset.model.dart'; // adjust to wherever PidDataset actually lives
 import 'package:simpson/modals/dtcDataset.model.dart'; // adjust to wherever DtcDataset actually lives
 import 'package:simpson/modals/user.model.dart';
-
 class AuthService {
   final Dio _dio;
 
