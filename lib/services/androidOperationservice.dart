@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
@@ -16,13 +15,17 @@ import 'package:simpson/common_widgets/popup.dart'; // only used for Android/iOS
 
 class AndroidOperationsService {
   static Future<bool> hasInternet() async {
-    final List<ConnectivityResult> connectivityResult =
-        await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) return false;
-    return connectivityResult.contains(ConnectivityResult.mobile) ||
-        connectivityResult.contains(ConnectivityResult.wifi) ||
-        connectivityResult.contains(ConnectivityResult.ethernet) ||
-        connectivityResult.contains(ConnectivityResult.vpn);
+    final ConnectivityResult connectivityResult =
+    await Connectivity().checkConnectivity();
+
+if (connectivityResult == ConnectivityResult.none) {
+  return false;
+}
+
+return connectivityResult == ConnectivityResult.mobile ||
+    connectivityResult == ConnectivityResult.wifi ||
+    connectivityResult == ConnectivityResult.ethernet ||
+    connectivityResult == ConnectivityResult.vpn;
   }
 
   static Future<String> getVersionNumber() async {

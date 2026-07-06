@@ -10,7 +10,6 @@ import 'package:simpson/routes/app_pages.dart';
 import 'package:simpson/services/androidOperationservice.dart';
 import 'package:simpson/services/apiServices.dart';
 
-
 class LoginController extends GetxController {
   final AuthService _authService = AuthService();
 
@@ -62,7 +61,8 @@ class LoginController extends GetxController {
 
     final username = usernameController.value.text.trim();
     final password = passwordController.value.text.trim();
-    debugPrint("🔵 [Login] username='$username' password_length=${password.length}");
+    debugPrint(
+        "🔵 [Login] username='$username' password_length=${password.length}");
 
     if (username.isEmpty || password.isEmpty) {
       debugPrint("🔴 [Login] Validation failed: empty username or password");
@@ -87,7 +87,8 @@ class LoginController extends GetxController {
         macId: macId,
         deviceType: deviceType,
       );
-      debugPrint("🟢 [Login] Success. user=${user.user} role=${user.role} userId=${user.userId}");
+      debugPrint(
+          "🟢 [Login] Success. user=${user.user} role=${user.role} userId=${user.userId}");
 
       currentUser.value = user;
 
@@ -101,15 +102,27 @@ class LoginController extends GetxController {
       } else {
         await SecureStorageService.clearCredentials();
       }
+      // await SecureStorageService.saveTokens(
+      //   accessToken: user.token?.access,
+      //   refreshToken: user.token?.refresh,
+      // );
+      debugPrint(
+          "🔵 [Login] user.token=${user.token} access=${user.token?.access} refresh=${user.token?.refresh}");
       await SecureStorageService.saveTokens(
         accessToken: user.token?.access,
         refreshToken: user.token?.refresh,
       );
       //await AppPreferences.setUserData(user.toJson());
-      debugPrint("🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
+      debugPrint(
+          "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
+
 
       debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
       Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
+
+      debugPrint(
+          "🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
+      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");
       debugPrint("🔴 [Login] StackTrace: $stackTrace");

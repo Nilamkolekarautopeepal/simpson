@@ -49,7 +49,7 @@ dependencies:
   flutter_bluetooth_serial_plus: ^0.5.1
   flutter_launcher_icons: ^0.14.4
   network_info_plus: ^8.2.0
-  connectivity_plus: ^7.1.1
+  connectivity_plus: ^5.0.2
   connectivity_wrapper: ^1.0.6
   device_info_plus: ^13.2.0
   flutter_secure_storage: ^10.3.1
@@ -79,6 +79,7 @@ flutter:
   assets:
     - asset/logo/
     - asset/images/
+    - asset/new/
     - asset/fonts/
     - asset/logo/erphrms.png
 

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
+import 'package:simpson/dev/dev_screen.dart';
 import 'package:simpson/themes/app_colors.dart';
+
 
 import '../controllers/home_page_controller.dart';
 // StepType is exported from home_page_controller.dart
@@ -61,6 +63,29 @@ class HomePageView extends GetView<HomePageController> {
               },
             ),
           ),
+          // ── Dev: API Logs — always visible at the bottom of the sidebar ──
+          const Divider(height: 1),
+          InkWell(
+            onTap: () => Get.to(() => const DevLogsPage()),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.bug_report_outlined,
+                      size: 18, color: Colors.grey.shade700),
+                  const SizedBox(width: 10),
+                  Text(
+                    'API Logs',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -81,7 +106,7 @@ class HomePageView extends GetView<HomePageController> {
               Icon(
                 isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 16,
-                color: isCompleted ? Colors.green : AppColors.themeColor,
+                color: isCompleted ? AppColors.themeColor : AppColors.themeColor,
               ),
               const SizedBox(width: 6),
               Text(
@@ -104,9 +129,8 @@ class HomePageView extends GetView<HomePageController> {
             decoration: InputDecoration(
               isDense: true,
               filled: true,
-              fillColor: isCompleted
-                  ? Colors.green.withOpacity(0.06)
-                  : Colors.white,
+              fillColor:
+                  isCompleted ? Colors.green.withOpacity(0.06) : Colors.white,
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               border: OutlineInputBorder(
@@ -138,6 +162,18 @@ class HomePageView extends GetView<HomePageController> {
                       ),
                     ),
             ),
+          if (step.key == 'list')
+            Obx(
+              () => controller.listError.value.isEmpty
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        controller.listError.value,
+                        style: const TextStyle(color: Colors.red, fontSize: 11),
+                      ),
+                    ),
+            ),
         ],
       ),
     );
@@ -158,7 +194,7 @@ class HomePageView extends GetView<HomePageController> {
               Icon(
                 isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 16,
-                color: isCompleted ? Colors.green : AppColors.themeColor,
+                color: isCompleted ? AppColors.themeColor : AppColors.themeColor,
               ),
               const SizedBox(width: 6),
               Text(
@@ -291,23 +327,22 @@ class HomePageView extends GetView<HomePageController> {
                             width: 22,
                             height: 22,
                             decoration: const BoxDecoration(
-                              color: Colors.green,
+                              color: AppColors.themeColor,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.check,
                                 color: Colors.white, size: 14),
-                                
-                                
                           ),
                           const SizedBox(height: 5),
-                          Text('Flashing Successful',
-                          style: TextStyle(
-                              fontSize: 12, color:Colors. green.shade800,
-                              fontWeight: FontWeight.bold
-                              ),),
+                          Text(
+                            'Flashing Successful',
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.themeColor,
+                                fontWeight: FontWeight.bold),
+                          ),
                         ],
                       ),
-                      
                       const SizedBox(width: 10),
                     ] else if (statusText != null) ...[
                       Container(
@@ -373,7 +408,7 @@ class HomePageView extends GetView<HomePageController> {
                 value: 1.0,
                 minHeight: 6,
                 backgroundColor: Colors.grey.shade200,
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                valueColor:  AlwaysStoppedAnimation<Color>(AppColors.themeColor),
               ),
             ),
             const SizedBox(height: 16),
@@ -384,11 +419,11 @@ class HomePageView extends GetView<HomePageController> {
                     width: 36,
                     height: 36,
                     decoration: const BoxDecoration(
-                      color: Colors.green,
+                      color:AppColors.themeColor,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check,
-                        color: Colors.white, size: 22),
+                    child:
+                        const Icon(Icons.check, color: Colors.white, size: 22),
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -408,93 +443,183 @@ class HomePageView extends GetView<HomePageController> {
 
       if (controller.flashInProgress.value) {
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (controller.selectedFlashFile.value != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 12),
                 child: Text(
                   controller.selectedFlashFile.value!,
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
                 ),
               ),
-            Row(
-              children: [
-                const Expanded(child: SizedBox.shrink()),
-                Text(
-                  controller.formattedElapsed,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
+
+            // Big centered timer
+            Text(
+              controller.formattedElapsed,
+              style: const TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 16),
+
+            // Progress bar
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: controller.flashProgress.value,
-                minHeight: 6,
-                backgroundColor: Colors.grey.shade200,
+                minHeight: 10,
+                backgroundColor: Colors.grey.shade300,
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.themeColor),
               ),
+            ),
+            const SizedBox(height: 8),
+
+            // Percentage below the bar
+            Text(
+              '${(controller.flashProgress.value * 100).round()}%',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            Column(
+              children: [
+                Image.asset('asset/new/gifPhone.gif', height: 90),
+                Image.asset('asset/new/gifDownArrow.gif', height: 26),
+                Image.asset('asset/new/ic_engine.png', height: 90),
+              ],
             ),
           ],
         );
       }
 
-      // Unlocked (all scan steps done) but flashing hasn't started yet.
-      return Row(
+      // Unlocked (all scan steps done) but flashing hasn't started yet —
+      // card-list picker instead of a dropdown.
+      if (controller.flashFilesLoading.value) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      }
+
+      if (controller.flashFilesError.value.isNotEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            controller.flashFilesError.value,
+            style: TextStyle(color: Colors.red.shade700, fontSize: 12.5),
+          ),
+        );
+      }
+
+      if (controller.availableFlashFiles.isEmpty) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            'No flash files available',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+          ),
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: DropdownButtonFormField<String>(
-              value: controller.selectedFlashFile.value,
-              isExpanded: true,
-              hint: const Text('Choose a file', style: TextStyle(fontSize: 13)),
-              items: controller.availableFlashFiles
-                  .map(
-                    (file) => DropdownMenuItem(
-                      value: file,
-                      child: Text(file, style: const TextStyle(fontSize: 13)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 260),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: controller.availableFlashFiles.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final file = controller.availableFlashFiles[index];
+                final isSelected = controller.selectedFlashFile.value == file;
+
+                return GestureDetector(
+                  onTap: () => controller.selectFlashFile(file),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.themeColor
+                            : Colors.grey.shade300,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  )
-                  .toList(),
-              onChanged: controller.selectFlashFile,
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                    child: ListTile(
+                      dense: true,
+                      title: Text(
+                        file,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.black,
+                        ),
+                      ),
+                      trailing: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? AppColors.themeColor
+                              : Colors.transparent,
+                          border: Border.all(
+                            color: AppColors.themeColor,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 14)
+                            : null,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          Center(
+            child: ElevatedButton(
+              onPressed: controller.selectedFlashFile.value != null
+                  ? controller.startFlashing
+                  : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.themeColor,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide:
-                      BorderSide(color: AppColors.themeColor, width: 1.5),
+              ),
+              child: const Text(
+                'Start Flashing',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            icon: Icon(
-              Icons.play_circle_fill,
-              color: controller.selectedFlashFile.value != null
-                  ? AppColors.themeColor
-                  : Colors.grey.shade400,
-              size: 28,
-            ),
-            onPressed: controller.selectedFlashFile.value != null
-                ? controller.startFlashing
-                : null,
-            tooltip: controller.selectedFlashFile.value != null
-                ? 'Start flashing'
-                : 'Select a file first',
           ),
         ],
       );
@@ -569,8 +694,7 @@ class HomePageView extends GetView<HomePageController> {
   Widget _buildPidCard(String raw) {
     final splitIndex = raw.indexOf(' — ');
     final label = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
-    final value =
-        splitIndex == -1 ? '' : raw.substring(splitIndex + 3).trim();
+    final value = splitIndex == -1 ? '' : raw.substring(splitIndex + 3).trim();
 
     return Container(
       width: double.infinity,
