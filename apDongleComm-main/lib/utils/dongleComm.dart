@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:ap_dongle_comm/utils/commController.dart';
 import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 import 'package:ap_dongle_comm/utils/enums/command_ids.dart';
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
@@ -18,6 +19,7 @@ class DongleComm {
   // hexToBytes/readData/sendCommand on this field — all 4 are part
   // of the interface, so no other code in this file needs to change.
   ICommController? comm;
+  CommController? comm1;
   bool isChannel;
   String? channelId;
   List<SessionLogsModel> logs = []; // nullable, could be null
@@ -33,9 +35,9 @@ class DongleComm {
 
     if (isChannel) {
       // .NET: command = "500a" + ChannelId + "47313030746565727061d13e"
-      command = '500A${ch}47313030746565727061D13E';
+      command = '500A${ch}47313030706d69737061adb0';
     } else {
-      command = '500C47568AFE56214E238000FFC3';
+      command = '500A47313030706d69737061adb0';
     }
     print("📤 Security Command String: $command");
     final bytes = comm!.hexToBytes(command);

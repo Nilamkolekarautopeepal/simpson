@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart' hide Response; // ← needed for Get.put
 import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 
 class App {
   static App instance = App();
@@ -24,6 +25,7 @@ class App {
   static int subModelId = 0;
   static String firmwareVersion = '';
   static String sessionId = '';
+  static DLLFunctions? dllFunctions;
 
   String? _version;
   String? _buildNumber;
