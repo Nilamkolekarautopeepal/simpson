@@ -26,7 +26,7 @@ class PlcService extends GetxService {
   Socket? _socket;
   StreamSubscription<List<int>>? _sub;
   List<int> _rxBuffer = [];
-  int _nextTransactionId = 1;
+  // Transaction ID is intentionally fixed at 1 — see _takeTransactionId().
   final Map<int, Completer<List<int>>> _pending = {};
 
   @override
@@ -166,10 +166,20 @@ class PlcService extends GetxService {
   }
 
   int _takeTransactionId() {
-    final id = _nextTransactionId;
-    _nextTransactionId = (_nextTransactionId + 1) & 0xFFFF;
-    if (_nextTransactionId == 0) _nextTransactionId = 1;
-    return id;
+    // NOTE: intentionally NOT incrementing. The test dongle firmware
+    // matches incoming requests via an exact byte comparison that
+    // includes the transaction ID — every entry in its lookup table is
+    // hardcoded to expect transaction ID = 1. Since PlcService only ever
+    // has one request in flight at a time (reads are sequential, not
+    // parallel — see home_page_controller._readLivePlcValuesForHarness),
+    // reusing a fixed transaction ID here is safe: there's never a
+    // second pending request that could be confused with this one.
+    //
+    // TODO: if/when this moves to a real Modbus PLC that expects unique
+    // incrementing transaction IDs per request (standard Modbus
+    // practice), restore the increment behavior — check with the
+    // hardware team which the real production PLC expects.
+    return 1;
   }
 
   void _onData(List<int> chunk) {

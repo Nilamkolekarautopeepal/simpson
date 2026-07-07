@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/dev/dev_screen.dart';
+import 'package:simpson/modals/harness.model.dart' as harness_ds;
 import 'package:simpson/themes/app_colors.dart';
 
 
@@ -18,6 +19,42 @@ class HomePageView extends GetView<HomePageController> {
       appBar: CommonAppBar(
         title: controller.station,
         actions: [
+          Obx(
+            () => InkWell(
+              onTap: controller.retryPlcConnection,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (controller.isPlcConnecting.value)
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+                      )
+                    else
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: controller.isPlcConnected.value ? Colors.greenAccent : Colors.redAccent,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Text(
+                      controller.isPlcConnecting.value
+                          ? 'Connecting…'
+                          : (controller.isPlcConnected.value ? 'PLC ' : 'PLC '),
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
@@ -325,7 +362,7 @@ class HomePageView extends GetView<HomePageController> {
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: SizedBox(
-          width: 640,
+          width: 780,
           height: 520,
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -376,21 +413,6 @@ class HomePageView extends GetView<HomePageController> {
                     return SingleChildScrollView(child: _buildRecipeTable());
                   }),
                 ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton(
-                    onPressed: () => Get.back(),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                    ),
-                    child: const Text('Close'),
-                  ),
-                ),
               ],
             ),
           ),
@@ -438,6 +460,11 @@ class HomePageView extends GetView<HomePageController> {
                 Expanded(
                     flex: 1,
                     child: Text('UNIT',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold))),
+                Expanded(
+                    flex: 3,
+                    child: Text('WRITE',
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
               ],
@@ -491,23 +518,44 @@ class HomePageView extends GetView<HomePageController> {
                       ),
                     ),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      '${sensor.value ?? '-'}',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.themeColor,
-                      ),
-                    ),
-                  ),
+          Expanded(
+            flex: 2,
+            child: Obx(() {
+              final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+              if (controller.isReadingPlcValues.value && live == null) {
+                return const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                );
+              }
+              final display = live ?? '${sensor.value ?? '-'}';
+              final isLive = live != null && live != 'ERR';
+              return Text(
+                display,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  color: live == 'ERR'
+                      ? Colors.red
+                      : (isLive ? AppColors.themeColor : Colors.grey.shade500),
+                ),
+              );
+            }),
+          ),
                   Expanded(
                     flex: 1,
                     child: Text(
                       sensor.unit ?? '-',
                       style: TextStyle(
                           fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: _SensorWriteAction(
+                      sensor: sensor,
+                      controller: controller,
                     ),
                   ),
                 ],
@@ -1107,5 +1155,90 @@ class HomePageView extends GetView<HomePageController> {
         ],
       ),
     );
+  }
+}
+
+/// Inline "write a value" control for one Recipe row: a small number
+/// field + send button. Kept as its own StatefulWidget (rather than
+/// building it inline) so its TextEditingController survives the
+/// Recipe dialog's Obx rebuilds — otherwise typed input would get wiped
+/// out every time any sensor's live value updates elsewhere in the list.
+class _SensorWriteAction extends StatefulWidget {
+  const _SensorWriteAction({required this.sensor, required this.controller});
+
+  final harness_ds.Receipe sensor;
+  final HomePageController controller;
+
+  @override
+  State<_SensorWriteAction> createState() => _SensorWriteActionState();
+}
+
+class _SensorWriteActionState extends State<_SensorWriteAction> {
+  final TextEditingController _valueController = TextEditingController();
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _valueController.text.trim();
+    final value = int.tryParse(text);
+    if (value == null) return;
+    widget.controller.writeSensorValue(widget.sensor, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final id = widget.sensor.id;
+      final isWriting = id != null && widget.controller.writeInFlightSensorIds.contains(id);
+
+      return Row(
+        children: [
+          SizedBox(
+            width: 60,
+            height: 32,
+            child: TextField(
+              controller: _valueController,
+              enabled: !isWriting,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                filled: true,
+                fillColor: const Color(0xFFF5F7FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide.none,
+                ),
+                hintText: 'val',
+                hintStyle: const TextStyle(fontSize: 11),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              icon: isWriting
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.send, size: 16, color: AppColors.themeColor),
+              onPressed: isWriting ? null : _submit,
+              tooltip: 'Write value to PLC',
+            ),
+          ),
+        ],
+      );
+    });
   }
 }

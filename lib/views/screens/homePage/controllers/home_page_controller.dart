@@ -9,6 +9,7 @@ import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 import 'package:simpson/modals/harness.model.dart' as harness_ds;
 import 'package:simpson/modals/pidDataset.model.dart' as pid_ds;
 import 'package:simpson/services/apiServices.dart';
+import 'package:simpson/services/plc/plc_service.dart';
 
 enum StepType { single, iqaGroup }
 
@@ -54,6 +55,54 @@ class HomePageController extends GetxController {
   String? _accessToken;
   list_ds.ListNumber? _variantListCache;
   all_ds.AllModel? _modelsCache;
+
+  // ── PLC connection (auto-connects, no manual IP/port entry) ──
+  // TODO: 192.168.1.10 is a PLACEHOLDER — replace with the real PLC/
+  // dongle IP and port for this station. This is the ONLY line that
+  // needs to change once you have the real address.
+  static const String _plcIp = '192.168.137.160';
+  static const int _plcPort = 502;
+
+  final PlcService plcService = Get.find<PlcService>();
+  RxBool get isPlcConnected => plcService.isConnected;
+  RxBool get isPlcConnecting => plcService.isConnecting;
+  RxString get plcStatus => plcService.status;
+
+  Timer? _plcRetryTimer;
+
+  Future<void> _autoConnectPlc() async {
+    if (plcService.isConnected.value || plcService.isConnecting.value) return;
+    _log('Connecting to PLC at $_plcIp:$_plcPort…');
+    try {
+      await plcService.connect(_plcIp, port: _plcPort);
+      _log('PLC connected ($_plcIp:$_plcPort)');
+      _plcRetryTimer?.cancel();
+    } catch (e) {
+      _log('PLC connection failed: $e — will keep retrying in the background');
+      _startPlcRetryTimer();
+    }
+  }
+
+  /// Keeps trying every 10s in the background, so if the PLC comes
+  /// online later (or the IP gets corrected) it connects automatically
+  /// without needing an app restart or manual retry.
+  void _startPlcRetryTimer() {
+    _plcRetryTimer?.cancel();
+    _plcRetryTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (plcService.isConnected.value) {
+        _plcRetryTimer?.cancel();
+        return;
+      }
+      _autoConnectPlc();
+    });
+  }
+
+  /// Tap the status indicator to retry immediately instead of waiting
+  /// for the next background retry tick.
+  void retryPlcConnection() {
+    if (isPlcConnected.value) return;
+    _autoConnectPlc();
+  }
 
   // ── Flash File ──
   final RxBool flashInProgress = false.obs;
@@ -115,6 +164,7 @@ class HomePageController extends GetxController {
     });
 
     _loadAccessToken();
+    _autoConnectPlc();
   }
 
   Future<void> _loadAccessToken() async {
@@ -341,6 +391,141 @@ class HomePageController extends GetxController {
 
   final RxList<harness_ds.Receipe> harnessReceipes = <harness_ds.Receipe>[].obs;
 
+  // ── Live PLC values for the current harness's recipe sensors ──
+  // Keyed by sensor id. Populated by reading each sensor's register
+  // address from the connected PLC, right after the harness API
+  final RxMap<int, String> livePlcValues = <int, String>{}.obs;
+  final RxBool isReadingPlcValues = false.obs;
+
+  Future<void> _readLivePlcValuesForHarness() async {
+    if (harnessReceipes.isEmpty) return;
+
+    if (!plcService.isConnected.value) {
+      _log('PLC not connected — showing recipe reference values only (no live read)');
+      return;
+    }
+
+    isReadingPlcValues.value = true;
+    livePlcValues.clear();
+    _log('Reading ${harnessReceipes.length} sensor value(s) from PLC…');
+
+    // NOTE: reads are sequential, not parallel. Most real Modbus TCP
+    // slave devices only handle one request at a time per connection —
+    // firing all reads at once (even with transaction-ID matching on
+    // our end) causes the slave to silently drop everything after the
+    // first request, which shows up as timeouts on every sensor after
+    // the first. One at a time is the reliable approach.
+    for (final sensor in harnessReceipes) {
+      await _readOneSensor(sensor);
+      // Small gap between requests — some PLCs/gateways need a brief
+      // settling time between transactions, even when sent sequentially.
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    isReadingPlcValues.value = false;
+    _log('PLC Write complete for ${harnessReceipes.length} sensor(s)');
+  }
+
+  Future<void> _readOneSensor(harness_ds.Receipe sensor) async {
+    final id = sensor.id;
+    final reg = sensor.regAddress;
+    if (id == null || reg == null) return;
+
+    try {
+      final int raw = await plcService.readRegister(reg);
+      final double engineeringValue = _applySensorFormula(sensor.type, raw);
+      final String formatted = engineeringValue.toStringAsFixed(2);
+
+      livePlcValues[id] = formatted;
+
+      // Verbose debug info — console/VS Code only, not shown in the UI.
+      print(
+          '[PLC WRITE] ${sensor.sensorName} | Reg $reg | Raw=$raw | Converted=$formatted ${sensor.unit ?? ''}');
+
+      // Clean, UI-facing Activity line — Sensor / Reg Address / Type / Value,
+      // with Value coming from the live PLC read (not the API's static value).
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Type: ${sensor.type ?? '-'}  |  Value: $formatted ${sensor.unit ?? ''}'
+              .trim());
+    } catch (e) {
+      livePlcValues[id] = 'ERR';
+      print('[PLC WRITE] ${sensor.sensorName} | Reg $reg | FAILED: $e');
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Type: ${sensor.type ?? '-'}  |  Value: ERR');
+    }
+  }
+
+  // ── Write ──
+  final RxBool isWritingSensor = false.obs;
+  final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
+
+  /// Writes [value] to [sensor]'s register on the PLC and confirms the
+  /// write actually took (PlcService.writeRegister checks the PLC echoed
+  /// back the same address+value, not just that bytes went out).
+  /// Same dual-logging pattern as reads: clean line in the UI Activity
+  /// box, verbose raw detail to the console only.
+  Future<void> writeSensorValue(harness_ds.Receipe sensor, int value) async {
+    final id = sensor.id;
+    final reg = sensor.regAddress;
+    if (id == null || reg == null) return;
+
+    if (!plcService.isConnected.value) {
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Write FAILED: PLC not connected');
+      return;
+    }
+
+    writeInFlightSensorIds.add(id);
+    try {
+      final bool confirmed = await plcService.writeRegister(reg, value);
+
+      // Verbose debug info — console/VS Code only.
+      print(
+          '[PLC WRITE] ${sensor.sensorName} | Reg $reg | Value=$value | Confirmed=$confirmed');
+
+      if (confirmed) {
+        // Re-read immediately so the UI/Recipe dialog shows the
+        // just-written value confirmed back from the PLC, not just
+        // what we asked to write.
+        livePlcValues[id] = value.toStringAsFixed(2);
+        _log(
+            '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Type: ${sensor.type ?? '-'}  |  Written: $value ${sensor.unit ?? ''}'
+                .trim());
+      } else {
+        _log(
+            '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Write NOT CONFIRMED (PLC did not echo the value back)');
+      }
+    } catch (e) {
+      print('[PLC WRITE] ${sensor.sensorName} | Reg $reg | FAILED: $e');
+      _log('  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Write FAILED: $e');
+    } finally {
+      writeInFlightSensorIds.remove(id);
+    }
+  }
+
+  /// TODO: this only handles "Linear" directly (raw value as-is, since
+  /// the recipe API doesn't currently give us multiplier/offset — the
+  /// register is assumed to already be PLC-scaled). Extend the other
+  /// branches once the real formulas/constants for Resistance/Current
+  /// sensors are confirmed for this API (see the older ESNController's
+  /// handlePlcData for the fuller reference formulas: current sensor
+  /// uses (Vout-2.5)/0.185, resistance uses R1*Vout/(Vin-Vout), etc.).
+  double _applySensorFormula(String? type, int raw) {
+    final t = (type ?? '').toLowerCase();
+    if (t.contains('resistance')) {
+      // TODO: needs real R1/Vin constants for this sensor — placeholder
+      // treats raw as already representing the resistance directly.
+      return raw.toDouble();
+    }
+    if (t.contains('current')) {
+      // TODO: needs the real current-sensor scaling — placeholder
+      // treats raw as already representing the current directly.
+      return raw.toDouble();
+    }
+    // Linear (default): raw value as-is.
+    return raw.toDouble();
+  }
+
   Future<bool> _isValidHarness(String value) async {
     final scanned = value.trim();
     final harnessList = await _authService.getHarnessList(
@@ -359,14 +544,10 @@ class HomePageController extends GetxController {
     _log(
         'Harness matched: "${match.name}" (${harnessReceipes.length} recipe sensor(s))');
 
-    // Log each sensor individually too, right under the match line.
-    // Logged in reverse so they read top-to-bottom in natural order
-    // (Sensor 1, 2, 3…) since _log() inserts newest-first.
-    for (final sensor in harnessReceipes.reversed) {
-      _log(
-          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: ${sensor.regAddress ?? '-'}  |  Type: ${sensor.type ?? '-'}  |  Value: ${sensor.value ?? '-'} ${sensor.unit ?? ''}'
-              .trim());
-    }
+    // Read live values from the PLC right away — fast/parallel, and
+    // each sensor's result gets logged to Activity as it comes in
+    // (see _readLivePlcValuesForHarness / _readOneSensor).
+    unawaited(_readLivePlcValuesForHarness());
 
     return true;
   }
@@ -408,6 +589,8 @@ class HomePageController extends GetxController {
     _configureIqaFields(_defaultIqaCount, null);
 
     harnessReceipes.clear();
+    livePlcValues.clear();
+    isReadingPlcValues.value = false;
 
     _flashStopwatch?.cancel();
     flashInProgress.value = false;
