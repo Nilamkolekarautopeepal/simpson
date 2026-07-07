@@ -339,7 +339,7 @@ class HomePageController extends GetxController {
     }
   }
 
-  List<harness_ds.Receipe> harnessReceipes = [];
+  final RxList<harness_ds.Receipe> harnessReceipes = <harness_ds.Receipe>[].obs;
 
   Future<bool> _isValidHarness(String value) async {
     final scanned = value.trim();
@@ -355,9 +355,19 @@ class HomePageController extends GetxController {
     if (match == null) return false;
     if (match.isActive != true) return false;
 
-    harnessReceipes = match.receipes ?? [];
+    harnessReceipes.assignAll(match.receipes ?? []);
     _log(
         'Harness matched: "${match.name}" (${harnessReceipes.length} recipe sensor(s))');
+
+    // Log each sensor individually too, right under the match line.
+    // Logged in reverse so they read top-to-bottom in natural order
+    // (Sensor 1, 2, 3…) since _log() inserts newest-first.
+    for (final sensor in harnessReceipes.reversed) {
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: ${sensor.regAddress ?? '-'}  |  Type: ${sensor.type ?? '-'}  |  Value: ${sensor.value ?? '-'} ${sensor.unit ?? ''}'
+              .trim());
+    }
+
     return true;
   }
 
@@ -397,7 +407,7 @@ class HomePageController extends GetxController {
     }
     _configureIqaFields(_defaultIqaCount, null);
 
-    harnessReceipes = [];
+    harnessReceipes.clear();
 
     _flashStopwatch?.cancel();
     flashInProgress.value = false;
