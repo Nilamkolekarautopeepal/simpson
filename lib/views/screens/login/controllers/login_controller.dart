@@ -29,7 +29,7 @@ class LoginController extends GetxController {
 
   // Station selection dropdown
   final List<String> stationOptions = const ['PFS Station', 'Test Station'];
-  final RxString selectedStation = 'PFS Station'.obs;
+  final RxString selectedStation = 'Test Station'.obs;
 
   @override
   void onInit() {
