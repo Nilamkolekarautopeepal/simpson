@@ -145,8 +145,6 @@ class LoginController extends GetxController {
     );
   }
 
-  /// Uses your existing device-id utility, which returns a 2-element
-  /// array matching the C# GetDeviceUniqueId() shape:
   /// ["true", "<mac>"] on success, ["false", "<reason>"] on failure.
   Future<String> _getMacId() async {
     final result = await AndroidOperationsService.getDeviceUniqueId();

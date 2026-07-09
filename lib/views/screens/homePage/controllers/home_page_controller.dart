@@ -60,7 +60,7 @@ class HomePageController extends GetxController {
   // TODO: 192.168.1.10 is a PLACEHOLDER — replace with the real PLC/
   // dongle IP and port for this station. This is the ONLY line that
   // needs to change once you have the real address.
-  static const String _plcIp = '192.168.137.160';
+  static const String _plcIp = '192.168.137.20';
   static const int _plcPort = 502;
 
   final PlcService plcService = Get.find<PlcService>();

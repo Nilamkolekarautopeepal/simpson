@@ -5,13 +5,11 @@ import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/dev/dev_screen.dart';
 import 'package:simpson/modals/harness.model.dart' as harness_ds;
 import 'package:simpson/themes/app_colors.dart';
-
-
 import '../controllers/home_page_controller.dart';
 // StepType is exported from home_page_controller.dart
 
 class HomePageView extends GetView<HomePageController> {
-  const HomePageView({super.key});
+    const HomePageView({super.key});
 
   @override
   Widget build(BuildContext context) {

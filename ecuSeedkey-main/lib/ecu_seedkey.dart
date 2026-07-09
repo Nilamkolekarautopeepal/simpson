@@ -224,15 +224,9 @@ class ECUCalculateSeedkey {
         sSeed = hexStringToByteArray("5C4062143A40C9B05C7E7F04DB2C6777");
         break;
 
-      // ═══════════════════════════════════════════════════════════════
-      // RE_SEEDKEY_EPM44
-      // ECU: RE23520P04EU5002 / HW: CP352000
-      // Algorithm: RIPEMD160(secret_16bytes + seed_4bytes) → first 8 bytes
-      // .NET sends last 4 bytes from seq file: send:2702+<key,4>
-      //
-      // ⚠️  UPDATE THIS SECRET when RE team provides correct value:
+      
       // sSeed = hexStringToByteArray("CORRECT_32_HEX_CHAR_SECRET_HERE");
-      // ═══════════════════════════════════════════════════════════════
+  
       case "RE_SEEDKEY_EPM44":
         sSeed = hexStringToByteArray("13A120A0FE9EC178ADEB179F9E5CC130");
         break;
