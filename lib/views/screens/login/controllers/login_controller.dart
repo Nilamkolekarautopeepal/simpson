@@ -27,10 +27,6 @@ class LoginController extends GetxController {
   final RxString errorMessage = ''.obs;
   final Rx<User?> currentUser = Rx<User?>(null);
 
-  // Station selection dropdown
-  final List<String> stationOptions = const ['PFS Station', 'Test Station'];
-  final RxString selectedStation = 'Test Station'.obs;
-
   @override
   void onInit() {
     super.onInit();
@@ -102,27 +98,45 @@ class LoginController extends GetxController {
       } else {
         await SecureStorageService.clearCredentials();
       }
-      // await SecureStorageService.saveTokens(
-      //   accessToken: user.token?.access,
-      //   refreshToken: user.token?.refresh,
-      // );
+
       debugPrint(
           "🔵 [Login] user.token=${user.token} access=${user.token?.access} refresh=${user.token?.refresh}");
       await SecureStorageService.saveTokens(
         accessToken: user.token?.access,
         refreshToken: user.token?.refresh,
       );
-      //await AppPreferences.setUserData(user.toJson());
+
       debugPrint(
           "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
 
+      final station = user.stationData?.firstOrNull;
+      final stationType = station?.stationType?.trim();
 
-      debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
+      // Pick the active dongle if there's more than one, else just the first.
+      final dongleIp = station?.prodbudDongles
+              ?.firstWhereOrNull((d) => d.isActive == true)
+              ?.ip ??
+          station?.prodbudDongles?.firstOrNull?.ip;
+
+      // PLC IP/port come straight from this same station object —
+      // station_data[0].plc_ip / .plc_port in the raw login JSON,
+      // already mapped onto StationDatum.plcIp / .plcPort.
+      final plcIp = station?.plcIp;
+      final plcPort = station?.plcPort;
 
       debugPrint(
-          "🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+          "🔵 [Login] station_type='$stationType' dongle_ip='$dongleIp' plc_ip='$plcIp' plc_port='$plcPort'");
+
+      await SecureStorageService.saveDongleIp(dongleIp);
+      await SecureStorageService.savePlcIp(plcIp);
+      await SecureStorageService.savePlcPort(plcPort?.toString());
+
+      if (stationType == 'Testing') {
+        Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
+      } else {
+        Get.offAllNamed(Routes.PSF_HOME_SCREEN,
+            arguments: station?.stationType);
+      }
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");
       debugPrint("🔴 [Login] StackTrace: $stackTrace");

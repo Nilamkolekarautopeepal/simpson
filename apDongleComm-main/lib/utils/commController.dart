@@ -52,8 +52,8 @@ class CommController extends GetxController implements ICommController {
     //required Connectivity selectedType, // ✅ Add this parameter
   }) async {
     try {
-     //
-      await disconnect();
+      //
+      //await disconnect();
 
       _socket = await Socket.connect(
         host,
@@ -66,11 +66,13 @@ class CommController extends GetxController implements ICommController {
       isConnected.value = true;
 
       // ✅ Set the dynamic connectivity value
-     // connectivityRx.value = selectedType;
-
+      // connectivityRx.value = selectedType;
+      connectivityRx.value = Connectivity.wiFi;
       _connectionStream.add(true);
       // Skip startForegroundService on Windows — causes semaphore timeout
-      try { if (!Platform.isWindows) startForegroundService(); } catch (_) {}
+      try {
+        if (!Platform.isWindows) startForegroundService();
+      } catch (_) {}
 
       _socketSub = _socket!.listen(
         (data) {
@@ -540,17 +542,20 @@ class CommController extends GetxController implements ICommController {
     return result;
   }
 
-
   // _readDirect: polls _buffer (filled by _socketSub._handleData)
   // _socketSub already listens — we just poll _buffer directly
-  Future<Uint8List?> _readDirect(Socket socket,
-      {Duration timeout = const Duration(seconds: 10)}) async {
+  Future<Uint8List?> _readDirect(
+    Socket socket, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final deadline = DateTime.now().add(timeout);
 
     // Wait for at least 2 bytes (header)
     while (_buffer.length < 2) {
       if (DateTime.now().isAfter(deadline)) {
-        print('⏰ _readDirect: timeout waiting for header, buf=${_buffer.length}');
+        print(
+          '⏰ _readDirect: timeout waiting for header, buf=${_buffer.length}',
+        );
         return Uint8List.fromList(utf8.encode('No Resp From Dongle'));
       }
       await Future.delayed(const Duration(milliseconds: 1));
@@ -566,7 +571,9 @@ class CommController extends GetxController implements ICommController {
     // Wait for full response
     while (_buffer.length < totalExpected) {
       if (DateTime.now().isAfter(deadline)) {
-        print('⏰ _readDirect: timeout waiting for body, have=${_buffer.length} need=$totalExpected');
+        print(
+          '⏰ _readDirect: timeout waiting for body, have=${_buffer.length} need=$totalExpected',
+        );
         break;
       }
       await Future.delayed(const Duration(milliseconds: 1));

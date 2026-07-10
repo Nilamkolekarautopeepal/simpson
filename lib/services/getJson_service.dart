@@ -278,58 +278,130 @@ class Hex2JSON {
     sectorLen[sectorIndex++] = sectorDataIndex;
   }
 
+  // Future<String> createJSON(
+  //     List<EcuMapFile>? ecuMapFiles, String checksumAlgo) async {
+  //   String returnJson = '';
+
+  //   try {
+  //     int count = 0;
+  //     int i = 0;
+  //     jsonStartAddress = List.filled(20, 0);
+  //     jsonEndAddress = List.filled(20, 0);
+  //     ecuStartAddress = List.filled(20, 0);
+  //     ecuEndAddress = List.filled(20, 0);
+
+  //     if (ecuMapFiles != null && ecuMapFiles.isNotEmpty) {
+  //       count = ecuMapFiles.length;
+  //       ecuStartAddress = List.filled(count, 0);
+  //       ecuEndAddress = List.filled(count, 0);
+
+  //       for (var item in ecuMapFiles) {
+  //         ecuStartAddress![i] = item.startAddr!;
+  //         ecuEndAddress![i] = item.endAddr!;
+  //         i++;
+  //       }
+  //     } else {
+  //       for (i = 0; i < sectorLen.length; i++) {
+  //         if (i + 1 >= sectorLen.length || sectorLen[i + 1] == 0) {
+  //           count = i + 1;
+  //           break;
+  //         }
+  //       }
+
+  //       ecuStartAddress = List.filled(count, 0);
+  //       ecuEndAddress = List.filled(count, 0);
+
+  //       for (i = 0; i < count; i++) {
+  //         ecuStartAddress![i] = sectorStrtAddr[i];
+  //         ecuEndAddress![i] = sectorStrtAddr[i] + sectorLen[i];
+  //       }
+  //     }
+
+  //     if (filetype == "HEX") {
+  //       returnJson = await createJsonByEcuMemMap(
+  //           count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
+  //     } else if (filetype == "SREC") {
+  //       returnJson = await srecCreateJsonByEcuMemMap(
+  //           count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
+  //     }
+
+  //     return returnJson;
+  //   } catch (e) {
+  //     return returnJson;
+  //   }
+  // }
+
   Future<String> createJSON(
-      List<EcuMapFile>? ecuMapFiles, String checksumAlgo) async {
-    String returnJson = '';
+    List<EcuMapFile>? ecuMapFiles, String checksumAlgo) async {
+  String returnJson = '';
 
-    try {
-      int count = 0;
-      int i = 0;
-      jsonStartAddress = List.filled(20, 0);
-      jsonEndAddress = List.filled(20, 0);
-      ecuStartAddress = List.filled(20, 0);
-      ecuEndAddress = List.filled(20, 0);
+  try {
+    int count = 0;
+    int i = 0;
+    jsonStartAddress = List.filled(20, 0);
+    jsonEndAddress = List.filled(20, 0);
+    ecuStartAddress = List.filled(20, 0);
+    ecuEndAddress = List.filled(20, 0);
 
-      if (ecuMapFiles != null && ecuMapFiles.isNotEmpty) {
-        count = ecuMapFiles.length;
-        ecuStartAddress = List.filled(count, 0);
-        ecuEndAddress = List.filled(count, 0);
+    if (ecuMapFiles != null && ecuMapFiles.isNotEmpty) {
+      print('✅ [Hex2JSON] Using ${ecuMapFiles.length} EcuMapFile entries from API');
+      count = ecuMapFiles.length;
+      ecuStartAddress = List.filled(count, 0);
+      ecuEndAddress = List.filled(count, 0);
 
-        for (var item in ecuMapFiles) {
-          ecuStartAddress![i] = item.startAddr!;
-          ecuEndAddress![i] = item.endAddr!;
-          i++;
-        }
-      } else {
-        for (i = 0; i < sectorLen.length; i++) {
-          if (i + 1 >= sectorLen.length || sectorLen[i + 1] == 0) {
-            count = i + 1;
-            break;
-          }
-        }
+      for (var item in ecuMapFiles) {
+        ecuStartAddress![i] = item.startAddr!;
+        ecuEndAddress![i] = item.endAddr!;
+        print('✅ [Hex2JSON]   sector[$i] start=0x${item.startAddr?.toRadixString(16).toUpperCase()} '
+            'end=0x${item.endAddr?.toRadixString(16).toUpperCase()}');
+        i++;
+      }
+    } else {
+      // ⚠️ FALLBACK PATH — no EcuMapFile data from the API for this
+      // ECU/variant. Deriving sector addresses purely from what the
+      // firmware file itself embeds. This is NOT guaranteed to match the
+      // valid memory ranges the ECU will actually accept — those live in
+      // the sequence file's "EcuMapFile:<start_address,...>" declarations,
+      // which this fallback has no way to cross-check against.
+      print('⚠️ [Hex2JSON] No EcuMapFile data from API — falling back to '
+          'firmware-embedded addresses. This can produce an address the ECU '
+          'rejects with ECUERROR_REQUESTOUTOFRANGE if the firmware\'s own '
+          'address records don\'t match the sequence file\'s declared '
+          'valid ranges.');
 
-        ecuStartAddress = List.filled(count, 0);
-        ecuEndAddress = List.filled(count, 0);
-
-        for (i = 0; i < count; i++) {
-          ecuStartAddress![i] = sectorStrtAddr[i];
-          ecuEndAddress![i] = sectorStrtAddr[i] + sectorLen[i];
+      for (i = 0; i < sectorLen.length; i++) {
+        if (i + 1 >= sectorLen.length || sectorLen[i + 1] == 0) {
+          count = i + 1;
+          break;
         }
       }
 
-      if (filetype == "HEX") {
-        returnJson = await createJsonByEcuMemMap(
-            count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
-      } else if (filetype == "SREC") {
-        returnJson = await srecCreateJsonByEcuMemMap(
-            count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
-      }
+      ecuStartAddress = List.filled(count, 0);
+      ecuEndAddress = List.filled(count, 0);
 
-      return returnJson;
-    } catch (e) {
-      return returnJson;
+      for (i = 0; i < count; i++) {
+        ecuStartAddress![i] = sectorStrtAddr[i];
+        ecuEndAddress![i] = sectorStrtAddr[i] + sectorLen[i];
+        print('⚠️ [Hex2JSON]   fallback sector[$i] start=0x${sectorStrtAddr[i].toRadixString(16).toUpperCase()} '
+            'end=0x${ecuEndAddress![i].toRadixString(16).toUpperCase()} '
+            '(from firmware file, NOT from API)');
+      }
     }
+
+    if (filetype == "HEX") {
+      returnJson = await createJsonByEcuMemMap(
+          count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
+    } else if (filetype == "SREC") {
+      returnJson = await srecCreateJsonByEcuMemMap(
+          count, ecuStartAddress!, ecuEndAddress!, checksumAlgo);
+    }
+
+    return returnJson;
+  } catch (e) {
+    print('❌ [Hex2JSON] createJSON exception: $e');
+    return returnJson;
   }
+}
 
   Future<String> createJsonByEcuMemMap(
     int ecuMemMapNumSectors,

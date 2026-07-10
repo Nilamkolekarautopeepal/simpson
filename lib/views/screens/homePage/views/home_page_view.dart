@@ -3,9 +3,8 @@
 // import 'package:get/get.dart';
 // import 'package:simpson/common_widgets/custom_app_bar.dart';
 // import 'package:simpson/dev/dev_screen.dart';
+// import 'package:simpson/modals/harness.model.dart' as harness_ds;
 // import 'package:simpson/themes/app_colors.dart';
-
-
 // import '../controllers/home_page_controller.dart';
 // // StepType is exported from home_page_controller.dart
 
@@ -18,6 +17,81 @@
 //       appBar: CommonAppBar(
 //         title: controller.station,
 //         actions: [
+//           Obx(
+//             () => InkWell(
+//               onTap: controller.retryPlcConnection,
+//               borderRadius: BorderRadius.circular(6),
+//               child: Padding(
+//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: [
+//                     if (controller.isPlcConnecting.value)
+//                       const SizedBox(
+//                         width: 10,
+//                         height: 10,
+//                         child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+//                       )
+//                     else
+//                       Container(
+//                         width: 10,
+//                         height: 10,
+//                         decoration: BoxDecoration(
+//                           shape: BoxShape.circle,
+//                           color: controller.isPlcConnected.value ? Colors.greenAccent : Colors.redAccent,
+//                         ),
+//                       ),
+//                     const SizedBox(width: 8),
+//                     Text(
+//                       controller.isPlcConnecting.value
+//                           ? 'Connecting…'
+//                           : (controller.isPlcConnected.value ? 'PLC ' : 'PLC '),
+//                       style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ),
+//           ),
+//           Obx(() {
+//             if (!controller.canConnectDongle.value) {
+//               return const SizedBox.shrink();
+//             }
+//             return InkWell(
+//               onTap: controller.retryDongleConnection,
+//               borderRadius: BorderRadius.circular(6),
+//               child: Padding(
+//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: [
+//                     if (controller.dongleConnecting.value)
+//                       const SizedBox(
+//                         width: 10,
+//                         height: 10,
+//                         child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+//                       )
+//                     else
+//                       Container(
+//                         width: 10,
+//                         height: 10,
+//                         decoration: BoxDecoration(
+//                           shape: BoxShape.circle,
+//                           color: controller.dongleConnected.value ? Colors.greenAccent : Colors.redAccent,
+//                         ),
+//                       ),
+//                     const SizedBox(width: 8),
+//                     Text(
+//                       controller.dongleConnecting.value
+//                           ? 'Connecting…'
+//                           : 'Dongle ',
+//                       style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             );
+//           }),
 //           IconButton(
 //             icon: const Icon(Icons.logout, color: Colors.white),
 //             onPressed: controller.logout,
@@ -46,8 +120,6 @@
 //           Expanded(
 //             child: Obx(
 //               () {
-//                 // Only render steps that have actually been reached —
-//                 // future steps are hidden entirely, not just disabled.
 //                 final visibleCount = (controller.currentStepIndex.value + 1)
 //                     .clamp(0, controller.steps.length);
 //                 return ListView.builder(
@@ -64,7 +136,6 @@
 //               },
 //             ),
 //           ),
-//           // ── Recipe: opens a popup showing the harness sensor recipe ──
 //           const Divider(height: 1),
 //           InkWell(
 //             onTap: () => _showRecipeDialog(),
@@ -104,7 +175,6 @@
 //               ),
 //             ),
 //           ),
-//           // ── Dev: API Logs — always visible at the bottom of the sidebar ──
 //           const Divider(height: 1),
 //           InkWell(
 //             onTap: () => Get.to(() => const DevLogsPage()),
@@ -165,7 +235,7 @@
 //             cursorColor: AppColors.themeColor,
 //             controller: controller.stepControllers[index],
 //             focusNode: controller.stepFocusNodes[index],
-//             enabled: true, // editable at all times once shown/unlocked
+//             enabled: true,
 //             style: const TextStyle(fontSize: 13),
 //             decoration: InputDecoration(
 //               isDense: true,
@@ -191,16 +261,11 @@
 //             onChanged: (_) => controller.onFieldChanged(index),
 //             onSubmitted: (_) => controller.submitStep(index),
 //           ),
-//           // NOTE: ESN/List validation errors are surfaced via the popup
-//           // dialog only (see controller._showErrorPopup). No inline error
-//           // text is rendered here anymore to avoid showing the same
-//           // message twice (popup + inline).
 //         ],
 //       ),
 //     );
 //   }
 
-//   /// IQA1..IQA4 shown together as one group once Harness is confirmed.
 //   Widget _buildIqaGroupTile(int index) {
 //     final isActive = index == controller.currentStepIndex.value;
 //     final isCompleted = index < controller.currentStepIndex.value;
@@ -215,7 +280,7 @@
 //               Icon(
 //                 isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
 //                 size: 16,
-//                 color: isCompleted ? AppColors.themeColor : AppColors.themeColor,
+//                 color: AppColors.themeColor,
 //               ),
 //               const SizedBox(width: 6),
 //               Text(
@@ -290,8 +355,6 @@
 //               children: [
 //                 Obx(() {
 //                   if (!controller.allStepsComplete) {
-//                     // Nothing else to show yet — still working through
-//                     // the remaining scan steps.
 //                     return const SizedBox.shrink();
 //                   }
 //                   return Column(
@@ -311,21 +374,22 @@
 //             ),
 //           ),
 //         ),
-//         // Activity is pinned to the bottom and visible from the very start.
 //         _buildActivitySection(),
 //       ],
 //     );
 //   }
 
-//   /// Recipe popup: table of sensors returned with the matched harness
-//   /// (sensor_name / reg_address / type / value / unit), straight from
-//   /// the harness API's "receipes" list.
+//   /// Recipe popup: static reference table straight from the harness
+//   /// API (sensor_name / reg_address / type / pin_no / value / unit).
+//   /// A sensor's VALUE only ever changes from the static API value once
+//   /// the operator uses the WRITE action on that row — there is no
+//   /// automatic PLC read here.
 //   void _showRecipeDialog() {
 //     Get.dialog(
 //       Dialog(
 //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
 //         child: SizedBox(
-//           width: 640,
+//           width: 860,
 //           height: 520,
 //           child: Padding(
 //             padding: const EdgeInsets.all(20),
@@ -376,21 +440,6 @@
 //                     return SingleChildScrollView(child: _buildRecipeTable());
 //                   }),
 //                 ),
-//                 const SizedBox(height: 12),
-//                 Align(
-//                   alignment: Alignment.centerRight,
-//                   child: OutlinedButton(
-//                     onPressed: () => Get.back(),
-//                     style: OutlinedButton.styleFrom(
-//                       side: BorderSide(color: Colors.grey.shade300),
-//                       shape: RoundedRectangleBorder(
-//                           borderRadius: BorderRadius.circular(8)),
-//                       padding: const EdgeInsets.symmetric(
-//                           horizontal: 24, vertical: 12),
-//                     ),
-//                     child: const Text('Close'),
-//                   ),
-//                 ),
 //               ],
 //             ),
 //           ),
@@ -432,12 +481,22 @@
 //                             fontSize: 11, fontWeight: FontWeight.bold))),
 //                 Expanded(
 //                     flex: 2,
+//                     child: Text('PIN NO',
+//                         style: TextStyle(
+//                             fontSize: 11, fontWeight: FontWeight.bold))),
+//                 Expanded(
+//                     flex: 2,
 //                     child: Text('VALUE',
 //                         style: TextStyle(
 //                             fontSize: 11, fontWeight: FontWeight.bold))),
 //                 Expanded(
 //                     flex: 1,
 //                     child: Text('UNIT',
+//                         style: TextStyle(
+//                             fontSize: 11, fontWeight: FontWeight.bold))),
+//                 Expanded(
+//                     flex: 3,
+//                     child: Text('WRITE',
 //                         style: TextStyle(
 //                             fontSize: 11, fontWeight: FontWeight.bold))),
 //               ],
@@ -494,13 +553,31 @@
 //                   Expanded(
 //                     flex: 2,
 //                     child: Text(
-//                       '${sensor.value ?? '-'}',
+//                       '${sensor.pinNo ?? '-'}',
 //                       style: TextStyle(
-//                         fontSize: 12.5,
-//                         fontWeight: FontWeight.bold,
-//                         color: AppColors.themeColor,
-//                       ),
+//                           fontSize: 12, color: Colors.grey.shade700),
 //                     ),
+//                   ),
+//                   Expanded(
+//                     flex: 2,
+//                     child: Obx(() {
+//                       // Static API value by default. Only replaced once
+//                       // the operator explicitly writes this sensor via
+//                       // the WRITE action — no automatic PLC read here.
+//                       final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+//                       final display = live ?? '${sensor.value ?? '-'}';
+//                       final isLive = live != null && live != 'ERR';
+//                       return Text(
+//                         display,
+//                         style: TextStyle(
+//                           fontSize: 12.5,
+//                           fontWeight: FontWeight.bold,
+//                           color: live == 'ERR'
+//                               ? Colors.red
+//                               : (isLive ? AppColors.themeColor : Colors.grey.shade500),
+//                         ),
+//                       );
+//                     }),
 //                   ),
 //                   Expanded(
 //                     flex: 1,
@@ -508,6 +585,13 @@
 //                       sensor.unit ?? '-',
 //                       style: TextStyle(
 //                           fontSize: 12, color: Colors.grey.shade600),
+//                     ),
+//                   ),
+//                   Expanded(
+//                     flex: 3,
+//                     child: _SensorWriteAction(
+//                       sensor: sensor,
+//                       controller: controller,
 //                     ),
 //                   ),
 //                 ],
@@ -523,8 +607,6 @@
 //     return Obx(() {
 //       final expanded = controller.flashExpanded.value;
 
-//       // Compact status shown next to the chevron, regardless of state.
-//       // Complete uses an actual checkmark icon instead of text.
 //       String? statusText;
 //       if (controller.flashInProgress.value) {
 //         statusText = '${(controller.flashProgress.value * 100).round()}%';
@@ -683,8 +765,6 @@
 //                   style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
 //                 ),
 //               ),
-
-//             // Big centered timer
 //             Text(
 //               controller.formattedElapsed,
 //               style: const TextStyle(
@@ -694,8 +774,6 @@
 //               ),
 //             ),
 //             const SizedBox(height: 16),
-
-//             // Progress bar
 //             ClipRRect(
 //               borderRadius: BorderRadius.circular(4),
 //               child: LinearProgressIndicator(
@@ -706,8 +784,6 @@
 //               ),
 //             ),
 //             const SizedBox(height: 8),
-
-//             // Percentage below the bar
 //             Text(
 //               '${(controller.flashProgress.value * 100).round()}%',
 //               style: const TextStyle(
@@ -717,7 +793,6 @@
 //               ),
 //             ),
 //             const SizedBox(height: 24),
-
 //             Column(
 //               children: [
 //                 Image.asset('asset/new/gifPhone.gif', height: 90),
@@ -729,8 +804,6 @@
 //         );
 //       }
 
-//       // Unlocked (all scan steps done) but flashing hasn't started yet —
-//       // card-list picker instead of a dropdown.
 //       if (controller.flashFilesLoading.value) {
 //         return const Padding(
 //           padding: EdgeInsets.symmetric(vertical: 20),
@@ -767,6 +840,33 @@
 //       return Column(
 //         crossAxisAlignment: CrossAxisAlignment.start,
 //         children: [
+//           if (!controller.dongleConnected.value)
+//             Padding(
+//               padding: const EdgeInsets.only(bottom: 10),
+//               child: Container(
+//                 padding: const EdgeInsets.symmetric(
+//                     horizontal: 12, vertical: 10),
+//                 decoration: BoxDecoration(
+//                   color: Colors.orange.withOpacity(0.08),
+//                   borderRadius: BorderRadius.circular(6),
+//                   border: Border.all(color: Colors.orange.shade200),
+//                 ),
+//                 child: Row(
+//                   children: [
+//                     Icon(Icons.info_outline,
+//                         size: 16, color: Colors.orange.shade800),
+//                     const SizedBox(width: 8),
+//                     Expanded(
+//                       child: Text(
+//                         'Waiting for the dongle to connect automatically…',
+//                         style: TextStyle(
+//                             fontSize: 12, color: Colors.orange.shade800),
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ),
 //           ConstrainedBox(
 //             constraints: const BoxConstraints(maxHeight: 260),
 //             child: ListView.separated(
@@ -828,7 +928,8 @@
 //           const SizedBox(height: 12),
 //           Center(
 //             child: ElevatedButton(
-//               onPressed: controller.selectedFlashFile.value != null
+//               onPressed: (controller.selectedFlashFile.value != null &&
+//                       controller.dongleConnected.value)
 //                   ? controller.startFlashing
 //                   : null,
 //               style: ElevatedButton.styleFrom(
@@ -866,9 +967,6 @@
 //         ));
 //   }
 
-//   /// Boxed DTC card: code bold on top, description grey below.
-//   /// Expects "CODE - description" (falls back to showing the raw
-//   /// string as the code if that separator isn't present).
 //   Widget _buildDtcCard(String raw) {
 //     final splitIndex = raw.indexOf(' - ');
 //     final code = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
@@ -917,9 +1015,6 @@
 //         ));
 //   }
 
-//   /// Boxed PID card, same style as the DTC cards: label bold on top,
-//   /// value grey below. Expects "Label — value" (falls back to showing
-//   /// the raw string as the label if that separator isn't present).
 //   Widget _buildPidCard(String raw) {
 //     final splitIndex = raw.indexOf(' — ');
 //     final label = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
@@ -1109,6 +1204,91 @@
 //     );
 //   }
 // }
+
+// /// Inline "write a value" control for one Recipe row: a small number
+// /// field + send button. Kept as its own StatefulWidget so its
+// /// TextEditingController survives the Recipe dialog's Obx rebuilds.
+// class _SensorWriteAction extends StatefulWidget {
+//   const _SensorWriteAction({required this.sensor, required this.controller});
+
+//   final harness_ds.Receipe sensor;
+//   final HomePageController controller;
+
+//   @override
+//   State<_SensorWriteAction> createState() => _SensorWriteActionState();
+// }
+
+// class _SensorWriteActionState extends State<_SensorWriteAction> {
+//   final TextEditingController _valueController = TextEditingController();
+
+//   @override
+//   void dispose() {
+//     _valueController.dispose();
+//     super.dispose();
+//   }
+
+//   void _submit() async {
+//     final text = _valueController.text.trim();
+//     final value = int.tryParse(text);
+//     if (value == null) return;
+
+//     await widget.controller.writeSensorValue(widget.sensor, value);
+//     _valueController.clear();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Obx(() {
+//       final id = widget.sensor.id;
+//       final isWriting = id != null && widget.controller.writeInFlightSensorIds.contains(id);
+
+//       return Row(
+//         children: [
+//           SizedBox(
+//             width: 60,
+//             height: 32,
+//             child: TextField(
+//               controller: _valueController,
+//               enabled: !isWriting,
+//               keyboardType: TextInputType.number,
+//               style: const TextStyle(fontSize: 12),
+//               decoration: InputDecoration(
+//                 isDense: true,
+//                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+//                 filled: true,
+//                 fillColor: const Color(0xFFF5F7FA),
+//                 border: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(6),
+//                   borderSide: BorderSide.none,
+//                 ),
+//                 hintText: 'val',
+//                 hintStyle: const TextStyle(fontSize: 11),
+//               ),
+//               onSubmitted: (_) => _submit(),
+//             ),
+//           ),
+//           const SizedBox(width: 6),
+//           SizedBox(
+//             width: 32,
+//             height: 32,
+//             child: IconButton(
+//               padding: EdgeInsets.zero,
+//               icon: isWriting
+//                   ? const SizedBox(
+//                       width: 14,
+//                       height: 14,
+//                       child: CircularProgressIndicator(strokeWidth: 2),
+//                     )
+//                   : Icon(Icons.send, size: 16, color: AppColors.themeColor),
+//               onPressed: isWriting ? null : _submit,
+//               tooltip: 'Write value to PLC',
+//             ),
+//           ),
+//         ],
+//       );
+//     });
+//   }
+// }
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -1120,7 +1300,7 @@ import '../controllers/home_page_controller.dart';
 // StepType is exported from home_page_controller.dart
 
 class HomePageView extends GetView<HomePageController> {
-    const HomePageView({super.key});
+  const HomePageView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -1164,6 +1344,45 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
           ),
+          Obx(() {
+            if (!controller.canConnectDongle.value) {
+              return const SizedBox.shrink();
+            }
+            return InkWell(
+              onTap: controller.retryDongleConnection,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (controller.dongleConnecting.value)
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(strokeWidth: 1.6, color: Colors.white),
+                      )
+                    else
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: controller.dongleConnected.value ? Colors.greenAccent : Colors.redAccent,
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Text(
+                      controller.dongleConnecting.value
+                          ? 'Connecting…'
+                          : 'Dongle ',
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
@@ -1192,8 +1411,6 @@ class HomePageView extends GetView<HomePageController> {
           Expanded(
             child: Obx(
               () {
-                // Only render steps that have actually been reached —
-                // future steps are hidden entirely, not just disabled.
                 final visibleCount = (controller.currentStepIndex.value + 1)
                     .clamp(0, controller.steps.length);
                 return ListView.builder(
@@ -1210,7 +1427,6 @@ class HomePageView extends GetView<HomePageController> {
               },
             ),
           ),
-          // ── Recipe: opens a popup showing the harness sensor recipe ──
           const Divider(height: 1),
           InkWell(
             onTap: () => _showRecipeDialog(),
@@ -1250,7 +1466,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
           ),
-          // ── Dev: API Logs — always visible at the bottom of the sidebar ──
           const Divider(height: 1),
           InkWell(
             onTap: () => Get.to(() => const DevLogsPage()),
@@ -1311,7 +1526,7 @@ class HomePageView extends GetView<HomePageController> {
             cursorColor: AppColors.themeColor,
             controller: controller.stepControllers[index],
             focusNode: controller.stepFocusNodes[index],
-            enabled: true, // editable at all times once shown/unlocked
+            enabled: true,
             style: const TextStyle(fontSize: 13),
             decoration: InputDecoration(
               isDense: true,
@@ -1337,16 +1552,11 @@ class HomePageView extends GetView<HomePageController> {
             onChanged: (_) => controller.onFieldChanged(index),
             onSubmitted: (_) => controller.submitStep(index),
           ),
-          // NOTE: ESN/List validation errors are surfaced via the popup
-          // dialog only (see controller._showErrorPopup). No inline error
-          // text is rendered here anymore to avoid showing the same
-          // message twice (popup + inline).
         ],
       ),
     );
   }
 
-  /// IQA1..IQA4 shown together as one group once Harness is confirmed.
   Widget _buildIqaGroupTile(int index) {
     final isActive = index == controller.currentStepIndex.value;
     final isCompleted = index < controller.currentStepIndex.value;
@@ -1361,7 +1571,7 @@ class HomePageView extends GetView<HomePageController> {
               Icon(
                 isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
                 size: 16,
-                color: isCompleted ? AppColors.themeColor : AppColors.themeColor,
+                color: AppColors.themeColor,
               ),
               const SizedBox(width: 6),
               Text(
@@ -1434,22 +1644,8 @@ class HomePageView extends GetView<HomePageController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // ── Dongle connect — visible as soon as ESN/vehicle is
-                // resolved, independent of the remaining scan steps, so
-                // the technician can connect whenever the dongle is ready. ──
-                Obx(() {
-                  if (!controller.canConnectDongle.value) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: _buildDongleConnectSection(),
-                  );
-                }),
                 Obx(() {
                   if (!controller.allStepsComplete) {
-                    // Nothing else to show yet — still working through
-                    // the remaining scan steps.
                     return const SizedBox.shrink();
                   }
                   return Column(
@@ -1469,166 +1665,22 @@ class HomePageView extends GetView<HomePageController> {
             ),
           ),
         ),
-        // Activity is pinned to the bottom and visible from the very start.
         _buildActivitySection(),
       ],
     );
   }
 
-  /// Dongle IP entry + connect button. Shown once vehicle/ECU info is
-  /// resolved from ESN (controller.canConnectDongle). Not gated on the
-  /// remaining scan steps — the technician can connect the dongle any
-  /// time after ESN, in parallel with List/Harness/IQA scanning.
-  Widget _buildDongleConnectSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.usb, size: 18, color: Colors.grey.shade700),
-              const SizedBox(width: 8),
-              const Text('Dongle Connection',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              const Spacer(),
-              Obx(() {
-                if (!controller.dongleConnected.value) {
-                  return const SizedBox.shrink();
-                }
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle,
-                        color: AppColors.themeColor, size: 16),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Connected',
-                      style: TextStyle(
-                        color: AppColors.themeColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                );
-              }),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Obx(
-                  () => TextField(
-                    controller: controller.dongleIpController,
-                    enabled: !controller.dongleConnected.value &&
-                        !controller.dongleConnecting.value,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Dongle IP, e.g. 192.168.4.1',
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 12),
-                      filled: true,
-                      fillColor: controller.dongleConnected.value
-                          ? Colors.green.withOpacity(0.06)
-                          : Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: Colors.grey.shade200),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: BorderSide(color: AppColors.themeColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide:
-                            BorderSide(color: AppColors.themeColor, width: 1.5),
-                      ),
-                    ),
-                    onSubmitted: (_) {
-                      if (!controller.dongleConnected.value) {
-                        controller.connectDongle();
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Obx(() {
-                if (controller.dongleConnected.value) {
-                  return OutlinedButton(
-                    onPressed: () {
-                      controller.dongleConnected.value = false;
-                      controller.dongleIpController.clear();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    child: const Text('Reconnect',
-                        style: TextStyle(fontSize: 13)),
-                  );
-                }
-                return ElevatedButton(
-                  onPressed:
-                      controller.dongleConnecting.value ? null : controller.connectDongle,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.themeColor,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  child: controller.dongleConnecting.value
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Connect',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                );
-              }),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Recipe popup: table of sensors returned with the matched harness
-  /// (sensor_name / reg_address / type / value / unit), straight from
-  /// the harness API's "receipes" list.
+  /// Recipe popup: static reference table straight from the harness
+  /// API (sensor_name / reg_address / type / pin_no / value / unit).
+  /// A sensor's VALUE only ever changes from the static API value once
+  /// the operator uses the WRITE action on that row — there is no
+  /// automatic PLC read here.
   void _showRecipeDialog() {
     Get.dialog(
       Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: SizedBox(
-          width: 780,
+          width: 860,
           height: 520,
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -1720,6 +1772,11 @@ class HomePageView extends GetView<HomePageController> {
                             fontSize: 11, fontWeight: FontWeight.bold))),
                 Expanded(
                     flex: 2,
+                    child: Text('PIN NO',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.bold))),
+                Expanded(
+                    flex: 2,
                     child: Text('VALUE',
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
@@ -1729,7 +1786,7 @@ class HomePageView extends GetView<HomePageController> {
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
                 Expanded(
-                    flex: 3,
+                    flex: 2,
                     child: Text('WRITE',
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
@@ -1784,31 +1841,35 @@ class HomePageView extends GetView<HomePageController> {
                       ),
                     ),
                   ),
-          Expanded(
-            flex: 2,
-            child: Obx(() {
-              final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
-              if (controller.isReadingPlcValues.value && live == null) {
-                return const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                );
-              }
-              final display = live ?? '${sensor.value ?? '-'}';
-              final isLive = live != null && live != 'ERR';
-              return Text(
-                display,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  color: live == 'ERR'
-                      ? Colors.red
-                      : (isLive ? AppColors.themeColor : Colors.grey.shade500),
-                ),
-              );
-            }),
-          ),
+                  Expanded(
+                    flex: 2,
+                    child: Text(
+                      '${sensor.pinNo ?? '-'}',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700),
+                    ),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: Obx(() {
+                      // Static API value by default. Only replaced once
+                      // the operator explicitly writes this sensor via
+                      // the WRITE action — no automatic PLC read here.
+                      final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+                      final display = live ?? '${sensor.value ?? '-'}';
+                      final isLive = live != null && live != 'ERR';
+                      return Text(
+                        display,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.bold,
+                          color: live == 'ERR'
+                              ? Colors.red
+                              : (isLive ? AppColors.themeColor : Colors.grey.shade500),
+                        ),
+                      );
+                    }),
+                  ),
                   Expanded(
                     flex: 1,
                     child: Text(
@@ -1818,7 +1879,7 @@ class HomePageView extends GetView<HomePageController> {
                     ),
                   ),
                   Expanded(
-                    flex: 3,
+                    flex: 2,
                     child: _SensorWriteAction(
                       sensor: sensor,
                       controller: controller,
@@ -1837,8 +1898,6 @@ class HomePageView extends GetView<HomePageController> {
     return Obx(() {
       final expanded = controller.flashExpanded.value;
 
-      // Compact status shown next to the chevron, regardless of state.
-      // Complete uses an actual checkmark icon instead of text.
       String? statusText;
       if (controller.flashInProgress.value) {
         statusText = '${(controller.flashProgress.value * 100).round()}%';
@@ -1997,8 +2056,6 @@ class HomePageView extends GetView<HomePageController> {
                   style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
                 ),
               ),
-
-            // Big centered timer
             Text(
               controller.formattedElapsed,
               style: const TextStyle(
@@ -2008,8 +2065,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Progress bar
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -2020,8 +2075,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
             const SizedBox(height: 8),
-
-            // Percentage below the bar
             Text(
               '${(controller.flashProgress.value * 100).round()}%',
               style: const TextStyle(
@@ -2031,7 +2084,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
             const SizedBox(height: 24),
-
             Column(
               children: [
                 Image.asset('asset/new/gifPhone.gif', height: 90),
@@ -2043,8 +2095,6 @@ class HomePageView extends GetView<HomePageController> {
         );
       }
 
-      // Unlocked (all scan steps done) but flashing hasn't started yet —
-      // card-list picker instead of a dropdown.
       if (controller.flashFilesLoading.value) {
         return const Padding(
           padding: EdgeInsets.symmetric(vertical: 20),
@@ -2081,9 +2131,6 @@ class HomePageView extends GetView<HomePageController> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Gentle reminder if files are ready but the dongle isn't
-          // connected yet — avoids the "Start Flashing" tap silently
-          // failing with no context.
           if (!controller.dongleConnected.value)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -2102,7 +2149,7 @@ class HomePageView extends GetView<HomePageController> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Connect the dongle above before starting flashing',
+                        'Waiting for the dongle to connect automatically…',
                         style: TextStyle(
                             fontSize: 12, color: Colors.orange.shade800),
                       ),
@@ -2211,9 +2258,6 @@ class HomePageView extends GetView<HomePageController> {
         ));
   }
 
-  /// Boxed DTC card: code bold on top, description grey below.
-  /// Expects "CODE - description" (falls back to showing the raw
-  /// string as the code if that separator isn't present).
   Widget _buildDtcCard(String raw) {
     final splitIndex = raw.indexOf(' - ');
     final code = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
@@ -2262,9 +2306,6 @@ class HomePageView extends GetView<HomePageController> {
         ));
   }
 
-  /// Boxed PID card, same style as the DTC cards: label bold on top,
-  /// value grey below. Expects "Label — value" (falls back to showing
-  /// the raw string as the label if that separator isn't present).
   Widget _buildPidCard(String raw) {
     final splitIndex = raw.indexOf(' — ');
     final label = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
@@ -2455,88 +2496,149 @@ class HomePageView extends GetView<HomePageController> {
   }
 }
 
-/// Inline "write a value" control for one Recipe row: a small number
-/// field + send button. Kept as its own StatefulWidget (rather than
-/// building it inline) so its TextEditingController survives the
-/// Recipe dialog's Obx rebuilds — otherwise typed input would get wiped
-/// out every time any sensor's live value updates elsewhere in the list.
-class _SensorWriteAction extends StatefulWidget {
+/// "WRITE VALUE" button for one Recipe row. Tapping it opens a small
+/// dialog with its own input field — write the value there, and the
+/// confirmed value (read back from the PLC after writing) shows right
+/// inside that same dialog.
+class _SensorWriteAction extends StatelessWidget {
   const _SensorWriteAction({required this.sensor, required this.controller});
 
   final harness_ds.Receipe sensor;
   final HomePageController controller;
 
-  @override
-  State<_SensorWriteAction> createState() => _SensorWriteActionState();
-}
+  void _openWriteValueDialog() {
+    final valueController = TextEditingController();
 
-class _SensorWriteActionState extends State<_SensorWriteAction> {
-  final TextEditingController _valueController = TextEditingController();
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: SizedBox(
+          width: 360,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Write Value — ${sensor.sensorName ?? '-'}',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                      onPressed: () => Get.back(),
+                      splashRadius: 16,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Reg Address: ${sensor.regAddress ?? '-'}  •  Type: ${sensor.type ?? '-'}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: valueController,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Value',
+                    filled: true,
+                    fillColor: const Color(0xFFF5F7FA),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Obx(() {
+                  final id = sensor.id;
+                  final isWriting = id != null && controller.writeInFlightSensorIds.contains(id);
+                  final live = id != null ? controller.livePlcValues[id] : null;
 
-  @override
-  void dispose() {
-    _valueController.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final text = _valueController.text.trim();
-    final value = int.tryParse(text);
-    if (value == null) return;
-    widget.controller.writeSensorValue(widget.sensor, value);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (live != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: live == 'ERR'
+                                ? Colors.red.withOpacity(0.08)
+                                : AppColors.themeColor.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            live == 'ERR'
+                                ? 'Write failed / not confirmed'
+                                : 'Confirmed value: $live ${sensor.unit ?? ''}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: live == 'ERR' ? Colors.red : AppColors.themeColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      SizedBox(
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: isWriting
+                              ? null
+                              : () async {
+                                  final value = int.tryParse(valueController.text.trim());
+                                  if (value == null) return;
+                                  await controller.writeSensorValue(sensor, value);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.themeColor,
+                            disabledBackgroundColor: AppColors.themeColor.withOpacity(0.5),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: isWriting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('WRITE VALUE', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final id = widget.sensor.id;
-      final isWriting = id != null && widget.controller.writeInFlightSensorIds.contains(id);
-
-      return Row(
-        children: [
-          SizedBox(
-            width: 60,
-            height: 32,
-            child: TextField(
-              controller: _valueController,
-              enabled: !isWriting,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 12),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                filled: true,
-                fillColor: const Color(0xFFF5F7FA),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide.none,
-                ),
-                hintText: 'val',
-                hintStyle: const TextStyle(fontSize: 11),
-              ),
-              onSubmitted: (_) => _submit(),
-            ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              icon: isWriting
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.send, size: 16, color: AppColors.themeColor),
-              onPressed: isWriting ? null : _submit,
-              tooltip: 'Write value to PLC',
-            ),
-          ),
-        ],
-      );
-    });
+    return SizedBox(
+      height: 32,
+      child: ElevatedButton(
+        onPressed: _openWriteValueDialog,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.themeColor,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: const Text(
+          'WRITE VALUE',
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ),
+    );
   }
 }
-

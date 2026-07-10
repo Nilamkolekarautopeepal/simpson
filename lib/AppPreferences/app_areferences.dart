@@ -19,6 +19,42 @@ class SecureStorageService {
 
   // ── Remember Me flag ──
 
+  static const _dongleIpKey = 'dongle_ip';
+  static const _plcIpKey = 'plc_ip';
+  static const _plcPortKey = 'plc_port';
+
+static Future<void> saveDongleIp(String? ip) async {
+  if (ip == null || ip.isEmpty) return;
+  await _storage.write(key: _dongleIpKey, value: ip);
+
+}
+static Future<void> savePlcIp(String? ip) async {
+  if (ip == null || ip.isEmpty) return;
+  await _storage.write(key: _plcIpKey, value: ip);
+
+
+}
+
+static Future<void> savePlcPort(String? port) async {
+  if (port == null || port.isEmpty) return;
+  await _storage.write(key: _plcPortKey, value: port);
+}
+
+
+static Future<String?> getDongleIp() async {
+  return await _storage.read(key: _dongleIpKey);
+
+  
+}
+
+static Future<String?> getPlcIp() async {
+  return await _storage.read(key: _plcIpKey);
+}
+
+static Future<String?> getPlcPort() async {
+  return await _storage.read(key: _plcPortKey);
+}
+
   static Future<void> setRememberMe(bool value) =>
       _storage.write(key: _rememberMeKey, value: value.toString());
 

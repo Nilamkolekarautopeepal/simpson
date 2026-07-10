@@ -532,15 +532,44 @@ class EcuMapFile {
     this.priority,
   });
 
-  factory EcuMapFile.fromJson(Map<String, dynamic> json) => EcuMapFile(
-        id: json["id"],
-        startAddress: json["start_address"],
-        startAddr: json["start_addr"],
-        endAddress: json["end_address"],
-        endAddr: json["end_addr"],
-        sectorName: json["sector_name"],
-        priority: json["priority"],
-      );
+  factory EcuMapFile.fromJson(Map<String, dynamic> json) {
+    final String? startAddressStr = json["start_address"];
+    final String? endAddressStr = json["end_address"];
+
+    // 🔧 FIX: derive startAddr/endAddr from the hex string fields
+    // (start_address/end_address) instead of trusting the API's separate
+    // start_addr/end_addr numeric fields directly. Those two numeric
+    // fields have been observed to diverge from the hex string for at
+    // least one variant — e.g. start_address="08FD8000" (correct, matches
+    // the flash sequence file) while start_addr held a completely
+    // different value (~0x0060C000), causing RequestDownload (UDS 0x34)
+    // to target the wrong ECU memory range and fail with
+    // ECUERROR_REQUESTOUTOFRANGE (NRC 0x31). Parsing from the hex string
+    // ourselves removes the dependency on that second field being kept
+    // in sync on the backend.
+    int? parsedStartAddr = startAddressStr != null
+        ? int.tryParse(startAddressStr, radix: 16)
+        : null;
+    int? parsedEndAddr = endAddressStr != null
+        ? int.tryParse(endAddressStr, radix: 16)
+        : null;
+
+    // If parsing the hex string failed for some reason (null/malformed),
+    // fall back to whatever the API's numeric field provided rather than
+    // silently producing a null address.
+    parsedStartAddr ??= json["start_addr"];
+    parsedEndAddr ??= json["end_addr"];
+
+    return EcuMapFile(
+      id: json["id"],
+      startAddress: startAddressStr,
+      startAddr: parsedStartAddr,
+      endAddress: endAddressStr,
+      endAddr: parsedEndAddr,
+      sectorName: json["sector_name"],
+      priority: json["priority"],
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         "id": id,

@@ -247,10 +247,12 @@ class ECUCalculateSeedkey {
     List<int> combined = [...sSeed, ...seed];
 
     // Debug: show exactly what secret+seed we are hashing
-    print('🔑 getHash[$seedKey]: '
-        'secret=${sSeed.map((b)=>b.toRadixString(16).padLeft(2,"0")).join()} '
-        'seed=${seed.map((b)=>b.toRadixString(16).padLeft(2,"0")).join()} '
-        'combined=${combined.length}bytes');
+    print(
+      '🔑 getHash[$seedKey]: '
+      'secret=${sSeed.map((b) => b.toRadixString(16).padLeft(2, "0")).join()} '
+      'seed=${seed.map((b) => b.toRadixString(16).padLeft(2, "0")).join()} '
+      'combined=${combined.length}bytes',
+    );
 
     var digest = RIPEMD160Digest();
     Uint8List output = Uint8List(digest.digestSize);
@@ -590,20 +592,23 @@ class ECUCalculateSeedkey {
       final mask32 = BigInt.parse('FFFFFFFF', radix: 16);
       final mask64 = BigInt.parse('FFFFFFFFFFFFFFFF', radix: 16);
 
-      BigInt sBig  = BigInt.from(s) & mask32;
-      BigInt ekBig = BigInt.parse(ek.toRadixString(16).padLeft(16,'0'), radix: 16);
+      BigInt sBig = BigInt.from(s) & mask32;
+      BigInt ekBig = BigInt.parse(
+        ek.toRadixString(16).padLeft(16, '0'),
+        radix: 16,
+      );
 
-      BigInt revS        = BigInt.from(reverseBits32(s));
-      BigInt notS        = (~sBig) & mask32;
-      BigInt notEK       = (~ekBig) & mask64;
-      String ekBinStr    = ekBig.toRadixString(2).padLeft(64, '0');
-      BigInt revEK       = BigInt.parse(ekBinStr.split('').reversed.join(), radix: 2);
-      BigInt rotL14S     = ((sBig << 14) | (sBig >> (32 - 14))) & mask32;
-      BigInt rotL31EK    = ((ekBig << 31) | (ekBig >> (64 - 31))) & mask64;
-      BigInt rotL13EK    = ((ekBig << 13) | (ekBig >> (64 - 13))) & mask64;
+      BigInt revS = BigInt.from(reverseBits32(s));
+      BigInt notS = (~sBig) & mask32;
+      BigInt notEK = (~ekBig) & mask64;
+      String ekBinStr = ekBig.toRadixString(2).padLeft(64, '0');
+      BigInt revEK = BigInt.parse(ekBinStr.split('').reversed.join(), radix: 2);
+      BigInt rotL14S = ((sBig << 14) | (sBig >> (32 - 14))) & mask32;
+      BigInt rotL31EK = ((ekBig << 31) | (ekBig >> (64 - 31))) & mask64;
+      BigInt rotL13EK = ((ekBig << 13) | (ekBig >> (64 - 13))) & mask64;
       BigInt notRotL13EK = (~rotL13EK) & mask64;
-      BigInt rotR10S     = ((sBig >> 10) | (sBig << (32 - 10))) & mask32;
-      BigInt revRotR10S  = BigInt.from(reverseBits32(rotR10S.toInt()));
+      BigInt rotR10S = ((sBig >> 10) | (sBig << (32 - 10))) & mask32;
+      BigInt revRotR10S = BigInt.from(reverseBits32(rotR10S.toInt()));
 
       String bHex =
           sBig.toRadixString(16).padLeft(8, '0') +
@@ -625,16 +630,53 @@ class ECUCalculateSeedkey {
       Uint8List d = Uint8List(ripemd.digestSize);
       ripemd.doFinal(d, 0);
 
-      List<int> revD  = d.reversed.toList();
-      String revDHex  = revD.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-      String revDBin  = revDHex.split('').map((c) =>
-          int.parse(c, radix: 16).toRadixString(2).padLeft(4, '0')).join();
-      String dBin     = revDBin.split('').reversed.join();
+      List<int> revD = d.reversed.toList();
+      String revDHex = revD
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join();
+      String revDBin = revDHex
+          .split('')
+          .map((c) => int.parse(c, radix: 16).toRadixString(2).padLeft(4, '0'))
+          .join();
+      String dBin = revDBin.split('').reversed.join();
 
-      List<int> positions = [19,74,59,78,0,26,89,77,144,107,47,134,61,88,58,135,121,95,29,158,81,54,70,115,46,3,44,123,39,157,30,90];
+      List<int> positions = [
+        19,
+        74,
+        59,
+        78,
+        0,
+        26,
+        89,
+        77,
+        144,
+        107,
+        47,
+        134,
+        61,
+        88,
+        58,
+        135,
+        121,
+        95,
+        29,
+        158,
+        81,
+        54,
+        70,
+        115,
+        46,
+        3,
+        44,
+        123,
+        39,
+        157,
+        30,
+        90,
+      ];
 
-      String keyBits  = positions.map((i) => dBin[i]).join();
-      keyBits         = keyBits.split('').reversed.join();
+      String keyBits = positions.map((i) => dBin[i]).join();
+      keyBits = keyBits.split('').reversed.join();
 
       int k = int.parse(keyBits, radix: 2);
       return uint32ToBytes(k);

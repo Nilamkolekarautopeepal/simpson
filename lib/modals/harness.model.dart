@@ -109,6 +109,7 @@ class Receipe {
   String? type;
   String? value;
   String? unit;
+  String? pinNo;
   bool? isActive;
 
   Receipe({
