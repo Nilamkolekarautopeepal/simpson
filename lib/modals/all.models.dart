@@ -78,7 +78,9 @@ class SubModel {
   dynamic segment;
   String? modelYear;
   dynamic subModelFile;
-  InjectorCharectorization? injectorCharectorization;
+  // Was a closed enum with only "ACTIVE" — kept as String so any status
+  // the API returns (e.g. "INACTIVE", "PENDING") doesn't crash parsing.
+  String? injectorCharectorization;
   String? password;
   List<dynamic>? runTimeLicenses;
   bool? isActive;
@@ -103,8 +105,7 @@ class SubModel {
         segment: json["segment"],
         modelYear: json["model_year"],
         subModelFile: json["sub_model_file"],
-        injectorCharectorization: injectorCharectorizationValues
-            .map[json["injector_charectorization"]]!,
+        injectorCharectorization: json["injector_charectorization"],
         password: json["password"],
         runTimeLicenses: json["run_time_licenses"] == null
             ? []
@@ -122,8 +123,7 @@ class SubModel {
         "segment": segment,
         "model_year": modelYear,
         "sub_model_file": subModelFile,
-        "injector_charectorization":
-            injectorCharectorizationValues.reverse[injectorCharectorization],
+        "injector_charectorization": injectorCharectorization,
         "password": password,
         "run_time_licenses": runTimeLicenses == null
             ? []
@@ -135,11 +135,6 @@ class SubModel {
       };
 }
 
-enum InjectorCharectorization { ACTIVE }
-
-final injectorCharectorizationValues =
-    EnumValues({"ACTIVE": InjectorCharectorization.ACTIVE});
-
 class SubmodelModelecu {
   int? id;
   Ecu? ecu;
@@ -148,7 +143,9 @@ class SubmodelModelecu {
   List<dynamic>? ivnDtcDatasets;
   List<dynamic>? ivnPidDatasets;
   FlashFile? flashFile;
-  FiringSequence? firingSequence;
+  // Was a closed enum with only "1,2,3"/"1,3,4,2" — any other injector
+  // count/order (5-cyl, 6-cyl, different order) would crash parsing.
+  String? firingSequence;
   int? noOfInjectors;
   List<String>? routineTest;
 
@@ -186,7 +183,7 @@ class SubmodelModelecu {
         flashFile: json["flash_file"] == null
             ? null
             : FlashFile.fromJson(json["flash_file"]),
-        firingSequence: firingSequenceValues.map[json["firing_sequence"]]!,
+        firingSequence: json["firing_sequence"],
         noOfInjectors: json["no_of_injectors"],
         routineTest: json["routine_test"] == null
             ? []
@@ -209,7 +206,7 @@ class SubmodelModelecu {
             ? []
             : List<dynamic>.from(ivnPidDatasets!.map((x) => x)),
         "flash_file": flashFile?.toJson(),
-        "firing_sequence": firingSequenceValues.reverse[firingSequence],
+        "firing_sequence": firingSequence,
         "no_of_injectors": noOfInjectors,
         "routine_test": routineTest == null
             ? []
@@ -239,12 +236,20 @@ class Dataset {
 
 class Ecu {
   int? id;
-  SequenceFileNameEnum? name;
+  // Was a closed enum with only MD1CC878/MD1CS162 — any new ECU model name
+  // from the API would crash parsing. Free text, matches real-world usage.
+  String? name;
   int? priority;
-  TxHeader? txHeader;
-  RxHeader? rxHeader;
+  // Was closed enums keyed to literal "07E0"/"07E8" — these are exactly the
+  // fields your dllFunctions code (setDongleProperties, canSetTxHeader, etc.)
+  // needs as raw hex strings. Any new ECU with a different header would have
+  // crashed parsing before reaching your flashing code at all.
+  String? txHeader;
+  String? rxHeader;
   dynamic readWritePidByAddr;
-  Channel? channel;
+  // Was a closed enum with only "CHANNEL-0" — any other channel string
+  // would crash parsing.
+  String? channel;
   Protocol? protocol;
   FnIndex? readDtcFnIndex;
   FnIndex? clearDtcFnIndex;
@@ -274,12 +279,12 @@ class Ecu {
 
   factory Ecu.fromJson(Map<String, dynamic> json) => Ecu(
         id: json["id"],
-        name: sequenceFileNameEnumValues.map[json["name"]]!,
+        name: json["name"],
         priority: json["priority"],
-        txHeader: txHeaderValues.map[json["tx_header"]]!,
-        rxHeader: rxHeaderValues.map[json["rx_header"]]!,
+        txHeader: json["tx_header"],
+        rxHeader: json["rx_header"],
         readWritePidByAddr: json["read_write_pid_by_addr"],
-        channel: channelValues.map[json["channel"]]!,
+        channel: json["channel"],
         protocol: json["protocol"] == null
             ? null
             : Protocol.fromJson(json["protocol"]),
@@ -306,12 +311,12 @@ class Ecu {
 
   Map<String, dynamic> toJson() => {
         "id": id,
-        "name": sequenceFileNameEnumValues.reverse[name],
+        "name": name,
         "priority": priority,
-        "tx_header": txHeaderValues.reverse[txHeader],
-        "rx_header": rxHeaderValues.reverse[rxHeader],
+        "tx_header": txHeader,
+        "rx_header": rxHeader,
         "read_write_pid_by_addr": readWritePidByAddr,
-        "channel": channelValues.reverse[channel],
+        "channel": channel,
         "protocol": protocol?.toJson(),
         "read_dtc_fn_index": readDtcFnIndex?.toJson(),
         "clear_dtc_fn_index": clearDtcFnIndex?.toJson(),
@@ -323,53 +328,32 @@ class Ecu {
       };
 }
 
-enum Channel { CHANNEL_0 }
-
-final channelValues = EnumValues({"CHANNEL-0": Channel.CHANNEL_0});
-
 class FnIndex {
-  Value? value;
+  // Was a closed enum (Value) requiring every seed-key/UDS function name to
+  // be pre-registered here. New security algorithms or function indexes
+  // from the API would otherwise crash parsing before you could even see
+  // what value came back.
+  String? value;
 
   FnIndex({
     this.value,
   });
 
   factory FnIndex.fromJson(Map<String, dynamic> json) => FnIndex(
-        value: valueValues.map[json["value"]]!,
+        value: json["value"],
       );
 
   Map<String, dynamic> toJson() => {
-        "value": valueValues.reverse[value],
+        "value": value,
       };
 }
 
-enum Value {
-  SIMPSON_MD1_CC878_SECURITY,
-  SIMPSON_MDCS162_SECURITY,
-  UDS,
-  UDS_3_BYTE_DTC,
-  UDS_4_BYTES,
-  UDS_DS1003_SK0102
-}
-
-final valueValues = EnumValues({
-  "SIMPSON_MD1CC878_SECURITY": Value.SIMPSON_MD1_CC878_SECURITY,
-  "SIMPSON_MDCS162_SECURITY": Value.SIMPSON_MDCS162_SECURITY,
-  "UDS": Value.UDS,
-  "UDS_3BYTE_DTC": Value.UDS_3_BYTE_DTC,
-  "UDS_4BYTES": Value.UDS_4_BYTES,
-  "UDS_DS1003_SK0102": Value.UDS_DS1003_SK0102
-});
-
-enum SequenceFileNameEnum { MD1_CC878, MD1_CS162 }
-
-final sequenceFileNameEnumValues = EnumValues({
-  "MD1CC878": SequenceFileNameEnum.MD1_CC878,
-  "MD1CS162": SequenceFileNameEnum.MD1_CS162
-});
-
 class Protocol {
-  ProtocolName? name;
+  // Was a closed enum with only ISO15765_1MB_11BIT_CAN — this is exactly
+  // the field setDongleProperties1() uses for Protocol.values.firstWhere(),
+  // so it needs to be a plain String to match against Protocol (comm-layer
+  // enum) by name, and to not crash on any new protocol the API adds.
+  String? name;
   dynamic elm;
   String? autopeepal;
 
@@ -380,136 +364,116 @@ class Protocol {
   });
 
   factory Protocol.fromJson(Map<String, dynamic> json) => Protocol(
-        name: protocolNameValues.map[json["name"]]!,
+        name: json["name"],
         elm: json["elm"],
         autopeepal: json["autopeepal"],
       );
 
   Map<String, dynamic> toJson() => {
-        "name": protocolNameValues.reverse[name],
+        "name": name,
         "elm": elm,
         "autopeepal": autopeepal,
       };
 }
 
-enum ProtocolName { ISO15765_1_MB_11_BIT_CAN }
+// class FlashFile {
+//   int? id;
+//   String? sequenceFileName;
+//   String? sequenceFile;
+//   List<FileElement>? file;
+//   Protocol? protocol;
+//   String? txHeader;
+//   String? rxHeader;
+//   dynamic flashDiagnosticMode;
+//   dynamic flashSeedKeyLength;
+//   dynamic flashAddressDataFormat;
+//   dynamic flashEraseType;
+//   dynamic flashFraseByte;
+//   dynamic flashNaxBlkseqcntr;
+//   dynamic flashsepTime;
+//   dynamic flashCheckSumType;
+//   dynamic flashStatus;
+//   String? sectorframetransferlen;
+//   String? sendseedbyte;
+//   List<dynamic>? ecuMapFile;
 
-final protocolNameValues = EnumValues(
-    {"ISO15765_1MB_11BIT_CAN": ProtocolName.ISO15765_1_MB_11_BIT_CAN});
+//   FlashFile({
+//     this.id,
+//     this.sequenceFileName,
+//     this.sequenceFile,
+//     this.file,
+//     this.protocol,
+//     this.txHeader,
+//     this.rxHeader,
+//     this.flashDiagnosticMode,
+//     this.flashSeedKeyLength,
+//     this.flashAddressDataFormat,
+//     this.flashEraseType,
+//     this.flashFraseByte,
+//     this.flashNaxBlkseqcntr,
+//     this.flashsepTime,
+//     this.flashCheckSumType,
+//     this.flashStatus,
+//     this.sectorframetransferlen,
+//     this.sendseedbyte,
+//     this.ecuMapFile,
+//   });
 
-enum RxHeader { THE_07_E8 }
+//   factory FlashFile.fromJson(Map<String, dynamic> json) => FlashFile(
+//         id: json["id"],
+//         sequenceFileName: json["sequence_file_name"]?.toString(),
+//         sequenceFile: json["sequence_file"],
+//         file: json["file"] == null
+//             ? []
+//             : List<FileElement>.from(
+//                 json["file"]!.map((x) => FileElement.fromJson(x))),
+//         protocol: json["protocol"] == null
+//             ? null
+//             : Protocol.fromJson(json["protocol"]),
+//         txHeader: json["tx_header"],
+//         rxHeader: json["rx_header"],
+//         flashDiagnosticMode: json["flash_diagnostic_mode"],
+//         flashSeedKeyLength: json["flash_seed_key_length"],
+//         flashAddressDataFormat: json["flash_address_data_format"],
+//         flashEraseType: json["flash_erase_type"],
+//         flashFraseByte: json["flash_frase_byte"],
+//         flashNaxBlkseqcntr: json["flash_nax_blkseqcntr"],
+//         flashsepTime: json["flashsep_time"],
+//         flashCheckSumType: json["flash_check_sum_type"],
+//         flashStatus: json["flash_status"],
+//         sectorframetransferlen: json["sectorframetransferlen"],
+//         sendseedbyte: json["sendseedbyte"],
+//         ecuMapFile: json["ecu_map_file"] == null
+//             ? []
+//             : List<dynamic>.from(json["ecu_map_file"]!.map((x) => x)),
+//       );
 
-final rxHeaderValues = EnumValues({"07E8": RxHeader.THE_07_E8});
-
-enum TxHeader { THE_07_E0 }
-
-final txHeaderValues = EnumValues({"07E0": TxHeader.THE_07_E0});
-
-enum FiringSequence { THE_123, THE_1342 }
-
-final firingSequenceValues = EnumValues(
-    {"1,2,3": FiringSequence.THE_123, "1,3,4,2": FiringSequence.THE_1342});
-
-class FlashFile {
-  int? id;
-  SequenceFileNameEnum? sequenceFileName;
-  String? sequenceFile;
-  List<FileElement>? file;
-  Protocol? protocol;
-  TxHeader? txHeader;
-  RxHeader? rxHeader;
-  dynamic flashDiagnosticMode;
-  dynamic flashSeedKeyLength;
-  dynamic flashAddressDataFormat;
-  dynamic flashEraseType;
-  dynamic flashFraseByte;
-  dynamic flashNaxBlkseqcntr;
-  dynamic flashsepTime;
-  dynamic flashCheckSumType;
-  dynamic flashStatus;
-  String? sectorframetransferlen;
-  String? sendseedbyte;
-  List<dynamic>? ecuMapFile;
-
-  FlashFile({
-    this.id,
-    this.sequenceFileName,
-    this.sequenceFile,
-    this.file,
-    this.protocol,
-    this.txHeader,
-    this.rxHeader,
-    this.flashDiagnosticMode,
-    this.flashSeedKeyLength,
-    this.flashAddressDataFormat,
-    this.flashEraseType,
-    this.flashFraseByte,
-    this.flashNaxBlkseqcntr,
-    this.flashsepTime,
-    this.flashCheckSumType,
-    this.flashStatus,
-    this.sectorframetransferlen,
-    this.sendseedbyte,
-    this.ecuMapFile,
-  });
-
-  factory FlashFile.fromJson(Map<String, dynamic> json) => FlashFile(
-        id: json["id"],
-        sequenceFileName:
-            sequenceFileNameEnumValues.map[json["sequence_file_name"]]!,
-        sequenceFile: json["sequence_file"],
-        file: json["file"] == null
-            ? []
-            : List<FileElement>.from(
-                json["file"]!.map((x) => FileElement.fromJson(x))),
-        protocol: json["protocol"] == null
-            ? null
-            : Protocol.fromJson(json["protocol"]),
-        txHeader: txHeaderValues.map[json["tx_header"]]!,
-        rxHeader: rxHeaderValues.map[json["rx_header"]]!,
-        flashDiagnosticMode: json["flash_diagnostic_mode"],
-        flashSeedKeyLength: json["flash_seed_key_length"],
-        flashAddressDataFormat: json["flash_address_data_format"],
-        flashEraseType: json["flash_erase_type"],
-        flashFraseByte: json["flash_frase_byte"],
-        flashNaxBlkseqcntr: json["flash_nax_blkseqcntr"],
-        flashsepTime: json["flashsep_time"],
-        flashCheckSumType: json["flash_check_sum_type"],
-        flashStatus: json["flash_status"],
-        sectorframetransferlen: json["sectorframetransferlen"],
-        sendseedbyte: json["sendseedbyte"],
-        ecuMapFile: json["ecu_map_file"] == null
-            ? []
-            : List<dynamic>.from(json["ecu_map_file"]!.map((x) => x)),
-      );
-
-  Map<String, dynamic> toJson() => {
-        "id": id,
-        "sequence_file_name":
-            sequenceFileNameEnumValues.reverse[sequenceFileName],
-        "sequence_file": sequenceFile,
-        "file": file == null
-            ? []
-            : List<dynamic>.from(file!.map((x) => x.toJson())),
-        "protocol": protocol?.toJson(),
-        "tx_header": txHeaderValues.reverse[txHeader],
-        "rx_header": rxHeaderValues.reverse[rxHeader],
-        "flash_diagnostic_mode": flashDiagnosticMode,
-        "flash_seed_key_length": flashSeedKeyLength,
-        "flash_address_data_format": flashAddressDataFormat,
-        "flash_erase_type": flashEraseType,
-        "flash_frase_byte": flashFraseByte,
-        "flash_nax_blkseqcntr": flashNaxBlkseqcntr,
-        "flashsep_time": flashsepTime,
-        "flash_check_sum_type": flashCheckSumType,
-        "flash_status": flashStatus,
-        "sectorframetransferlen": sectorframetransferlen,
-        "sendseedbyte": sendseedbyte,
-        "ecu_map_file": ecuMapFile == null
-            ? []
-            : List<dynamic>.from(ecuMapFile!.map((x) => x)),
-      };
-}
+//   Map<String, dynamic> toJson() => {
+//         "id": id,
+//         "sequence_file_name": sequenceFileName,
+//         "sequence_file": sequenceFile,
+//         "file": file == null
+//             ? []
+//             : List<dynamic>.from(file!.map((x) => x.toJson())),
+//         "protocol": protocol?.toJson(),
+//         "tx_header": txHeader,
+//         "rx_header": rxHeader,
+//         "flash_diagnostic_mode": flashDiagnosticMode,
+//         "flash_seed_key_length": flashSeedKeyLength,
+//         "flash_address_data_format": flashAddressDataFormat,
+//         "flash_erase_type": flashEraseType,
+//         "flash_frase_byte": flashFraseByte,
+//         "flash_nax_blkseqcntr": flashNaxBlkseqcntr,
+//         "flashsep_time": flashsepTime,
+//         "flash_check_sum_type": flashCheckSumType,
+//         "flash_status": flashStatus,
+//         "sectorframetransferlen": sectorframetransferlen,
+//         "sendseedbyte": sendseedbyte,
+//         "ecu_map_file": ecuMapFile == null
+//             ? []
+//             : List<dynamic>.from(ecuMapFile!.map((x) => x)),
+//       };
+// }
 
 class FileElement {
   int? id;
@@ -547,14 +511,146 @@ class FileElement {
       };
 }
 
-class EnumValues<T> {
-  Map<String, T> map;
-  late Map<T, String> reverseMap;
+/// Represents one flashable memory-address sector for an ECU, as returned
+/// directly by the API under flash_file.ecu_map_file / ecu2.ecu_map_file.
+class EcuMapFile {
+  int? id;
+  String? startAddress;
+  int? startAddr;
+  String? endAddress;
+  int? endAddr;
+  String? sectorName;
+  int? priority;
 
-  EnumValues(this.map);
+  EcuMapFile({
+    this.id,
+    this.startAddress,
+    this.startAddr,
+    this.endAddress,
+    this.endAddr,
+    this.sectorName,
+    this.priority,
+  });
 
-  Map<T, String> get reverse {
-    reverseMap = map.map((k, v) => MapEntry(v, k));
-    return reverseMap;
-  }
+  factory EcuMapFile.fromJson(Map<String, dynamic> json) => EcuMapFile(
+        id: json["id"],
+        startAddress: json["start_address"],
+        startAddr: json["start_addr"],
+        endAddress: json["end_address"],
+        endAddr: json["end_addr"],
+        sectorName: json["sector_name"],
+        priority: json["priority"],
+      );
+
+  Map<String, dynamic> toJson() => {
+        "id": id,
+        "start_address": startAddress,
+        "start_addr": startAddr,
+        "end_address": endAddress,
+        "end_addr": endAddr,
+        "sector_name": sectorName,
+        "priority": priority,
+      };
+}
+
+class FlashFile {
+  int? id;
+  String? sequenceFileName;
+  String? sequenceFile;
+  List<FileElement>? file;
+  Protocol? protocol;
+  String? txHeader;
+  String? rxHeader;
+  dynamic flashDiagnosticMode;
+  dynamic flashSeedKeyLength;
+  dynamic flashAddressDataFormat;
+  dynamic flashEraseType;
+  dynamic flashFraseByte;
+  dynamic flashNaxBlkseqcntr;
+  dynamic flashsepTime;
+  dynamic flashCheckSumType;
+  dynamic flashStatus;
+  String? sectorframetransferlen;
+  String? sendseedbyte;
+  // Was List<dynamic> — now properly typed against the real API shape,
+  // matching EcuMapFile.fromJson above (id/start_addr/end_addr/sector_name/priority).
+  List<EcuMapFile>? ecuMapFile;
+
+  FlashFile({
+    this.id,
+    this.sequenceFileName,
+    this.sequenceFile,
+    this.file,
+    this.protocol,
+    this.txHeader,
+    this.rxHeader,
+    this.flashDiagnosticMode,
+    this.flashSeedKeyLength,
+    this.flashAddressDataFormat,
+    this.flashEraseType,
+    this.flashFraseByte,
+    this.flashNaxBlkseqcntr,
+    this.flashsepTime,
+    this.flashCheckSumType,
+    this.flashStatus,
+    this.sectorframetransferlen,
+    this.sendseedbyte,
+    this.ecuMapFile,
+  });
+
+  factory FlashFile.fromJson(Map<String, dynamic> json) => FlashFile(
+        id: json["id"],
+        sequenceFileName: json["sequence_file_name"]?.toString(),
+        sequenceFile: json["sequence_file"],
+        file: json["file"] == null
+            ? []
+            : List<FileElement>.from(
+                json["file"]!.map((x) => FileElement.fromJson(x))),
+        protocol: json["protocol"] == null
+            ? null
+            : Protocol.fromJson(json["protocol"]),
+        txHeader: json["tx_header"],
+        rxHeader: json["rx_header"],
+        flashDiagnosticMode: json["flash_diagnostic_mode"],
+        flashSeedKeyLength: json["flash_seed_key_length"],
+        flashAddressDataFormat: json["flash_address_data_format"],
+        flashEraseType: json["flash_erase_type"],
+        flashFraseByte: json["flash_frase_byte"],
+        flashNaxBlkseqcntr: json["flash_nax_blkseqcntr"],
+        flashsepTime: json["flashsep_time"],
+        flashCheckSumType: json["flash_check_sum_type"],
+        flashStatus: json["flash_status"],
+        sectorframetransferlen: json["sectorframetransferlen"],
+        sendseedbyte: json["sendseedbyte"],
+        ecuMapFile: json["ecu_map_file"] == null
+            ? []
+            : List<EcuMapFile>.from(
+                json["ecu_map_file"]!.map((x) => EcuMapFile.fromJson(x))),
+      );
+
+  Map<String, dynamic> toJson() => {
+        "id": id,
+        "sequence_file_name": sequenceFileName,
+        "sequence_file": sequenceFile,
+        "file": file == null
+            ? []
+            : List<dynamic>.from(file!.map((x) => x.toJson())),
+        "protocol": protocol?.toJson(),
+        "tx_header": txHeader,
+        "rx_header": rxHeader,
+        "flash_diagnostic_mode": flashDiagnosticMode,
+        "flash_seed_key_length": flashSeedKeyLength,
+        "flash_address_data_format": flashAddressDataFormat,
+        "flash_erase_type": flashEraseType,
+        "flash_frase_byte": flashFraseByte,
+        "flash_nax_blkseqcntr": flashNaxBlkseqcntr,
+        "flashsep_time": flashsepTime,
+        "flash_check_sum_type": flashCheckSumType,
+        "flash_status": flashStatus,
+        "sectorframetransferlen": sectorframetransferlen,
+        "sendseedbyte": sendseedbyte,
+        "ecu_map_file": ecuMapFile == null
+            ? []
+            : List<dynamic>.from(ecuMapFile!.map((x) => x.toJson())),
+      };
 }

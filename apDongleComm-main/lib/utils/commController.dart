@@ -49,12 +49,10 @@ class CommController extends GetxController implements ICommController {
   Future<void> connectWifi({
     required String host,
     required int port,
-    required Connectivity selectedType, // ✅ Add this parameter
+    //required Connectivity selectedType, // ✅ Add this parameter
   }) async {
     try {
-      print(
-        "🌐 [connectWifi] Attempting $selectedType connection to $host:$port...",
-      );
+     //
       await disconnect();
 
       _socket = await Socket.connect(
@@ -68,7 +66,7 @@ class CommController extends GetxController implements ICommController {
       isConnected.value = true;
 
       // ✅ Set the dynamic connectivity value
-      connectivityRx.value = selectedType;
+     // connectivityRx.value = selectedType;
 
       _connectionStream.add(true);
       // Skip startForegroundService on Windows — causes semaphore timeout
@@ -93,7 +91,7 @@ class CommController extends GetxController implements ICommController {
       // Do NOT clear buffer here - data may arrive immediately after listen()
       // _buffer.clear() removed - caused data loss on Windows
 
-      print('🚀 $selectedType Ready over WiFi');
+      //print('🚀 $selectedType Ready over WiFi');
     } on SocketException catch (e) {
       print('🔥 SocketException: $e');
       _handleDisconnect();
