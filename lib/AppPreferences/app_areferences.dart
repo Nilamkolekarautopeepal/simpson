@@ -19,6 +19,17 @@ class SecureStorageService {
 
   // ── Remember Me flag ──
 
+  static const _dongleIpKey = 'dongle_ip';
+
+static Future<void> saveDongleIp(String? ip) async {
+  if (ip == null || ip.isEmpty) return;
+  await _storage.write(key: _dongleIpKey, value: ip);
+}
+
+static Future<String?> getDongleIp() async {
+  return await _storage.read(key: _dongleIpKey);
+}
+
   static Future<void> setRememberMe(bool value) =>
       _storage.write(key: _rememberMeKey, value: value.toString());
 

@@ -5,7 +5,7 @@ class ApiUrls {
   // static const String baseUrl1 = "http://192.168.1.184:8080/api/v1";
  
   // Auth
-  static const String login = "$baseUrl/accounts/login/";
+  static const String login = "$baseUrl/accounts/new1/login/";
   static const String refreshToken = "$baseUrl/auth/refresh/";
   static const String logout = "$baseUrl/auth/logout/";
  

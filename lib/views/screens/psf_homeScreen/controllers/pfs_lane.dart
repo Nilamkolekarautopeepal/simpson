@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:simpson/modals/dtcDataset.model.dart' show DtcCode;
-import 'package:simpson/modals/pidDataset.model.dart' show Code, MessageType, PiCodeVariable;
+import 'package:simpson/modals/pidDataset.model.dart' show Code, MessageType, PiCodeVariables;
 
 /// One lane in the PFS Station's 6-lane grid. Uses individual Rx fields
 /// (rather than one big Rx<PsfLane>) so updating one field only rebuilds
@@ -66,7 +66,7 @@ class PsfLane {
   /// entries, not on Code itself — a Code counts as "IQA" if any of its
   /// piCodeVariable entries are tagged MessageType.IQA.
   void applyPidCodes(List<Code> codes) {
-    bool isIqa(Code c) => (c.piCodeVariable ?? const <PiCodeVariable>[])
+    bool isIqa(Code c) => (c.piCodeVariable ?? const <PiCodeVariables>[])
         .any((v) => v.messageType == MessageType.IQA);
 
     iqaParameterCodes.assignAll(codes.where(isIqa));

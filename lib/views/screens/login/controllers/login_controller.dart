@@ -27,9 +27,7 @@ class LoginController extends GetxController {
   final RxString errorMessage = ''.obs;
   final Rx<User?> currentUser = Rx<User?>(null);
 
-  // Station selection dropdown
-  final List<String> stationOptions = const ['PFS Station', 'Test Station'];
-  final RxString selectedStation = 'Test Station'.obs;
+ 
 
   @override
   void onInit() {
@@ -55,6 +53,80 @@ class LoginController extends GetxController {
       passwordController.value.text = savedPassword;
     }
   }
+
+  // Future<void> login() async {
+  //   debugPrint("🔵 [Login] Button pressed");
+
+  //   final username = usernameController.value.text.trim();
+  //   final password = passwordController.value.text.trim();
+  //   debugPrint(
+  //       "🔵 [Login] username='$username' password_length=${password.length}");
+
+  //   if (username.isEmpty || password.isEmpty) {
+  //     debugPrint("🔴 [Login] Validation failed: empty username or password");
+  //     errorMessage.value = "Username and password are required";
+  //     _showErrorPopup(errorMessage.value);
+  //     return;
+  //   }
+
+  //   try {
+  //     isLoading.value = true;
+  //     errorMessage.value = '';
+  //     debugPrint("🔵 [Login] Fetching macId and deviceType...");
+
+  //     final macId = await _getMacId();
+  //     final deviceType = _getDeviceType();
+  //     debugPrint("🔵 [Login] macId=$macId deviceType=$deviceType");
+
+  //     debugPrint("🔵 [Login] Calling AuthService.login() -> ${ApiUrls.login}");
+  //     final user = await _authService.login(
+  //       username: username,
+  //       password: password,
+  //       macId: macId,
+  //       deviceType: deviceType,
+  //     );
+  //     debugPrint(
+  //         "🟢 [Login] Success. user=${user.user} role=${user.role} userId=${user.userId}");
+
+  //     currentUser.value = user;
+
+  //     // Persist everything needed to stay "logged in" / pre-fill next time.
+  //     await SecureStorageService.setRememberMe(rememberMe.value);
+  //     if (rememberMe.value) {
+  //       await SecureStorageService.saveCredentials(
+  //         username: username,
+  //         password: password,
+  //       );
+  //     } else {
+  //       await SecureStorageService.clearCredentials();
+  //     }
+
+  //     debugPrint(
+  //         "🔵 [Login] user.token=${user.token} access=${user.token?.access} refresh=${user.token?.refresh}");
+  //     await SecureStorageService.saveTokens(
+  //       accessToken: user.token?.access,
+  //       refreshToken: user.token?.refresh,
+  //     );
+
+  //     debugPrint(
+  //         "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
+
+  //     debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
+  //     Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
+
+  //     debugPrint(
+  //         "🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
+  //     Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+  //   } catch (e, stackTrace) {
+  //     debugPrint("🔴 [Login] Failed: $e");
+  //     debugPrint("🔴 [Login] StackTrace: $stackTrace");
+  //     errorMessage.value = e.toString().replaceFirst('Exception: ', '');
+  //     _showErrorPopup(errorMessage.value);
+  //   } finally {
+  //     isLoading.value = false;
+  //     debugPrint("🔵 [Login] isLoading reset to false");
+  //   }
+  // }
 
   Future<void> login() async {
     debugPrint("🔵 [Login] Button pressed");
@@ -102,27 +174,36 @@ class LoginController extends GetxController {
       } else {
         await SecureStorageService.clearCredentials();
       }
-      // await SecureStorageService.saveTokens(
-      //   accessToken: user.token?.access,
-      //   refreshToken: user.token?.refresh,
-      // );
+
       debugPrint(
           "🔵 [Login] user.token=${user.token} access=${user.token?.access} refresh=${user.token?.refresh}");
       await SecureStorageService.saveTokens(
         accessToken: user.token?.access,
         refreshToken: user.token?.refresh,
       );
-      //await AppPreferences.setUserData(user.toJson());
+
       debugPrint(
           "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
 
+   final station = user.stationData?.firstOrNull;
+final stationType = station?.stationType?.trim();
 
-      debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
+// Pick the active dongle if there's more than one, else just the first.
+final dongleIp = station?.prodbudDongles
+        ?.firstWhereOrNull((d) => d.isActive == true)
+        ?.ip ??
+    station?.prodbudDongles?.firstOrNull?.ip;
 
-      debugPrint(
-          "🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+debugPrint(
+    "🔵 [Login] station_type='$stationType' dongle_ip='$dongleIp'");
+
+await SecureStorageService.saveDongleIp(dongleIp);
+
+if (stationType == 'Testing') {
+  Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
+} else {
+  Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: station?.stationType);
+}
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");
       debugPrint("🔴 [Login] StackTrace: $stackTrace");
