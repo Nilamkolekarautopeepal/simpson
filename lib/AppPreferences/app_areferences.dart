@@ -31,8 +31,6 @@ static Future<void> saveDongleIp(String? ip) async {
 static Future<void> savePlcIp(String? ip) async {
   if (ip == null || ip.isEmpty) return;
   await _storage.write(key: _plcIpKey, value: ip);
-
-
 }
 
 static Future<void> savePlcPort(String? port) async {
@@ -44,7 +42,6 @@ static Future<void> savePlcPort(String? port) async {
 static Future<String?> getDongleIp() async {
   return await _storage.read(key: _dongleIpKey);
 
-  
 }
 
 static Future<String?> getPlcIp() async {

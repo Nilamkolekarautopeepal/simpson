@@ -109,7 +109,7 @@ class Receipe {
   String? type;
   String? value;
   String? unit;
-  String? pinNo;
+  int? pinNo;
   bool? isActive;
 
   Receipe({
@@ -119,6 +119,7 @@ class Receipe {
     this.type,
     this.value,
     this.unit,
+    this.pinNo,
     this.isActive,
   });
 
@@ -129,6 +130,7 @@ class Receipe {
         type: json["type"],
         value: json["value"],
         unit: json["unit"],
+        pinNo: json["pin_no"],
         isActive: json["is_active"],
       );
 
@@ -139,6 +141,7 @@ class Receipe {
         "type": type,
         "value": value,
         "unit": unit,
+        "pin_no": pinNo,
         "is_active": isActive,
       };
 }

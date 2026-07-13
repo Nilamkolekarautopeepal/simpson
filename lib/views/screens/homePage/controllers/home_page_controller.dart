@@ -2061,6 +2061,7 @@ import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 
+
 enum StepType { single, iqaGroup }
 
 class ScanStep {
@@ -2141,6 +2142,7 @@ class HomePageController extends GetxController {
   RxString get plcStatus => plcService.status;
 
   Timer? _plcRetryTimer;
+  Timer? _plcHeartbeatTimer;
 
   Future<void> _autoConnectPlc() async {
     if (plcService.isConnected.value || plcService.isConnecting.value) return;
@@ -2178,6 +2180,47 @@ class HomePageController extends GetxController {
   void retryPlcConnection() {
     if (isPlcConnected.value) return;
     _autoConnectPlc();
+  }
+
+  /// Runs continuously in the background. A silently-dropped WiFi/TCP
+  /// connection often doesn't fire any socket error or close event —
+  /// the OS just goes quiet, so isConnected can stay stuck at true
+  /// forever unless something actually tries to talk to the PLC and
+  /// notices it doesn't answer. This is that check: a real register
+  /// read, on a short timeout, done periodically. Skips itself while
+  /// a real sensor read is already in progress (isReadingPlcValues) so
+  /// it never collides with actual work.
+  void _startPlcHeartbeat() {
+    _plcHeartbeatTimer?.cancel();
+    _plcHeartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (!plcService.isConnected.value) return;
+      if (isReadingPlcValues.value) return;
+
+      final pingReg = harnessReceipes.isNotEmpty
+          ? (harnessReceipes.first.regAddress ?? 4)
+          : 4;
+
+      // One retry before declaring the connection actually dead — this
+      // test rig is single-threaded and can occasionally be a moment
+      // late to respond even when it's perfectly fine; a single missed
+      // beat shouldn't force a full reconnect.
+      try {
+        await plcService.readRegister(pingReg).timeout(const Duration(seconds: 3));
+        return; // first attempt succeeded, all good
+      } catch (_) {
+        // fall through to retry below
+      }
+
+      try {
+        await Future.delayed(const Duration(milliseconds: 300));
+        await plcService.readRegister(pingReg).timeout(const Duration(seconds: 3));
+        // second attempt succeeded — connection is fine, no action needed
+      } catch (e) {
+        _log('❌ PLC heartbeat failed (twice) — connection lost: $e');
+        plcService.isConnected.value = false;
+        _startPlcRetryTimer();
+      }
+    });
   }
 
   // ── Flash File ──
@@ -2254,6 +2297,7 @@ class HomePageController extends GetxController {
     _loadDongleIp();
     _loadPlcConfig().then((_) => _autoConnectPlc());
     _startDongleHeartbeat();
+    _startPlcHeartbeat();
   }
 
   Future<void> _loadAccessToken() async {
@@ -2537,8 +2581,9 @@ class HomePageController extends GetxController {
 
         if (_iqaFiringOrder != null &&
             _iqaFiringOrder!.length == variables.length) {
-          variables =
-              _iqaFiringOrder!.map((e) => variables[int.parse(e) - 1]).toList();
+          variables = _iqaFiringOrder!
+              .map((e) => variables[int.parse(e) - 1])
+              .toList();
         }
 
         final writeInput = Uint8List(iqaPid.totalLen ?? 0);
@@ -2755,8 +2800,7 @@ class HomePageController extends GetxController {
       // the PLC actually has stored, not just an echo of what we asked
       // to write.
       final int rawReadBack = await plcService.readRegister(reg);
-      final double engineeringValue =
-          _applySensorFormula(sensor.type, rawReadBack);
+      final double engineeringValue = _applySensorFormula(sensor.type, rawReadBack);
       final String formatted = engineeringValue.toStringAsFixed(2);
 
       livePlcValues[id] = formatted;
@@ -2774,6 +2818,79 @@ class HomePageController extends GetxController {
     } finally {
       writeInFlightSensorIds.remove(id);
     }
+  }
+
+  /// Reads [sensor]'s current value straight from the PLC and shows it
+  /// in the Recipe table's VALUE cell. No writing involved — this is
+  /// purely "what does the PLC have right now for this sensor."
+  Future<void> readSensorValue(harness_ds.Receipe sensor) async {
+    final id = sensor.id;
+    final reg = sensor.regAddress;
+    if (id == null || reg == null) return;
+
+    if (!plcService.isConnected.value) {
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Read FAILED: PLC not connected');
+      return;
+    }
+
+    writeInFlightSensorIds.add(id); // reused as a generic "busy" marker for this row
+    try {
+      int raw;
+      try {
+        raw = await plcService.readRegister(reg);
+      } catch (firstError) {
+        // One quick retry — this test rig runs over WiFi, and a single
+        // dropped packet shouldn't be treated the same as a genuinely
+        // dead connection. If this second attempt also fails, give up
+        // for real and let the heartbeat/reconnect logic handle it.
+        print('[PLC READ] ${sensor.sensorName} | Reg $reg | first attempt failed ($firstError), retrying once...');
+        await Future.delayed(const Duration(milliseconds: 200));
+        raw = await plcService.readRegister(reg);
+      }
+
+      final double engineeringValue = _applySensorFormula(sensor.type, raw);
+      final String formatted = engineeringValue.toStringAsFixed(2);
+
+      livePlcValues[id] = formatted;
+
+      print('[PLC READ] ${sensor.sensorName} | Reg $reg | Raw=$raw | Value=$formatted');
+
+      _log(
+          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Type: ${sensor.type ?? '-'}  |  Value: $formatted ${sensor.unit ?? ''}'
+              .trim());
+    } catch (e) {
+      livePlcValues[id] = 'ERR';
+      print('[PLC READ] ${sensor.sensorName} | Reg $reg | FAILED after retry: $e');
+      _log('  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: $reg  |  Read FAILED: $e');
+    } finally {
+      writeInFlightSensorIds.remove(id);
+    }
+  }
+
+  /// Reads every sensor's value from the PLC, one at a time, and shows
+  /// all of them in the Recipe table's VALUE cells. Same as tapping
+  /// "GET VALUE" on every row, just in one click.
+  Future<void> readAllSensorValues() async {
+    if (harnessReceipes.isEmpty) return;
+
+    if (!plcService.isConnected.value) {
+      _log('PLC not connected — cannot read values');
+      return;
+    }
+
+    isReadingPlcValues.value = true;
+    _log('Reading ${harnessReceipes.length} sensor value(s) from PLC…');
+
+    for (final sensor in harnessReceipes) {
+      await readSensorValue(sensor);
+      // Small gap between requests — same reasoning as everywhere else
+      // in this file: most PLCs can't handle overlapping requests.
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
+
+    isReadingPlcValues.value = false;
+    _log('PLC read complete for ${harnessReceipes.length} sensor(s)');
   }
 
   /// TODO: this only handles "Linear" directly (raw value as-is, since
@@ -2810,16 +2927,11 @@ class HomePageController extends GetxController {
     _log(
         'Harness matched: "${match.name}" (${harnessReceipes.length} recipe sensor(s))');
 
-    // Static reference data straight from the harness API only —
-    // sensor name / reg address / type / pin no / value / unit. NO
-    // automatic PLC read here. A sensor's live value is only ever
-    // fetched when the operator explicitly uses Write in the Recipe
-    // dialog (see writeSensorValue() above).
-    for (final sensor in harnessReceipes.reversed) {
-      _log(
-          '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: ${sensor.regAddress ?? '-'}  |  Type: ${sensor.type ?? '-'}  |  Pin No: ${sensor.pinNo ?? '-'}  |  Value: ${sensor.value ?? '-'} ${sensor.unit ?? ''}'
-              .trim());
-    }
+    // NOTE: no value logging here at all — sensor name / reg address /
+    // type / pin no are visible in the Recipe dialog's table straight
+    // from the API, but VALUE only ever gets read (and only ever gets
+    // logged to Activity) when the operator clicks "Show All Values"
+    // in that dialog (see readAllSensorValues() / readSensorValue()).
 
     return true;
   }
@@ -3803,8 +3915,7 @@ class HomePageController extends GetxController {
   /// never collides with real dongle traffic from flashing/DTC/PID/IQA.
   void _startDongleHeartbeat() {
     _dongleHeartbeatTimer?.cancel();
-    _dongleHeartbeatTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) async {
+    _dongleHeartbeatTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (!dongleConnected.value) return;
       if (isDongleBusy.value) return;
       if (_dongleIp == null || _dongleIp!.isEmpty) return;
@@ -3856,8 +3967,10 @@ class HomePageController extends GetxController {
     }
     _flashStopwatch?.cancel();
     _plcRetryTimer?.cancel();
+    _plcHeartbeatTimer?.cancel();
     _dongleRetryTimer?.cancel();
     _dongleHeartbeatTimer?.cancel();
     super.onClose();
   }
 }
+

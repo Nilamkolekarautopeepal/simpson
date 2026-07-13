@@ -1708,6 +1708,28 @@ class HomePageView extends GetView<HomePageController> {
                       ),
                     ),
                     const Spacer(),
+                    Obx(
+                      () => ElevatedButton.icon(
+                        onPressed: controller.isReadingPlcValues.value
+                            ? null
+                            : controller.readAllSensorValues,
+                        icon: controller.isReadingPlcValues.value
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.download, size: 16),
+                        label: Text(controller.isReadingPlcValues.value ? 'Reading…' : 'Write Values'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.themeColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.close, size: 20, color: Colors.grey),
                       onPressed: () => Get.back(),
@@ -1786,7 +1808,7 @@ class HomePageView extends GetView<HomePageController> {
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
                 Expanded(
-                    flex: 2,
+                    flex: 3,
                     child: Text('WRITE',
                         style: TextStyle(
                             fontSize: 11, fontWeight: FontWeight.bold))),
@@ -1856,7 +1878,7 @@ class HomePageView extends GetView<HomePageController> {
                       // the operator explicitly writes this sensor via
                       // the WRITE action — no automatic PLC read here.
                       final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
-                      final display = live ?? '${sensor.value ?? '-'}';
+                      final display = live ?? '-';
                       final isLive = live != null && live != 'ERR';
                       return Text(
                         display,
@@ -1879,7 +1901,7 @@ class HomePageView extends GetView<HomePageController> {
                     ),
                   ),
                   Expanded(
-                    flex: 2,
+                    flex: 3,
                     child: _SensorWriteAction(
                       sensor: sensor,
                       controller: controller,
@@ -2496,149 +2518,91 @@ class HomePageView extends GetView<HomePageController> {
   }
 }
 
-/// "WRITE VALUE" button for one Recipe row. Tapping it opens a small
-/// dialog with its own input field — write the value there, and the
-/// confirmed value (read back from the PLC after writing) shows right
-/// inside that same dialog.
-class _SensorWriteAction extends StatelessWidget {
+/// Inline "write a value" control for one Recipe row: a small number
+/// field + send button. Writes to the PLC, then reads the register
+/// back for real confirmation (see writeSensorValue in the
+/// controller) — the VALUE cell updates with whatever the PLC
+/// actually confirms, not just an echo of what was typed. Kept as its
+/// own StatefulWidget so its TextEditingController survives the
+/// Recipe dialog's Obx rebuilds.
+class _SensorWriteAction extends StatefulWidget {
   const _SensorWriteAction({required this.sensor, required this.controller});
 
   final harness_ds.Receipe sensor;
   final HomePageController controller;
 
-  void _openWriteValueDialog() {
-    final valueController = TextEditingController();
+  @override
+  State<_SensorWriteAction> createState() => _SensorWriteActionState();
+}
 
-    Get.dialog(
-      Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        child: SizedBox(
-          width: 360,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Write Value — ${sensor.sensorName ?? '-'}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 18, color: Colors.grey),
-                      onPressed: () => Get.back(),
-                      splashRadius: 16,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Reg Address: ${sensor.regAddress ?? '-'}  •  Type: ${sensor.type ?? '-'}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: valueController,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Value',
-                    filled: true,
-                    fillColor: const Color(0xFFF5F7FA),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Obx(() {
-                  final id = sensor.id;
-                  final isWriting = id != null && controller.writeInFlightSensorIds.contains(id);
-                  final live = id != null ? controller.livePlcValues[id] : null;
+class _SensorWriteActionState extends State<_SensorWriteAction> {
+  final TextEditingController _valueController = TextEditingController();
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (live != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: live == 'ERR'
-                                ? Colors.red.withOpacity(0.08)
-                                : AppColors.themeColor.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            live == 'ERR'
-                                ? 'Write failed / not confirmed'
-                                : 'Confirmed value: $live ${sensor.unit ?? ''}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: live == 'ERR' ? Colors.red : AppColors.themeColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                      ],
-                      SizedBox(
-                        height: 44,
-                        child: ElevatedButton(
-                          onPressed: isWriting
-                              ? null
-                              : () async {
-                                  final value = int.tryParse(valueController.text.trim());
-                                  if (value == null) return;
-                                  await controller.writeSensorValue(sensor, value);
-                                },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.themeColor,
-                            disabledBackgroundColor: AppColors.themeColor.withOpacity(0.5),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          child: isWriting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Text('WRITE VALUE', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                    ],
-                  );
-                }),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
+  }
+
+  void _submit() async {
+    final text = _valueController.text.trim();
+    final value = int.tryParse(text);
+    if (value == null) return;
+
+    await widget.controller.writeSensorValue(widget.sensor, value);
+    _valueController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 32,
-      child: ElevatedButton(
-        onPressed: _openWriteValueDialog,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.themeColor,
-          foregroundColor: Colors.white,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: const Text(
-          'WRITE VALUE',
-          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-      ),
-    );
+    return Obx(() {
+      final id = widget.sensor.id;
+      final isBusy = id != null && widget.controller.writeInFlightSensorIds.contains(id);
+
+      return Row(
+        children: [
+          SizedBox(
+            width: 70,
+            height: 32,
+            child: TextField(
+              controller: _valueController,
+              enabled: !isBusy,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 12),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                filled: true,
+                fillColor: const Color(0xFFF5F7FA),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide.none,
+                ),
+                hintText: 'value',
+                hintStyle: const TextStyle(fontSize: 11),
+              ),
+              onSubmitted: (_) => _submit(),
+            ),
+          ),
+          // const SizedBox(width: 6),
+          // SizedBox(
+          //   width: 32,
+          //   height: 32,
+          //   child: IconButton(
+          //     padding: EdgeInsets.zero,
+          //     icon: isBusy
+          //         ? const SizedBox(
+          //             width: 14,
+          //             height: 14,
+          //             child: CircularProgressIndicator(strokeWidth: 2),
+          //           )
+          //         : Icon(Icons.send, size: 16, color: AppColors.themeColor),
+          //     onPressed: isBusy ? null : _submit,
+          //     tooltip: 'Write value to PLC',
+          //   ),
+          // ),
+        ],
+      );
+    });
   }
 }

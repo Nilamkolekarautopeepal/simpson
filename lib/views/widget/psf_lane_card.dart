@@ -2,15 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
-
 import 'package:simpson/views/widget/psf_dtc_dialog.dart';
-
 import 'package:simpson/views/widget/views_widget/psf_live_parameter_dialog.dart';
 
-/// One lane card in the PFS Station's 6-lane horizontal grid.
-/// Mirrors the client reference: ECU model name + LED dot + refresh,
-/// harness status band, ESN field, tappable injector/IQA grid, flash
-/// controls with real progress, DTC + live parameter buttons.
 class PsfLaneCard extends StatelessWidget {
   const PsfLaneCard({
     super.key,
@@ -136,11 +130,6 @@ class PsfLaneCard extends StatelessWidget {
       ),
     );
   }
-
-  /// Shows the ESN once matched — read-only display, NOT a second scan
-  /// input. Scanning happens exactly once, in the top scan bar; this just
-  /// reflects the result so it's clear at a glance which engine this
-  /// lane belongs to.
   Widget _esnDisplayRow() {
     final hasEsn = lane.esn.value.isNotEmpty;
     return Padding(
