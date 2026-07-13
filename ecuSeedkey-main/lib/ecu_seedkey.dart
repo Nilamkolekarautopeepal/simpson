@@ -224,9 +224,6 @@ class ECUCalculateSeedkey {
         sSeed = hexStringToByteArray("5C4062143A40C9B05C7E7F04DB2C6777");
         break;
 
-      
-      // sSeed = hexStringToByteArray("CORRECT_32_HEX_CHAR_SECRET_HERE");
-  
       case "RE_SEEDKEY_EPM44":
         sSeed = hexStringToByteArray("13A120A0FE9EC178ADEB179F9E5CC130");
         break;

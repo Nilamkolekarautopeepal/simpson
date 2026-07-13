@@ -53,7 +53,7 @@ class CommController extends GetxController implements ICommController {
   }) async {
     try {
       //
-      //await disconnect();
+      await disconnect();
 
       _socket = await Socket.connect(
         host,
