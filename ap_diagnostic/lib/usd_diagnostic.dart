@@ -163,7 +163,6 @@ class UDSDiagnostic {
   //         dtcIndex == ReadDtcIndex.UDS_2BYTE12_DTC ||
   //         dtcIndex == ReadDtcIndex.UDS_2BYTE13_DTC ||
   //         dtcIndex == ReadDtcIndex.UDS_3BYTE_DTC) {
-  //       // Standard DTC read
   //       int frameLength = 3;
   //       final responseBytes = await _dongleComm.can2xTxRx(
   //         frameLength,
@@ -173,139 +172,129 @@ class UDSDiagnostic {
   //       final actualData = responseBytes.actualDataBytes;
   //       returnStatus = '';
 
-  //       if (status == 'NOERROR' && actualData != null) {
+  //       if (status == 'NOERROR') {
   //         returnStatus = 'NO_ERROR';
+  //         final rxSize = actualData!.length;
   //         final rxArray = actualData;
   //         int dtcStartByteIndex = 3;
-  //         final noOfDtc = ((rxArray.length) - 3) ~/ 4;
+  //         // 59 02 FF DTCHB DTCMB1 DTCLB1 DTCSTS1 DTCHB2 DTCMB2 DTCLB2 DTCSTS2 ..... DTCHBn DTCMBn DTCLBn DTCSTSn
+  //         final noOfDtc = (rxSize - 3) ~/ 4;
   //         dtcArray = List.generate(noOfDtc, (_) => List.filled(2, ''));
 
-  //         for (int i = 0; i < noOfDtc; i++) {
-  //           // Determine DTC type
+  //         int i = 0;
+  //         while (i < noOfDtc) {
   //           final dtcTypeBits = (rxArray[dtcStartByteIndex] & 0xC0) >> 6;
   //           String dtcType = '';
-  //           switch (dtcTypeBits) {
+  //           if (dtcTypeBits == 0x00) {
+  //             dtcType = 'P';
+  //           } else if (dtcTypeBits == 0x01) {
+  //             dtcType = 'C';
+  //           } else if (dtcTypeBits == 0x02) {
+  //             dtcType = 'B';
+  //           } else if (dtcTypeBits == 0x03) {
+  //             dtcType = 'U';
+  //           }
+
+  //           final value = rxArray[dtcStartByteIndex + 3] & 0x01;
+  //           switch (value) {
   //             case 0x00:
-  //               dtcType = 'P';
+  //               dtcArray[i][1] = 'Inactive';
   //               break;
   //             case 0x01:
-  //               dtcType = 'C';
-  //               break;
-  //             case 0x02:
-  //               dtcType = 'B';
-  //               break;
-  //             case 0x03:
-  //               dtcType = 'U';
+  //               dtcArray[i][1] = 'Active';
   //               break;
   //           }
 
-  //           // Determine DTC status
-  //           final value = rxArray[dtcStartByteIndex + 3] & 0x01;
-  //           String dtcStatus = (value == 0x00) ? 'Inactive' : 'Active';
-
-  //           // Parse DTC code based on type
-  //           String dtcCode = '';
   //           switch (dtcIndex) {
   //             case ReadDtcIndex.UDS_3BYTE_DTC:
-  //               dtcCode =
+  //               dtcArray[i][0] =
   //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}-${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
   //               break;
   //             case ReadDtcIndex.UDS_2BYTE12_DTC:
-  //               dtcCode =
+  //               dtcArray[i][0] =
   //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
   //               break;
   //             case ReadDtcIndex.UDS_2BYTE13_DTC:
-  //               dtcCode =
+  //               dtcArray[i][0] =
   //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
   //               break;
   //             case ReadDtcIndex.KWP_2BYTE_DTC:
-  //               dtcCode =
+  //               dtcArray[i][0] =
   //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
   //               break;
   //             default:
-  //               dtcCode = '';
+  //               dtcArray[i][0] = '';
   //           }
 
-  //           dtcArray[i][0] = dtcCode;
-  //           dtcArray[i][1] = dtcStatus;
-
   //           dtcStartByteIndex += 4;
+  //           i++;
   //         }
   //       } else {
   //         returnStatus = status;
   //       }
   //     } else if (dtcIndex == ReadDtcIndex.GENERIC_OBD) {
-  //       // Generic OBD DTC read
   //       int frameLength = 1;
   //       final responseBytes03 = await _dongleComm.can2xTxRx(frameLength, '03');
   //       status = responseBytes03.ecuResponseStatus ?? '';
   //       final actualData03 = responseBytes03.actualDataBytes;
 
-  //       if (status == 'NOERROR' && actualData03 != null) {
-  //         final rxArray03 = actualData03;
+  //       if (status == 'NOERROR') {
+  //         final rxArray03 = actualData03!;
+  //         frameLength = 1;
   //         final responseBytes07 = await _dongleComm.can2xTxRx(
   //           frameLength,
   //           '07',
   //         );
   //         status = responseBytes07.ecuResponseStatus ?? '';
   //         final actualData07 = responseBytes07.actualDataBytes;
+  //         returnStatus = '';
 
-  //         if (status == 'NOERROR' && actualData07 != null) {
+  //         if (status == 'NOERROR') {
   //           returnStatus = 'NO_ERROR';
-  //           final rxArray07 = actualData07;
-
+  //           final rxArray07 = actualData07!;
+  //           // All DTCs    - 43 LEN DTCHB DTCLB1 DTCHB2 DTCLB2  ..... DTCHBn DTCLBn
+  //           // Pending DTCs - 47 LEN DTCHB DTCLB1 DTCHB2 DTCLB2  ..... DTCHBn DTCLBn
   //           final noOfDtc03 = rxArray03[1];
   //           final noOfDtc07 = rxArray07[1];
 
   //           dtcArray = List.generate(
-  //             (noOfDtc03 + noOfDtc07),
+  //             noOfDtc03 + noOfDtc07,
   //             (_) => List.filled(2, ''),
   //           );
 
-  //           // Current DTCs
-  //           for (int i = 0; i < noOfDtc03; i++) {
+  //           int i = 0;
+  //           for (i = 0; i < noOfDtc03; i++) {
   //             final dtcTypeBits = (rxArray03[i * 2 + 2] & 0xC0) >> 6;
   //             String dtcType = '';
-  //             switch (dtcTypeBits) {
-  //               case 0x00:
-  //                 dtcType = 'P';
-  //                 break;
-  //               case 0x01:
-  //                 dtcType = 'C';
-  //                 break;
-  //               case 0x02:
-  //                 dtcType = 'B';
-  //                 break;
-  //               case 0x03:
-  //                 dtcType = 'U';
-  //                 break;
+  //             if (dtcTypeBits == 0x00) {
+  //               dtcType = 'P';
+  //             } else if (dtcTypeBits == 0x01) {
+  //               dtcType = 'C';
+  //             } else if (dtcTypeBits == 0x02) {
+  //               dtcType = 'B';
+  //             } else if (dtcTypeBits == 0x03) {
+  //               dtcType = 'U';
   //             }
   //             dtcArray[i][0] =
   //                 '$dtcType${(rxArray03[i * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray03[i * 2 + 3].toRadixString(16).padLeft(2, '0')}';
   //             dtcArray[i][1] = 'Current';
   //           }
 
-  //           // Pending DTCs
   //           for (int j = 0; j < noOfDtc07; j++) {
   //             final dtcTypeBits = (rxArray07[j * 2 + 2] & 0xC0) >> 6;
   //             String dtcType = '';
-  //             switch (dtcTypeBits) {
-  //               case 0x00:
-  //                 dtcType = 'P';
-  //                 break;
-  //               case 0x01:
-  //                 dtcType = 'C';
-  //                 break;
-  //               case 0x02:
-  //                 dtcType = 'B';
-  //                 break;
-  //               case 0x03:
-  //                 dtcType = 'U';
-  //                 break;
+  //             if (dtcTypeBits == 0x00) {
+  //               dtcType = 'P';
+  //             } else if (dtcTypeBits == 0x01) {
+  //               dtcType = 'C';
+  //             } else if (dtcTypeBits == 0x02) {
+  //               dtcType = 'B';
+  //             } else if (dtcTypeBits == 0x03) {
+  //               dtcType = 'U';
   //             }
-  //             dtcArray[noOfDtc03 + j][0] =
+  //             dtcArray[i + j][0] =
   //                 '$dtcType${(rxArray07[j * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray07[j * 2 + 3].toRadixString(16).padLeft(2, '0')}';
-  //             dtcArray[noOfDtc03 + j][1] = 'Pending';
+  //             dtcArray[i + j][1] = 'Pending';
   //           }
   //         } else {
   //           returnStatus = status;
@@ -896,17 +885,35 @@ class UDSDiagnostic {
                       ? unsignedValue * (variable.resolution ?? 1.0)
                       : unsignedValue * (variable.resolution ?? 1.0) +
                             (variable.offset ?? 0.0);
-                  dataValue = value.toStringAsFixed(3);
+                  dataValue = value == value.roundToDouble()
+                      ? value.toInt().toString()
+                      : value
+                            .toStringAsFixed(3)
+                            .replaceFirst(RegExp(r'0+$'), '')
+                            .replaceFirst(RegExp(r'\.$'), '');
                   break;
 
+                // case "ASCII":
+                //   num end = baseOffset + (variable.noOfBytes ?? 0);
+                //   if (end <= rxArray.length) {
+                //     Uint8List temp = rxArray.sublist(baseOffset, end as int?);
+                //     dataValue = latin1.decode(
+                //       temp,
+                //       //allowInvalid: true,
+                //     ); // ✅ keep all zeros
+                //   }
+                //   break;
                 case "ASCII":
-                  num end = baseOffset + (variable.noOfBytes ?? 0);
-                  if (end <= rxArray.length) {
-                    Uint8List temp = rxArray.sublist(baseOffset, end as int?);
-                    dataValue = latin1.decode(
-                      temp,
-                      //allowInvalid: true,
-                    ); // ✅ keep all zeros
+                  {
+                    num end = baseOffset + (variable.noOfBytes ?? 0);
+                    if (end <= rxArray.length) {
+                      Uint8List temp = rxArray.sublist(baseOffset, end as int?);
+                      dataValue = latin1
+                          .decode(temp)
+                          .replaceAll('\u0000', '')
+                          .replaceAll(' ', '')
+                          .trim();
+                    }
                   }
                   break;
 

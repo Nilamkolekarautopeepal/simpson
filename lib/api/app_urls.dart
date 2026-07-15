@@ -12,10 +12,10 @@ class ApiUrls {
   // Data
   static const String models = "$baseUrl/models/get-models/";
   static const String flashRecords = "$baseUrl/flash/flash/";
-  static const String listNumber = "$baseUrl/variant/list/";
+  static const String listNumber = "$baseUrl/variant/prodbud-variant/list";
   static const String pidDataset = "$baseUrl/datasets/get-pid-datasets/";
   static const String dtcDataset = "$baseUrl/datasets/get-dtc-datasets/";
   static const String engineSerialNumber =
       "$baseUrl/analyze_prodbud/engslno/list/";
-  static const String harnessNumber = "$baseUrl/analyze_prodbud/harness/list/";
+
 }

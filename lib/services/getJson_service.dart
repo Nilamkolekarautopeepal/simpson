@@ -786,20 +786,31 @@ class Crc16 {
     return crc;
   }
 
+  // int computeChecksumKTM(List<int> bytes) {
+  //   int crc = 0xFFFF;
+
+  //   // Example CRC table (replace with your actual crc_tabccitt values)
+  //   List<int> crcTabCcitt = List<int>.filled(256, 0);
+
+  //   for (int i = 0; i < bytes.length; i++) {
+  //     int byteVal = bytes[i] & 0xFF; // Ensure byte is 0-255
+  //     crc =
+  //         ((crc << 8) ^ crcTabCcitt[((crc >> 8) ^ byteVal) & 0xFFFF]) & 0xFFFF;
+  //   }
+
+  //   return crc;
+  // }
+
   int computeChecksumKTM(List<int> bytes) {
     int crc = 0xFFFF;
 
-    // Example CRC table (replace with your actual crc_tabccitt values)
-    List<int> crcTabCcitt = List<int>.filled(256, 0);
-
     for (int i = 0; i < bytes.length; i++) {
-      int byteVal = bytes[i] & 0xFF; // Ensure byte is 0-255
-      crc =
-          ((crc << 8) ^ crcTabCcitt[((crc >> 8) ^ byteVal) & 0xFFFF]) & 0xFFFF;
+      int byteVal = bytes[i] & 0xFF;
+      crc = ((crc << 8) ^ crcTabCcitt[((crc >> 8) ^ byteVal) & 0xFFFF]) & 0xFFFF;
     }
 
     return crc;
-  }
+}
 
   int computeJamCRC(List<int> data) {
     int crc = 0xFFFFFFFF;

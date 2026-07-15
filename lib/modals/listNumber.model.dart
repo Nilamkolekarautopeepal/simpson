@@ -36,12 +36,14 @@ class Result {
   String? variantCode;
   String? description;
   int? oem;
-  String? vinNo;
-  IsActive? isActive;
+  dynamic vinNo;
+  String? isActive;
   int? vehicleModel;
   int? subModel;
   int? modelYear;
-  List<VariantEcu>? variantEcu;
+  List<DatasetEcu>? dDatasetEcu;
+  List<DatasetEcu>? tDatasetEcu;
+  List<ProdbudVariantHarness>? prodbudVariantHarness;
 
   Result({
     this.id,
@@ -53,7 +55,9 @@ class Result {
     this.vehicleModel,
     this.subModel,
     this.modelYear,
-    this.variantEcu,
+    this.dDatasetEcu,
+    this.tDatasetEcu,
+    this.prodbudVariantHarness,
   });
 
   factory Result.fromJson(Map<String, dynamic> json) => Result(
@@ -62,14 +66,22 @@ class Result {
         description: json["description"],
         oem: json["oem"],
         vinNo: json["vin_no"],
-        isActive: isActiveValues.map[json["is_active"]]!,
+        isActive: json["is_active"],
         vehicleModel: json["vehicle_model"],
         subModel: json["sub_model"],
         modelYear: json["model_year"],
-        variantEcu: json["variant_ecu"] == null
+        dDatasetEcu: json["d_dataset_ecu"] == null
             ? []
-            : List<VariantEcu>.from(
-                json["variant_ecu"]!.map((x) => VariantEcu.fromJson(x))),
+            : List<DatasetEcu>.from(
+                json["d_dataset_ecu"]!.map((x) => DatasetEcu.fromJson(x))),
+        tDatasetEcu: json["t_dataset_ecu"] == null
+            ? []
+            : List<DatasetEcu>.from(
+                json["t_dataset_ecu"]!.map((x) => DatasetEcu.fromJson(x))),
+        prodbudVariantHarness: json["prodbud_variant_harness"] == null
+            ? []
+            : List<ProdbudVariantHarness>.from(json["prodbud_variant_harness"]!
+                .map((x) => ProdbudVariantHarness.fromJson(x))),
       );
 
   Map<String, dynamic> toJson() => {
@@ -78,28 +90,30 @@ class Result {
         "description": description,
         "oem": oem,
         "vin_no": vinNo,
-        "is_active": isActiveValues.reverse[isActive],
+        "is_active": isActive,
         "vehicle_model": vehicleModel,
         "sub_model": subModel,
         "model_year": modelYear,
-        "variant_ecu": variantEcu == null
+        "d_dataset_ecu": dDatasetEcu == null
             ? []
-            : List<dynamic>.from(variantEcu!.map((x) => x.toJson())),
+            : List<dynamic>.from(dDatasetEcu!.map((x) => x.toJson())),
+        "t_dataset_ecu": tDatasetEcu == null
+            ? []
+            : List<dynamic>.from(tDatasetEcu!.map((x) => x.toJson())),
+        "prodbud_variant_harness": prodbudVariantHarness == null
+            ? []
+            : List<dynamic>.from(prodbudVariantHarness!.map((x) => x.toJson())),
       };
 }
 
-enum IsActive { ACTIVE }
-
-final isActiveValues = EnumValues({"active": IsActive.ACTIVE});
-
-class VariantEcu {
+class DatasetEcu {
   int? id;
   int? ecu;
-  DataFile? dataFile;
+  String? dataFile;
   bool? isLatest;
   bool? isActive;
 
-  VariantEcu({
+  DatasetEcu({
     this.id,
     this.ecu,
     this.dataFile,
@@ -107,12 +121,10 @@ class VariantEcu {
     this.isActive,
   });
 
-  factory VariantEcu.fromJson(Map<String, dynamic> json) => VariantEcu(
+  factory DatasetEcu.fromJson(Map<String, dynamic> json) => DatasetEcu(
         id: json["id"],
         ecu: json["ecu"],
-        dataFile: json["data_file"] == null
-            ? null
-            : DataFile.fromJson(json["data_file"]),
+        dataFile: json["data_file"],
         isLatest: json["is_latest"],
         isActive: json["is_active"],
       );
@@ -120,48 +132,94 @@ class VariantEcu {
   Map<String, dynamic> toJson() => {
         "id": id,
         "ecu": ecu,
-        "data_file": dataFile?.toJson(),
+        "data_file": dataFile,
         "is_latest": isLatest,
         "is_active": isActive,
       };
 }
 
-class DataFile {
+class ProdbudVariantHarness {
   int? id;
-  int? sequenceFileName;
-  String? dataFile;
-  String? hexSrecFile;
+  String? name;
+  String? stationType;
+  String? harnessType;
+  bool? isActive;
+  List<Receipe>? receipes;
 
-  DataFile({
+  ProdbudVariantHarness({
     this.id,
-    this.sequenceFileName,
-    this.dataFile,
-    this.hexSrecFile,
+    this.name,
+    this.stationType,
+    this.harnessType,
+    this.isActive,
+    this.receipes,
   });
 
-  factory DataFile.fromJson(Map<String, dynamic> json) => DataFile(
+  factory ProdbudVariantHarness.fromJson(Map<String, dynamic> json) =>
+      ProdbudVariantHarness(
         id: json["id"],
-        sequenceFileName: json["sequence_file_name"],
-        dataFile: json["data_file"],
-        hexSrecFile: json["hex_srec_file"],
+        name: json["name"],
+        stationType: json["station_type"],
+        harnessType: json["harness_type"],
+        isActive: json["is_active"],
+        receipes: json["receipes"] == null
+            ? []
+            : List<Receipe>.from(
+                json["receipes"]!.map((x) => Receipe.fromJson(x))),
       );
 
   Map<String, dynamic> toJson() => {
         "id": id,
-        "sequence_file_name": sequenceFileName,
-        "data_file": dataFile,
-        "hex_srec_file": hexSrecFile,
+        "name": name,
+        "station_type": stationType,
+        "harness_type": harnessType,
+        "is_active": isActive,
+        "receipes": receipes == null
+            ? []
+            : List<dynamic>.from(receipes!.map((x) => x.toJson())),
       };
 }
 
-class EnumValues<T> {
-  Map<String, T> map;
-  late Map<T, String> reverseMap;
+class Receipe {
+  int? id;
+  String? sensorName;
+  int? regAddress;
+  String? type;
+  String? value;
+  String? unit;
+  int? pinNo;
+  bool? isActive;
 
-  EnumValues(this.map);
+  Receipe({
+    this.id,
+    this.sensorName,
+    this.regAddress,
+    this.type,
+    this.value,
+    this.unit,
+    this.pinNo,
+    this.isActive,
+  });
 
-  Map<T, String> get reverse {
-    reverseMap = map.map((k, v) => MapEntry(v, k));
-    return reverseMap;
-  }
+  factory Receipe.fromJson(Map<String, dynamic> json) => Receipe(
+        id: json["id"],
+        sensorName: json["sensor_name"],
+        regAddress: json["reg_address"],
+        type: json["type"],
+        value: json["value"],
+        unit: json["unit"],
+        pinNo: json["pin_no"],
+        isActive: json["is_active"],
+      );
+
+  Map<String, dynamic> toJson() => {
+        "id": id,
+        "sensor_name": sensorName,
+        "reg_address": regAddress,
+        "type": type,
+        "value": value,
+        "unit": unit,
+        "pin_no": pinNo,
+        "is_active": isActive,
+      };
 }

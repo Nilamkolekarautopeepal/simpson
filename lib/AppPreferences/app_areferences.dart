@@ -35,6 +35,17 @@ static Future<void> savePlcIp(String? ip) async {
 
 }
 
+static const _dongleListKey = 'dongle_list';
+
+static Future<void> saveDongleList(String? json) async {
+  if (json == null) return;
+  await _storage.write(key: _dongleListKey, value: json);
+}
+
+static Future<String?> getDongleList() async {
+  return await _storage.read(key: _dongleListKey);
+}
+
 static Future<void> savePlcPort(String? port) async {
   if (port == null || port.isEmpty) return;
   await _storage.write(key: _plcPortKey, value: port);
