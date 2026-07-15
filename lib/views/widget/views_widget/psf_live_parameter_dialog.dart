@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:simpson/modals/pidDataset.model.dart' show Code;
+import 'package:simpson/modals/pidDataset.model.dart' show Code, PiCodeVariables;
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 
 
@@ -117,17 +117,34 @@ class PsfLiveParameterDialog extends StatelessWidget {
   }
 
   Widget _codeList(List<Code> codes, {required String emptyText}) {
-    if (codes.isEmpty) {
+    // Flatten each Code's piCodeVariable list into individual rows —
+    // a single Code (e.g. "IQA", code 220079) can contain several
+    // named sub-variables (IQA 1, IQA 2, IQA 3...), and each one needs
+    // its own row rather than only showing the first.
+    final rows = <_ParamRow>[];
+    for (final code in codes) {
+      final variables = code.piCodeVariable ?? [];
+      if (variables.isEmpty) {
+        rows.add(_ParamRow(code: code, variable: null));
+        continue;
+      }
+      for (final v in variables) {
+        rows.add(_ParamRow(code: code, variable: v));
+      }
+    }
+
+    if (rows.isEmpty) {
       return Center(child: Text(emptyText, style: const TextStyle(color: Colors.grey)));
     }
     return ListView.builder(
-      itemCount: codes.length,
-      itemBuilder: (context, i) => _codeTile(codes[i]),
+      itemCount: rows.length,
+      itemBuilder: (context, i) => _codeTile(rows[i]),
     );
   }
 
-  Widget _codeTile(Code code) {
-    final variable = (code.piCodeVariable?.isNotEmpty ?? false) ? code.piCodeVariable!.first : null;
+  Widget _codeTile(_ParamRow row) {
+    final code = row.code;
+    final variable = row.variable;
     final unit = variable?.unit ?? '';
 
     return Container(
@@ -142,7 +159,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  variable?.longName ?? code.shortName ?? code.code ?? '-',
+                  variable?.longName ?? variable?.shortName ?? code.shortName ?? code.code ?? '-',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                 ),
                 if ((code.code ?? '').isNotEmpty) ...[
@@ -167,4 +184,12 @@ class PsfLiveParameterDialog extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One flattened, displayable row: a Code paired with one of its
+/// piCodeVariable sub-entries (or null if the Code has none at all).
+class _ParamRow {
+  const _ParamRow({required this.code, required this.variable});
+  final Code code;
+  final PiCodeVariables? variable;
 }

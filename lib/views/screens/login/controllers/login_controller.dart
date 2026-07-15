@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -130,6 +131,26 @@ class LoginController extends GetxController {
       await SecureStorageService.saveDongleIp(dongleIp);
       await SecureStorageService.savePlcIp(plcIp);
       await SecureStorageService.savePlcPort(plcPort?.toString());
+
+      // PFS stations have MULTIPLE dongles, each pre-wired to a
+      // specific ECU id via ecu_station — save the whole list so the
+      // PFS screen can build one lane per dongle and match scanned
+      // ESNs against each lane's expected ECU id.
+      final dongleListJson = jsonEncode(
+        (station?.prodbudDongles ?? []).map((d) {
+          final ecuStationList = d.ecuStation ?? [];
+          final firstEcuStation = ecuStationList.isNotEmpty ? ecuStationList.first : null;
+          final ecuId = (firstEcuStation is Map) ? firstEcuStation['ecu'] : null;
+          return {
+            'dongleId': d.id,
+            'ip': d.ip,
+            'macId': d.macId,
+            'priority': d.priority,
+            'ecuId': ecuId,
+          };
+        }).toList(),
+      );
+      await SecureStorageService.saveDongleList(dongleListJson);
 
       if (stationType == 'Testing') {
         Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);

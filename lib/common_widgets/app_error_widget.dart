@@ -42,7 +42,7 @@ class AppErrorWidget extends StatelessWidget {
               ),
               C20(),
               Text(
-                "crashFinalTitle",
+                "Something went wrong",
                 style: TextStyles.defaultBold.copyWith(
                   fontSize: FontSizes.s20,
                 ),
@@ -50,9 +50,10 @@ class AppErrorWidget extends StatelessWidget {
               ),
               C20(),
               Text(
-                "crashFinalMessage",
+                errorDetails.exceptionAsString(),
                 style: TextStyles.defaultRegular.copyWith(
-                  fontSize: FontSizes.s18,
+                  fontSize: FontSizes.s14,
+                  color: Colors.red,
                 ),
                 textAlign: TextAlign.justify,
               ),

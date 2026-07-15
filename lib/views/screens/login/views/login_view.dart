@@ -197,16 +197,16 @@ class LoginScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Forgot Password ?',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
+                          // TextButton(
+                          //   onPressed: () {},
+                          //   child: Text(
+                          //     'Forgot Password ?',
+                          //     style: TextStyle(
+                          //       color: Colors.grey.shade700,
+                          //       fontSize: 13,
+                          //     ),
+                          //   ),
+                          // ),
                         ],
                       ),
 
@@ -250,15 +250,15 @@ class LoginScreen extends StatelessWidget {
                         ),
                       ),
 
-                      Center(
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            'Register',
-                            style: TextStyle(color: Colors.blue),
-                          ),
-                        ),
-                      ),
+                      // Center(
+                      //   child: TextButton(
+                      //     onPressed: () {},
+                      //     child: const Text(
+                      //       'Register',
+                      //       style: TextStyle(color: Colors.blue),
+                      //     ),
+                      //   ),
+                      // ),
 
                       const SizedBox(height: 24),
                       Column(

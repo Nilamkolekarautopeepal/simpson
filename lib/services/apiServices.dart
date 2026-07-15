@@ -231,6 +231,60 @@ class AuthService {
     }
   }
 
+  /// PFS-specific List Number lookup — distinct from getVariantsList()
+  /// above (which hits plain /variant/list/ and only returns the old
+  /// variant_ecu shape). This hits analyze_prodbud/variant/list/,
+  /// which returns d_dataset_ecu / t_dataset_ecu — the real source of
+  /// PFS's single resolved flash file per lane.
+  Future<ListNumber> getProdbudVariantsList({String? accessToken}) async {
+    try {
+      debugPrint("🔵 [ProdbudVariantsService] GET ${ApiUrls.prodbudVariantList}");
+
+      final response = await _dio.get(
+        ApiUrls.prodbudVariantList,
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint("🔵 [ProdbudVariantsService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [ProdbudVariantsService] response.data=${response.data}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ListNumber.fromJson(_asMap(response.data));
+      }
+
+      throw Exception(
+          "Failed to load PFS variants with status ${response.statusCode}");
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [ProdbudVariantsService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [ProdbudVariantsService] response.data=${e.response?.data}");
+
+      final data = e.response?.data;
+      String? serverMessage;
+      if (data is Map) {
+        serverMessage =
+            (data["detail"] ?? data["message"] ?? data["error"])?.toString();
+      } else if (data is String && data.trim().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(data);
+          if (decoded is Map) {
+            serverMessage =
+                (decoded["detail"] ?? decoded["message"] ?? decoded["error"])
+                    ?.toString();
+          }
+        } catch (_) {
+          // response wasn't JSON, ignore and fall back below
+        }
+      }
+
+      throw Exception(serverMessage ?? _friendlyMessage(e));
+    }
+  }
+
   Future<PidDataset> getPidDataset({
     required int id,
     String? accessToken,

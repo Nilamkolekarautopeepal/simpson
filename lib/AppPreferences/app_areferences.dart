@@ -52,6 +52,19 @@ static Future<String?> getPlcPort() async {
   return await _storage.read(key: _plcPortKey);
 }
 
+// ── Full dongle list (PFS stations — multiple dongles, each pre-wired
+// to a specific ECU id via ecu_station) — saved as a JSON string at
+// login time, read back fresh whenever the PFS screen loads. ──
+static const _dongleListKey = 'dongle_list';
+
+static Future<void> saveDongleList(String jsonList) async {
+  await _storage.write(key: _dongleListKey, value: jsonList);
+}
+
+static Future<String?> getDongleList() async {
+  return await _storage.read(key: _dongleListKey);
+}
+
   static Future<void> setRememberMe(bool value) =>
       _storage.write(key: _rememberMeKey, value: value.toString());
 

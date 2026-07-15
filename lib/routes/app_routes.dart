@@ -6,8 +6,9 @@ abstract class Routes {
   static const SPLASH_SCREEN_DART = _Paths.SPLASH_SCREEN_DART;
   static const LOGIN = _Paths.LOGIN;
   static const HOME_PAGE = _Paths.HOME_PAGE;
-  static const PSF_HOME_SCREEN =
-       _Paths.PSF_HOME_SCREEN;
+  static const PSF_HOME_SCREEN = _Paths.PSF_HOME_SCREEN;
+  static const ECU_FLASHING_PAGE =
+     _Paths.ECU_FLASHING_PAGE;
 }
 
 abstract class _Paths {
@@ -16,4 +17,5 @@ abstract class _Paths {
   static const LOGIN = '/login';
   static const HOME_PAGE = '/home-page';
   static const PSF_HOME_SCREEN = '/psf-home-screen';
+  static const ECU_FLASHING_PAGE = '/ecu-flashing-page';
 }

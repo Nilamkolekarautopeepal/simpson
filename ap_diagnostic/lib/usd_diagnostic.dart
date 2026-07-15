@@ -153,6 +153,174 @@ class UDSDiagnostic {
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
+  // Future<ReadDtcResponseModel> readDTC(ReadDtcIndex dtcIndex) async {
+  //   String status = '';
+  //   String returnStatus = '';
+  //   List<List<String>>? dtcArray;
+
+  //   try {
+  //     if (dtcIndex == ReadDtcIndex.KWP_2BYTE_DTC ||
+  //         dtcIndex == ReadDtcIndex.UDS_2BYTE12_DTC ||
+  //         dtcIndex == ReadDtcIndex.UDS_2BYTE13_DTC ||
+  //         dtcIndex == ReadDtcIndex.UDS_3BYTE_DTC) {
+  //       // Standard DTC read
+  //       int frameLength = 3;
+  //       final responseBytes = await _dongleComm.can2xTxRx(
+  //         frameLength,
+  //         '1902FF',
+  //       );
+  //       status = responseBytes.ecuResponseStatus ?? '';
+  //       final actualData = responseBytes.actualDataBytes;
+  //       returnStatus = '';
+
+  //       if (status == 'NOERROR' && actualData != null) {
+  //         returnStatus = 'NO_ERROR';
+  //         final rxArray = actualData;
+  //         int dtcStartByteIndex = 3;
+  //         final noOfDtc = ((rxArray.length) - 3) ~/ 4;
+  //         dtcArray = List.generate(noOfDtc, (_) => List.filled(2, ''));
+
+  //         for (int i = 0; i < noOfDtc; i++) {
+  //           // Determine DTC type
+  //           final dtcTypeBits = (rxArray[dtcStartByteIndex] & 0xC0) >> 6;
+  //           String dtcType = '';
+  //           switch (dtcTypeBits) {
+  //             case 0x00:
+  //               dtcType = 'P';
+  //               break;
+  //             case 0x01:
+  //               dtcType = 'C';
+  //               break;
+  //             case 0x02:
+  //               dtcType = 'B';
+  //               break;
+  //             case 0x03:
+  //               dtcType = 'U';
+  //               break;
+  //           }
+
+  //           // Determine DTC status
+  //           final value = rxArray[dtcStartByteIndex + 3] & 0x01;
+  //           String dtcStatus = (value == 0x00) ? 'Inactive' : 'Active';
+
+  //           // Parse DTC code based on type
+  //           String dtcCode = '';
+  //           switch (dtcIndex) {
+  //             case ReadDtcIndex.UDS_3BYTE_DTC:
+  //               dtcCode =
+  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}-${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
+  //               break;
+  //             case ReadDtcIndex.UDS_2BYTE12_DTC:
+  //               dtcCode =
+  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
+  //               break;
+  //             case ReadDtcIndex.UDS_2BYTE13_DTC:
+  //               dtcCode =
+  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
+  //               break;
+  //             case ReadDtcIndex.KWP_2BYTE_DTC:
+  //               dtcCode =
+  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
+  //               break;
+  //             default:
+  //               dtcCode = '';
+  //           }
+
+  //           dtcArray[i][0] = dtcCode;
+  //           dtcArray[i][1] = dtcStatus;
+
+  //           dtcStartByteIndex += 4;
+  //         }
+  //       } else {
+  //         returnStatus = status;
+  //       }
+  //     } else if (dtcIndex == ReadDtcIndex.GENERIC_OBD) {
+  //       // Generic OBD DTC read
+  //       int frameLength = 1;
+  //       final responseBytes03 = await _dongleComm.can2xTxRx(frameLength, '03');
+  //       status = responseBytes03.ecuResponseStatus ?? '';
+  //       final actualData03 = responseBytes03.actualDataBytes;
+
+  //       if (status == 'NOERROR' && actualData03 != null) {
+  //         final rxArray03 = actualData03;
+  //         final responseBytes07 = await _dongleComm.can2xTxRx(
+  //           frameLength,
+  //           '07',
+  //         );
+  //         status = responseBytes07.ecuResponseStatus ?? '';
+  //         final actualData07 = responseBytes07.actualDataBytes;
+
+  //         if (status == 'NOERROR' && actualData07 != null) {
+  //           returnStatus = 'NO_ERROR';
+  //           final rxArray07 = actualData07;
+
+  //           final noOfDtc03 = rxArray03[1];
+  //           final noOfDtc07 = rxArray07[1];
+
+  //           dtcArray = List.generate(
+  //             (noOfDtc03 + noOfDtc07),
+  //             (_) => List.filled(2, ''),
+  //           );
+
+  //           // Current DTCs
+  //           for (int i = 0; i < noOfDtc03; i++) {
+  //             final dtcTypeBits = (rxArray03[i * 2 + 2] & 0xC0) >> 6;
+  //             String dtcType = '';
+  //             switch (dtcTypeBits) {
+  //               case 0x00:
+  //                 dtcType = 'P';
+  //                 break;
+  //               case 0x01:
+  //                 dtcType = 'C';
+  //                 break;
+  //               case 0x02:
+  //                 dtcType = 'B';
+  //                 break;
+  //               case 0x03:
+  //                 dtcType = 'U';
+  //                 break;
+  //             }
+  //             dtcArray[i][0] =
+  //                 '$dtcType${(rxArray03[i * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray03[i * 2 + 3].toRadixString(16).padLeft(2, '0')}';
+  //             dtcArray[i][1] = 'Current';
+  //           }
+
+  //           // Pending DTCs
+  //           for (int j = 0; j < noOfDtc07; j++) {
+  //             final dtcTypeBits = (rxArray07[j * 2 + 2] & 0xC0) >> 6;
+  //             String dtcType = '';
+  //             switch (dtcTypeBits) {
+  //               case 0x00:
+  //                 dtcType = 'P';
+  //                 break;
+  //               case 0x01:
+  //                 dtcType = 'C';
+  //                 break;
+  //               case 0x02:
+  //                 dtcType = 'B';
+  //                 break;
+  //               case 0x03:
+  //                 dtcType = 'U';
+  //                 break;
+  //             }
+  //             dtcArray[noOfDtc03 + j][0] =
+  //                 '$dtcType${(rxArray07[j * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray07[j * 2 + 3].toRadixString(16).padLeft(2, '0')}';
+  //             dtcArray[noOfDtc03 + j][1] = 'Pending';
+  //           }
+  //         } else {
+  //           returnStatus = status;
+  //         }
+  //       } else {
+  //         returnStatus = status;
+  //       }
+  //     }
+
+  //     return ReadDtcResponseModel(dtcs: dtcArray, status: returnStatus);
+  //   } catch (e) {
+  //     return ReadDtcResponseModel(dtcs: null, status: e.toString());
+  //   }
+  // }
+
   Future<ReadDtcResponseModel> readDTC(ReadDtcIndex dtcIndex) async {
     String status = '';
     String returnStatus = '';
@@ -163,11 +331,12 @@ class UDSDiagnostic {
           dtcIndex == ReadDtcIndex.UDS_2BYTE12_DTC ||
           dtcIndex == ReadDtcIndex.UDS_2BYTE13_DTC ||
           dtcIndex == ReadDtcIndex.UDS_3BYTE_DTC) {
-        // Standard DTC read
+        // Standard DTC read — mask 0C matches the reference C# implementation
+        // (confirmedDTC | testFailed), not 0xFF (all statuses).
         int frameLength = 3;
         final responseBytes = await _dongleComm.can2xTxRx(
           frameLength,
-          '1902FF',
+          '19020C',
         );
         status = responseBytes.ecuResponseStatus ?? '';
         final actualData = responseBytes.actualDataBytes;
@@ -181,7 +350,6 @@ class UDSDiagnostic {
           dtcArray = List.generate(noOfDtc, (_) => List.filled(2, ''));
 
           for (int i = 0; i < noOfDtc; i++) {
-            // Determine DTC type
             final dtcTypeBits = (rxArray[dtcStartByteIndex] & 0xC0) >> 6;
             String dtcType = '';
             switch (dtcTypeBits) {
@@ -199,11 +367,9 @@ class UDSDiagnostic {
                 break;
             }
 
-            // Determine DTC status
             final value = rxArray[dtcStartByteIndex + 3] & 0x01;
             String dtcStatus = (value == 0x00) ? 'Inactive' : 'Active';
 
-            // Parse DTC code based on type
             String dtcCode = '';
             switch (dtcIndex) {
               case ReadDtcIndex.UDS_3BYTE_DTC:
@@ -235,7 +401,6 @@ class UDSDiagnostic {
           returnStatus = status;
         }
       } else if (dtcIndex == ReadDtcIndex.GENERIC_OBD) {
-        // Generic OBD DTC read
         int frameLength = 1;
         final responseBytes03 = await _dongleComm.can2xTxRx(frameLength, '03');
         status = responseBytes03.ecuResponseStatus ?? '';
@@ -262,7 +427,6 @@ class UDSDiagnostic {
               (_) => List.filled(2, ''),
             );
 
-            // Current DTCs
             for (int i = 0; i < noOfDtc03; i++) {
               final dtcTypeBits = (rxArray03[i * 2 + 2] & 0xC0) >> 6;
               String dtcType = '';
@@ -285,7 +449,6 @@ class UDSDiagnostic {
               dtcArray[i][1] = 'Current';
             }
 
-            // Pending DTCs
             for (int j = 0; j < noOfDtc07; j++) {
               final dtcTypeBits = (rxArray07[j * 2 + 2] & 0xC0) >> 6;
               String dtcType = '';

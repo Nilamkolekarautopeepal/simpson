@@ -42,6 +42,8 @@ class Result {
   int? subModel;
   int? modelYear;
   List<VariantEcu>? variantEcu;
+  List<DatasetEcu>? dDatasetEcu;
+  List<DatasetEcu>? tDatasetEcu;
 
   Result({
     this.id,
@@ -54,6 +56,8 @@ class Result {
     this.subModel,
     this.modelYear,
     this.variantEcu,
+    this.dDatasetEcu,
+    this.tDatasetEcu,
   });
 
   factory Result.fromJson(Map<String, dynamic> json) => Result(
@@ -70,6 +74,14 @@ class Result {
             ? []
             : List<VariantEcu>.from(
                 json["variant_ecu"]!.map((x) => VariantEcu.fromJson(x))),
+        dDatasetEcu: json["d_dataset_ecu"] == null
+            ? []
+            : List<DatasetEcu>.from(
+                json["d_dataset_ecu"]!.map((x) => DatasetEcu.fromJson(x))),
+        tDatasetEcu: json["t_dataset_ecu"] == null
+            ? []
+            : List<DatasetEcu>.from(
+                json["t_dataset_ecu"]!.map((x) => DatasetEcu.fromJson(x))),
       );
 
   Map<String, dynamic> toJson() => {
@@ -121,6 +133,42 @@ class VariantEcu {
         "id": id,
         "ecu": ecu,
         "data_file": dataFile?.toJson(),
+        "is_latest": isLatest,
+        "is_active": isActive,
+      };
+}
+
+/// Matches the REAL shape of d_dataset_ecu / t_dataset_ecu entries —
+/// data_file here is a plain URL string, not a nested object like
+/// VariantEcu's data_file above. Two separate arrays exist per variant
+/// result: d_dataset_ecu and t_dataset_ecu (one per dataset type).
+class DatasetEcu {
+  int? id;
+  int? ecu;
+  String? dataFile;
+  bool? isLatest;
+  bool? isActive;
+
+  DatasetEcu({
+    this.id,
+    this.ecu,
+    this.dataFile,
+    this.isLatest,
+    this.isActive,
+  });
+
+  factory DatasetEcu.fromJson(Map<String, dynamic> json) => DatasetEcu(
+        id: json["id"],
+        ecu: json["ecu"],
+        dataFile: json["data_file"],
+        isLatest: json["is_latest"],
+        isActive: json["is_active"],
+      );
+
+  Map<String, dynamic> toJson() => {
+        "id": id,
+        "ecu": ecu,
+        "data_file": dataFile,
         "is_latest": isLatest,
         "is_active": isActive,
       };

@@ -68,4 +68,6 @@ class ConnectionWifi {
       return "";
     }
   }
+
+  
 }

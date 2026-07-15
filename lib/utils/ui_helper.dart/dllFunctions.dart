@@ -292,61 +292,128 @@ class DLLFunctions {
     return buffer.toString();
   }
 
+  // Future<ReadDtcResponseModel?> readDtc(String dtcIndex) async {
+  //   print("🔹 [readDtc] Start - Received index string: $dtcIndex");
+
+  //   try {
+  //     ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
+  //       (e) => e.toString().split('.').last == dtcIndex,
+  //       orElse: () {
+  //         print("❌ No matching ReadDtcIndex enum found for: $dtcIndex");
+  //         throw Exception("Invalid DTC index: $dtcIndex");
+  //       },
+  //     );
+  //     print("✅ [readDtc] Mapped string '$dtcIndex' to enum: $index");
+
+  //     ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
+
+  //     int attempt = 0;
+
+  //     do {
+  //       attempt++;
+  //       print("⏳ [readDtc] Attempt #$attempt to read DTC...");
+
+  //       final rawResponse = await mUdsDiagnostic.readDTC(index);
+
+  //       readDtcResponseModel.dtcs = rawResponse.dtcs;
+  //       readDtcResponseModel.status = rawResponse.status;
+  //       readDtcResponseModel.noofdtc = rawResponse.noofdtc;
+
+  //       print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
+  //       print(
+  //           "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
+
+  //       if (readDtcResponseModel.status ==
+  //               "GENERALERROR_INVALIDRESPFROMDONGLE" ||
+  //           readDtcResponseModel.status?.contains("BUSY") == true) {
+  //         print("⏳ [readDtc] ECU busy or invalid response, retrying...");
+  //         await Future.delayed(const Duration(milliseconds: 100));
+  //       } else {
+  //         break;
+  //       }
+  //     } while (attempt < 10);
+
+  //     if (readDtcResponseModel.dtcs != null) {
+  //       print(
+  //           "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
+  //     } else {
+  //       print("⚠️ [readDtc] Warning - dtcs array is null");
+  //     }
+
+  //     return readDtcResponseModel;
+  //   } catch (e, st) {
+  //     print("❌ [readDtc] EXCEPTION: $e");
+  //     print("❌ StackTrace: $st");
+  //     return null;
+  //   }
+  // }
+
   Future<ReadDtcResponseModel?> readDtc(String dtcIndex) async {
-    print("🔹 [readDtc] Start - Received index string: $dtcIndex");
+  print("🔹 [readDtc] Start - Received index string: $dtcIndex");
 
-    try {
-      ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
-        (e) => e.toString().split('.').last == dtcIndex,
-        orElse: () {
-          print("❌ No matching ReadDtcIndex enum found for: $dtcIndex");
-          throw Exception("Invalid DTC index: $dtcIndex");
-        },
-      );
-      print("✅ [readDtc] Mapped string '$dtcIndex' to enum: $index");
+  try {
+    // Normalize to match C# ReadDtc(string dtc_index):
+    //   - "UDS-2BYTE-DTC" is a special legacy alias -> "UDS_2BYTE12_DTC"
+    //   - all other dashes get replaced with underscores
+    String normalized = dtcIndex == 'UDS-2BYTE-DTC'
+        ? 'UDS_2BYTE12_DTC'
+        : dtcIndex.replaceAll('-', '_');
 
-      ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
-
-      int attempt = 0;
-
-      do {
-        attempt++;
-        print("⏳ [readDtc] Attempt #$attempt to read DTC...");
-
-        final rawResponse = await mUdsDiagnostic.readDTC(index);
-
-        readDtcResponseModel.dtcs = rawResponse.dtcs;
-        readDtcResponseModel.status = rawResponse.status;
-        readDtcResponseModel.noofdtc = rawResponse.noofdtc;
-
-        print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
-        print(
-            "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
-
-        if (readDtcResponseModel.status ==
-                "GENERALERROR_INVALIDRESPFROMDONGLE" ||
-            readDtcResponseModel.status?.contains("BUSY") == true) {
-          print("⏳ [readDtc] ECU busy or invalid response, retrying...");
-          await Future.delayed(const Duration(milliseconds: 100));
-        } else {
-          break;
-        }
-      } while (attempt < 10);
-
-      if (readDtcResponseModel.dtcs != null) {
-        print(
-            "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
-      } else {
-        print("⚠️ [readDtc] Warning - dtcs array is null");
-      }
-
-      return readDtcResponseModel;
-    } catch (e, st) {
-      print("❌ [readDtc] EXCEPTION: $e");
-      print("❌ StackTrace: $st");
-      return null;
+    if (normalized != dtcIndex) {
+      print("🔧 [readDtc] Normalized '$dtcIndex' -> '$normalized'");
     }
+
+    ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
+      (e) => e.toString().split('.').last == normalized,
+      orElse: () {
+        print("❌ No matching ReadDtcIndex enum found for: $normalized");
+        throw Exception("Invalid DTC index: $normalized");
+      },
+    );
+    print("✅ [readDtc] Mapped string '$normalized' to enum: $index");
+
+    ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
+
+    int attempt = 0;
+
+    do {
+      attempt++;
+      print("⏳ [readDtc] Attempt #$attempt to read DTC...");
+
+      final rawResponse = await mUdsDiagnostic.readDTC(index);
+
+      readDtcResponseModel.dtcs = rawResponse.dtcs;
+      readDtcResponseModel.status = rawResponse.status;
+      readDtcResponseModel.noofdtc = rawResponse.noofdtc;
+
+      print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
+      print(
+          "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
+
+      if (readDtcResponseModel.status ==
+              "GENERALERROR_INVALIDRESPFROMDONGLE" ||
+          readDtcResponseModel.status?.contains("BUSY") == true) {
+        print("⏳ [readDtc] ECU busy or invalid response, retrying...");
+        await Future.delayed(const Duration(milliseconds: 100));
+      } else {
+        break;
+      }
+    } while (attempt < 10);
+
+    if (readDtcResponseModel.dtcs != null) {
+      print(
+          "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
+    } else {
+      print("⚠️ [readDtc] Warning - dtcs array is null");
+    }
+
+    return readDtcResponseModel;
+  } catch (e, st) {
+    print("❌ [readDtc] EXCEPTION: $e");
+    print("❌ StackTrace: $st");
+    return null;
   }
+}
 
   List<Code> readPID(pid_ds.PidDataset dataset) {
     final List<Code> pidCodes = [];
