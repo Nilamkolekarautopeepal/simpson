@@ -10,18 +10,17 @@ import 'package:simpson/AppPreferences/app_areferences.dart';
 import 'package:simpson/app.dart';
 import 'package:simpson/common_widgets/popup.dart';
 import 'package:simpson/modals/all.models.dart' as all_ds;
+import 'package:simpson/modals/esn.model.dart' as esn_ds;
 import 'package:simpson/modals/liveParameter_model.dart';
 import 'package:simpson/modals/pidDataset.model.dart';
 import 'package:simpson/modals/staticData.dart';
 import 'package:simpson/modals/dtcDataset.model.dart' as dtc_ds;
 import 'package:simpson/modals/listNumber.model.dart' as list_ds;
-import 'package:simpson/modals/harness.model.dart' as harness_ds;
 import 'package:simpson/modals/pidDataset.model.dart' as pid_ds;
 import 'package:simpson/services/apiServices.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
-import 'package:simpson/views/screens/ecu_flashing_page/views/ecu_flashing_page_view.dart';
 
 enum StepType { single, iqaGroup }
 
@@ -80,11 +79,6 @@ class HomePageController extends GetxController {
   String? _accessToken;
   list_ds.ListNumber? _variantListCache;
   all_ds.AllModel? _modelsCache;
-
-  // ── PLC connection (auto-connects, no manual IP/port entry) ──
-  // PLC IP/port come ONLY from the login response (station_data[0].plc_ip /
-  // .plc_port) — no hardcoded IP anywhere. Port falls back to 502 (the
-  // standard Modbus TCP port) only if login data is somehow missing it.
   String? _plcIp;
   int _plcPort = 502;
 
@@ -121,9 +115,6 @@ class HomePageController extends GetxController {
     }
   }
 
-  /// Keeps trying every 10s in the background, so if the PLC comes
-  /// online later (or the IP gets corrected) it connects automatically
-  /// without needing an app restart or manual retry.
   void _startPlcRetryTimer() {
     _plcRetryTimer?.cancel();
     _plcRetryTimer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -135,8 +126,6 @@ class HomePageController extends GetxController {
     });
   }
 
-  /// Tap the status indicator to retry immediately instead of waiting
-  /// for the next background retry tick.
   void retryPlcConnection() {
     if (isPlcConnected.value) return;
     _autoConnectPlc();
@@ -213,7 +202,7 @@ class HomePageController extends GetxController {
     });
 
     _loadAccessToken();
-    _loadDongleIp();
+    _loadDongleEntries();
     _loadPlcConfig().then((_) => _autoConnectPlc());
   }
 
@@ -221,13 +210,28 @@ class HomePageController extends GetxController {
     _accessToken = await SecureStorageService.getAccessToken();
   }
 
-  /// Loads the dongle IP that was saved at login time (from
-  /// station_data[0].prodbud_dongles[*].ip in the login response).
-  Future<void> _loadDongleIp() async {
-    _dongleIp = await SecureStorageService.getDongleIp();
-    dongleIp.value = _dongleIp ?? '';
-    if (_dongleIp == null || _dongleIp!.isEmpty) {
-      _log('Dongle: no IP found from login data');
+  List<_DongleEntry> _dongleEntries = [];
+
+  Future<void> _loadDongleEntries() async {
+    final raw = await SecureStorageService.getDongleList();
+    if (raw == null || raw.isEmpty) {
+      _log('Dongle: no dongle list found from login data');
+      return;
+    }
+    try {
+      final List<dynamic> decoded = jsonDecode(raw);
+      _dongleEntries = decoded.map((d) {
+        final ecuIdsRaw = (d['ecu_ids'] as List?) ?? [];
+        return _DongleEntry(
+          macId: d['mac_id'] as String?,
+          ip: d['ip'] as String?,
+          isActive: d['is_active'] == true,
+          ecuIds: ecuIdsRaw.whereType<num>().map((n) => n.toInt()).toList(),
+        );
+      }).toList();
+      _log('Dongle: loaded ${_dongleEntries.length} dongle(s) from login data');
+    } catch (e) {
+      _log('Dongle: failed to parse dongle list — $e');
     }
   }
 
@@ -279,74 +283,6 @@ class HomePageController extends GetxController {
   String? _esnVehicleSubModelName;
   List<all_ds.SubmodelModelecu> vehicleEcuEntries = [];
 
-  Future<void> _resolveVehicleFromEsn() async {
-    final modelName = _esnVehicleModelName?.trim();
-    final subModelName = _esnVehicleSubModelName?.trim();
-
-    if (modelName == null ||
-        modelName.isEmpty ||
-        subModelName == null ||
-        subModelName.isEmpty) {
-      _log('Vehicle context: ESN match missing model/sub_model name');
-      vehicleDisplayName.value = '';
-      vehicleEcuEntries = [];
-      canConnectDongle.value = false;
-      return;
-    }
-
-    try {
-      final models = await _ensureModels();
-
-      all_ds.Result? matchedModel;
-      all_ds.SubModel? matchedSubModel;
-
-      for (final result in models.results ?? <all_ds.Result>[]) {
-        if ((result.name ?? '').trim().toUpperCase() !=
-            modelName.toUpperCase()) {
-          continue;
-        }
-        matchedModel = result;
-        for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
-          if ((subModel.name ?? '').trim().toUpperCase() ==
-              subModelName.toUpperCase()) {
-            matchedSubModel = subModel;
-            break;
-          }
-        }
-        break;
-      }
-
-      if (matchedModel == null || matchedSubModel == null) {
-        _log(
-            'Vehicle context: no match for model="$modelName", sub_model="$subModelName" in models/get-models/');
-        vehicleDisplayName.value =
-            '$modelName — $subModelName (unrecognized combination)';
-        vehicleEcuEntries = [];
-        canConnectDongle.value = false;
-        return;
-      }
-
-      vehicleDisplayName.value =
-          '${matchedModel.name} — ${matchedSubModel.name}';
-      vehicleEcuEntries =
-          matchedSubModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
-
-      _log('Vehicle resolved from ESN: ${vehicleDisplayName.value} '
-          '(${vehicleEcuEntries.length} ECU entr${vehicleEcuEntries.length == 1 ? 'y' : 'ies'})');
-
-      canConnectDongle.value = vehicleEcuEntries.isNotEmpty;
-
-      if (canConnectDongle.value) {
-        _autoConnectDongle();
-      }
-    } catch (e) {
-      _log('Vehicle context resolution failed: $e');
-      vehicleDisplayName.value = '';
-      vehicleEcuEntries = [];
-      canConnectDongle.value = false;
-    }
-  }
-
   Future<list_ds.ListNumber> _ensureVariantList(
       {bool forceRefresh = false}) async {
     if (!forceRefresh && _variantListCache != null) return _variantListCache!;
@@ -363,246 +299,307 @@ class HomePageController extends GetxController {
     return _modelsCache!;
   }
 
+  int? _esnVehicleModelId;
+  int? _esnVehicleSubModelId;
+
+  // Future<void> _resolveVehicleFromEsn() async {
+  //   final modelName = _esnVehicleModelName?.trim();
+  //   final subModelName = _esnVehicleSubModelName?.trim();
+
+  //   if (modelName == null ||
+  //       modelName.isEmpty ||
+  //       subModelName == null ||
+  //       subModelName.isEmpty) {
+  //     _log('Vehicle context: ESN match missing model/sub_model name');
+  //     vehicleDisplayName.value = '';
+  //     vehicleEcuEntries = [];
+  //     canConnectDongle.value = false;
+  //     _esnVehicleModelId = null;
+  //     _esnVehicleSubModelId = null;
+  //     return;
+  //   }
+
+  //   try {
+  //     final models = await _ensureModels();
+
+  //     all_ds.Result? matchedModel;
+  //     all_ds.SubModel? matchedSubModel;
+
+  //     for (final result in models.results ?? <all_ds.Result>[]) {
+  //       if ((result.name ?? '').trim().toUpperCase() !=
+  //           modelName.toUpperCase()) {
+  //         continue;
+  //       }
+  //       matchedModel = result;
+  //       for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
+  //         if ((subModel.name ?? '').trim().toUpperCase() ==
+  //             subModelName.toUpperCase()) {
+  //           matchedSubModel = subModel;
+  //           break;
+  //         }
+  //       }
+  //       break;
+  //     }
+
+  //     if (matchedModel == null || matchedSubModel == null) {
+  //       _log(
+  //           'Vehicle context: no match for model="$modelName", sub_model="$subModelName" in models/get-models/');
+  //       vehicleDisplayName.value =
+  //           '$modelName — $subModelName (unrecognized combination)';
+  //       vehicleEcuEntries = [];
+  //       canConnectDongle.value = false;
+  //       _esnVehicleModelId = null;
+  //       _esnVehicleSubModelId = null;
+  //       return;
+  //     }
+
+  //     vehicleDisplayName.value =
+  //         '${matchedModel.name} — ${matchedSubModel.name}';
+  //     vehicleEcuEntries =
+  //         matchedSubModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
+
+  //     // Store the resolved ids for the later List Number cross-check.
+  //     _esnVehicleModelId = matchedModel.id;
+  //     _esnVehicleSubModelId = matchedSubModel.id;
+
+  //     _log('Vehicle resolved from ESN: ${vehicleDisplayName.value} '
+  //         '(${vehicleEcuEntries.length} ECU entr${vehicleEcuEntries.length == 1 ? 'y' : 'ies'})');
+
+  //     canConnectDongle.value = vehicleEcuEntries.isNotEmpty;
+
+  //     if (canConnectDongle.value) {
+  //       _resolveDongleIpFromEcu();
+  //     }
+  //   } catch (e) {
+  //     _log('Vehicle context resolution failed: $e');
+  //     vehicleDisplayName.value = '';
+  //     vehicleEcuEntries = [];
+  //     canConnectDongle.value = false;
+  //     _esnVehicleModelId = null;
+  //     _esnVehicleSubModelId = null;
+  //   }
+  // }
+
+  // void _resolveDongleIpFromEcu() {
+  //   final targetEcuIds =
+  //       vehicleEcuEntries.map((e) => e.ecu?.id).whereType<int>().toSet();
+
+  //   if (targetEcuIds.isEmpty) {
+  //     _log('Dongle: ESN-resolved vehicle has no ECU ids — cannot pick dongle');
+  //     return;
+  //   }
+
+  //   if (_dongleEntries.isEmpty) {
+  //     _log('Dongle: no dongle list from login data — cannot pick dongle');
+  //     return;
+  //   }
+
+  //   final matched = _dongleEntries.firstWhereOrNull(
+  //     (d) => d.ecuIds.any(targetEcuIds.contains),
+  //   );
+
+  //   if (matched == null || matched.ip == null || matched.ip!.isEmpty) {
+  //     _log('Dongle: no dongle configured for ECU id(s) '
+  //         '${targetEcuIds.join(', ')} — cannot connect');
+  //     return;
+  //   }
+
+  //   _dongleIp = matched.ip;
+  //   dongleIp.value = matched.ip!;
+  //   _log('Dongle: matched ${matched.macId ?? matched.ip} for ECU id(s) '
+  //       '${targetEcuIds.join(', ')} — connecting');
+
+  //   _autoConnectDongle();
+  // }
+
+  Future<void> _resolveVehicleFromEsn() async {
+  final modelName = _esnVehicleModelName?.trim();
+  final subModelName = _esnVehicleSubModelName?.trim();
+
+  void resetVehicleContext() {
+    vehicleDisplayName.value = '';
+    vehicleEcuEntries = <all_ds.SubmodelModelecu>[];
+    canConnectDongle.value = false;
+    _esnVehicleModelId = null;
+    _esnVehicleSubModelId = null;
+  }
+
+  if (modelName == null ||
+      modelName.isEmpty ||
+      subModelName == null ||
+      subModelName.isEmpty) {
+    _log('Vehicle context: ESN model/sub-model not found.');
+    resetVehicleContext();
+    return;
+  }
+
+  try {
+    final models = await _ensureModels();
+
+    all_ds.Result? matchedModel;
+    all_ds.SubModel? matchedSubModel;
+
+    for (final model in models.results ?? <all_ds.Result>[]) {
+      if ((model.name ?? '').trim().toUpperCase() !=
+          modelName.toUpperCase()) {
+        continue;
+      }
+
+      matchedModel = model;
+
+      for (final sub in model.subModels ?? <all_ds.SubModel>[]) {
+        if ((sub.name ?? '').trim().toUpperCase() ==
+            subModelName.toUpperCase()) {
+          matchedSubModel = sub;
+          break;
+        }
+      }
+
+      break;
+    }
+
+    if (matchedModel == null || matchedSubModel == null) {
+      _log(
+          'Vehicle context: Unable to resolve Model="$modelName", SubModel="$subModelName".');
+
+      vehicleDisplayName.value =
+          '$modelName - $subModelName (Not Available)';
+      resetVehicleContext();
+      return;
+    }
+
+    vehicleDisplayName.value =
+        '${matchedModel.name} - ${matchedSubModel.name}';
+
+    vehicleEcuEntries =
+        matchedSubModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
+
+    _esnVehicleModelId = matchedModel.id;
+    _esnVehicleSubModelId = matchedSubModel.id;
+
+    final ecuIds = vehicleEcuEntries
+        .map((e) => e.ecu?.id)
+        .whereType<int>()
+        .toSet();
+
+    _log('----------------------------------------');
+    _log('Vehicle Resolved');
+    _log('Model     : ${matchedModel.name}');
+    _log('Sub Model : ${matchedSubModel.name}');
+    _log('Model ID  : $_esnVehicleModelId');
+    _log('SubModel ID : $_esnVehicleSubModelId');
+    _log('Vehicle ECU IDs : ${ecuIds.join(", ")}');
+    _log('----------------------------------------');
+
+    canConnectDongle.value = ecuIds.isNotEmpty;
+
+    if (canConnectDongle.value) {
+      _resolveDongleIpFromEcu(ecuIds);
+    } else {
+      _log('Vehicle has no ECU configured.');
+    }
+  } catch (e) {
+    _log('Vehicle context resolution failed : $e');
+    resetVehicleContext();
+  }
+}
+
+void _resolveDongleIpFromEcu(Set<int> vehicleEcuIds) {
+  if (vehicleEcuIds.isEmpty) {
+    _log('No ECU IDs found for resolved vehicle.');
+    return;
+  }
+
+  if (_dongleEntries.isEmpty) {
+    _log('No dongles received from login response.');
+    return;
+  }
+
+  _log('Searching matching dongle...');
+  _log('Vehicle ECU IDs : ${vehicleEcuIds.join(", ")}');
+
+  for (final dongle in _dongleEntries) {
+    _log(
+      'Dongle : ${dongle.macId ?? "Unknown"} | '
+      'IP : ${dongle.ip} | '
+      'ECU IDs : ${dongle.ecuIds.join(", ")}',
+    );
+  }
+
+  final matchedDongle = _dongleEntries.firstWhereOrNull(
+    (dongle) =>
+        dongle.ip != null &&
+        dongle.ip!.isNotEmpty &&
+        dongle.ecuIds.any(vehicleEcuIds.contains),
+  );
+
+  if (matchedDongle == null) {
+    _log('No matching dongle found for ECU IDs : ${vehicleEcuIds.join(", ")}');
+    canConnectDongle.value = false;
+    return;
+  }
+
+  _dongleIp = matchedDongle.ip;
+  dongleIp.value = matchedDongle.ip!;
+
+  _log('----------------------------------------');
+  _log('Matching Dongle Found');
+  _log('MAC : ${matchedDongle.macId}');
+  _log('IP  : ${matchedDongle.ip}');
+  _log('Matched ECU IDs : ${matchedDongle.ecuIds.join(", ")}');
+  _log('----------------------------------------');
+
+  _autoConnectDongle();
+}
+
   Future<bool> _isValidListNumber(String value) async {
     final scanned = value.trim().toUpperCase();
 
-    bool checkAgainst(list_ds.ListNumber list) {
-      return (list.results ?? []).any(
+    list_ds.Result? findMatch(list_ds.ListNumber list) {
+      return (list.results ?? []).firstWhereOrNull(
         (r) => (r.variantCode ?? '').trim().toUpperCase() == scanned,
       );
     }
 
     final cached = await _ensureVariantList();
-    if (checkAgainst(cached)) return true;
+    var match = findMatch(cached);
 
-    _log(
-        'List validation: no match in cached list — refetching to rule out stale cache');
-    final fresh = await _ensureVariantList(forceRefresh: true);
-    return checkAgainst(fresh);
-  }
-
-  Future<void> _resolveInjectorConfig(String scannedListValue) async {
-    try {
-      final list = await _ensureVariantList();
-      final scanned = scannedListValue.trim().toUpperCase();
-
-      final variant = (list.results ?? []).firstWhereOrNull(
-        (r) => (r.variantCode ?? '').trim().toUpperCase() == scanned,
-      );
-      if (variant == null) {
-        _log('Injector config: no matching variant for "$scannedListValue"');
-        _configureIqaFields(_defaultIqaCount, null);
-        return;
-      }
-
-      final vehicleModelId = variant.vehicleModel;
-      final subModelId = variant.subModel;
-      final ecuId = (variant.variantEcu ?? [])
-          .map((ve) => ve.ecu)
-          .whereType<int>()
-          .firstOrNull;
-
-      if (vehicleModelId == null || subModelId == null || ecuId == null) {
-        _log('Injector config: variant missing model/submodel/ecu ids');
-        _configureIqaFields(_defaultIqaCount, null);
-        return;
-      }
-
-      final models = await _ensureModels();
-      all_ds.SubmodelModelecu? matched;
-
-      for (final result in models.results ?? <all_ds.Result>[]) {
-        if (result.id != vehicleModelId) continue;
-        for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
-          if (subModel.id != subModelId) continue;
-
-          final candidates =
-              subModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
-          if (candidates.isEmpty) continue;
-          matched =
-              candidates.firstWhereOrNull((sme) => sme.ecu?.id == ecuId) ??
-                  candidates.first;
-
-          if (matched.ecu?.id != ecuId) {
-            _log(
-                'Injector config: ecu mismatch (variant says $ecuId, models/get-models/ has ${matched.ecu?.id}) — using the submodel\'s entry anyway');
-          }
-        }
-      }
-
-      if (matched == null) {
-        _log(
-            'Injector config: no submodel_modelecu match in models/get-models/');
-        _configureIqaFields(_defaultIqaCount, null);
-        return;
-      }
-
-      final noOfInjectors = matched.noOfInjectors;
-      final firingSequenceStr = matched.firingSequence ?? '';
-
-      if (noOfInjectors == null || noOfInjectors <= 0) {
-        _log(
-            'Injector config: no_of_injectors missing/invalid — using default');
-        _configureIqaFields(_defaultIqaCount, null);
-        return;
-      }
-
-      final firingOrder = firingSequenceStr
-          .split(',')
-          .map((s) => s.trim())
-          .where((s) => s.isNotEmpty)
-          .toList();
-
+    if (match == null) {
       _log(
-          'Injector config resolved: $noOfInjectors injector(s), firing sequence [${firingOrder.join(',')}]');
-      _configureIqaFields(
-        noOfInjectors,
-        firingOrder.length == noOfInjectors ? firingOrder : null,
-      );
-    } catch (e) {
-      _log('Injector config resolution failed: $e — using default');
-      _configureIqaFields(_defaultIqaCount, null);
+          'List validation: no match in cached list — refetching to rule out stale cache');
+      final fresh = await _ensureVariantList(forceRefresh: true);
+      match = findMatch(fresh);
     }
+
+    if (match == null) {
+      // Genuinely doesn't exist — existing "not recognized" popup path.
+      return false;
+    }
+
+    // The list number exists, but must belong to the SAME vehicle
+    // model/sub-model that was already resolved from the ESN scan.
+    if (_esnVehicleModelId == null || _esnVehicleSubModelId == null) {
+      _log(
+          'List validation: ESN vehicle context not resolved yet — cannot cross-check list number "$scanned"');
+      throw Exception(
+          'Vehicle model could not be confirmed from the ESN. Please rescan the ESN first.');
+    }
+
+    final modelMatches = match.vehicleModel == _esnVehicleModelId;
+    final subModelMatches = match.subModel == _esnVehicleSubModelId;
+
+    if (!modelMatches || !subModelMatches) {
+      _log('List mismatch: list number "$scanned" belongs to '
+          'vehicleModel=${match.vehicleModel}, subModel=${match.subModel} — '
+          'but ESN resolved vehicleModel=$_esnVehicleModelId, '
+          'subModel=$_esnVehicleSubModelId');
+      throw Exception(
+          'This list number belongs to a different vehicle model/sub-model '
+          'than the scanned ESN. Please rescan the correct list number.');
+    }
+
+    return true;
   }
-
-  /// Runs automatically once flashing succeeds (see startFlashing()) —
-  /// no button, no user interaction. Writes whatever IQA values were
-  /// typed into the sidebar fields to the ECU and returns a short
-  /// status line that gets folded into the "Flashing Complete" popup.
-  /// Never throws — any failure is captured in the returned message.
-  // Future<String> _autoWriteIqaValues() {
-  //   return _withDongleBusy(() async {
-  //     try {
-  //       final iqaPid = await _findIqaPidCode();
-
-  //       if (iqaPid == null) {
-  //         _log('IQA auto-write: IQA PID not found — skipping');
-  //         return 'IQA write skipped: IQA PID not found';
-  //       }
-
-  //       for (int i = 0; i < iqaControllers.length; i++) {
-  //         final value = iqaControllers[i].text.trim();
-  //         if (value.length != 7) {
-  //           _log(
-  //               'IQA auto-write: ${_iqaRecordLabel(i)} is not 7 characters — skipping write');
-  //           return 'IQA write skipped: enter a valid 7-character value for each cylinder';
-  //         }
-  //       }
-
-  //       List<PiCodeVariables> variables =
-  //           List<PiCodeVariables>.from(iqaPid.piCodeVariable ?? []);
-
-  //       variables.sort(
-  //         (a, b) => (a.priority ?? 0).compareTo(b.priority ?? 0),
-  //       );
-
-  //       if (_iqaFiringOrder != null &&
-  //           _iqaFiringOrder!.length == variables.length) {
-  //         variables =
-  //             _iqaFiringOrder!.map((e) => variables[int.parse(e) - 1]).toList();
-  //       }
-
-  //       final writeInput = Uint8List(iqaPid.totalLen ?? 0);
-  //       final List<VariantDataLists> variantList = [];
-
-  //       for (int i = 0; i < variables.length; i++) {
-  //         final variable = variables[i];
-
-  //         final value = iqaControllers[i].text.trim().toUpperCase();
-
-  //         final bytes = latin1.encode(value);
-
-  //         final start = variable.bytePosition! - 1;
-
-  //         writeInput.setRange(
-  //           start,
-  //           start + bytes.length,
-  //           bytes,
-  //         );
-
-  //         variantList.add(
-  //           VariantDataLists(
-  //             pidId: variable.id,
-  //             pidName: variable.shortName,
-  //             startByte: variable.bytePosition,
-  //             noOfBytes: variable.length,
-  //             datatype: variable.messageType.toString(),
-  //             resolution: variable.resolution,
-  //             offset: variable.offset,
-  //             unit: variable.unit,
-  //             isBitcoded: variable.bitcoded,
-  //             startBit: variable.startBitPosition ?? 0,
-  //             noofBits: 0,
-  //           ),
-  //         );
-  //       }
-
-  //       final int startByte = variantList
-  //           .map((e) => e.startByte!)
-  //           .reduce((a, b) => a < b ? a : b);
-
-  //       final ecu = StaticData.ecuInfo.firstWhereOrNull(
-  //         (e) => e.writePidIndex != null,
-  //       );
-
-  //       if (ecu == null) {
-  //         _log('IQA auto-write: ECU configuration not found — skipping');
-  //         return 'IQA write skipped: ECU configuration not found';
-  //       }
-
-  //       final pid = WriteParameterPid(
-  //         writePamIndex: ecu.writePidIndex,
-  //         seedKeyIndex: ecu.seedKeyIndex,
-  //         writePid: iqaPid.writePid,
-  //         writeParaDataSize: iqaPid.totalLen,
-  //         writeInput: writeInput,
-  //         pid: iqaPid.code,
-  //         totalLen: iqaPid.totalLen,
-  //         totalBytes: iqaPid.totalLen,
-  //         startByte: startByte,
-  //         variantList: variantList,
-  //       );
-
-  //       print("--------------- WRITE DATA ----------------");
-  //       print("PID : ${pid.pid}");
-  //       print("Start Byte : ${pid.startByte}");
-  //       print("Total Bytes : ${pid.totalBytes}");
-  //       print("Write Input : ${writeInput.toList()}");
-  //       for (final v in variantList) {
-  //         print(
-  //           "PID=${v.pidName}, "
-  //           "Start=${v.startByte}, "
-  //           "Len=${v.noOfBytes}, "
-  //           "Type=${v.datatype}",
-  //         );
-  //       }
-  //       print("-------------------------------------------");
-
-  //       _log('Writing IQA values to ECU...');
-  //       final response = await App.dllFunctions!.writePid(
-  //         ecu.writePidIndex!,
-  //         [pid],
-  //       );
-
-  //       if (response != null &&
-  //           response.isNotEmpty &&
-  //           response.first.status?.toUpperCase() == "NOERROR") {
-  //         await _readIqaCurrentValues(iqaPid);
-  //         _log('✅ IQA write successful');
-  //         return 'IQA write: Successful';
-  //       } else {
-  //         final failMsg = (response == null || response.isEmpty)
-  //             ? "No response from ECU"
-  //             : (response.first.status ?? "Write Failed");
-  //         _log('❌ IQA write failed: $failMsg');
-  //         return 'IQA write failed: $failMsg';
-  //       }
-  //     } catch (e) {
-  //       _log('❌ IQA auto-write exception: $e');
-  //       return 'IQA write failed: $e';
-  //     }
-  //   });
-  // }
 
   Future<String> _autoWriteIqaValues() async {
     try {
@@ -641,8 +638,20 @@ class HomePageController extends GetxController {
 
       final writeInput = Uint8List(iqaPid.totalLen ?? 0);
       final List<VariantDataLists> variantList = [];
+      if (variables.length != iqaControllers.length) {
+        final usedCount = variables.length < iqaControllers.length
+            ? variables.length
+            : iqaControllers.length;
+        _log('⚠️ IQA auto-write: PID has ${variables.length} variable(s) but '
+            '${iqaControllers.length} value(s) were entered — using the first '
+            '$usedCount');
+      }
 
-      for (int i = 0; i < variables.length; i++) {
+      final int loopCount = variables.length < iqaControllers.length
+          ? variables.length
+          : iqaControllers.length;
+
+      for (int i = 0; i < loopCount; i++) {
         final variable = variables[i];
 
         final value = iqaControllers[i].text.trim().toUpperCase();
@@ -650,10 +659,19 @@ class HomePageController extends GetxController {
         final bytes = latin1.encode(value);
 
         final start = variable.bytePosition! - 1;
+        final end = start + bytes.length;
+
+        if (start < 0 || end > writeInput.length) {
+          _log('❌ IQA auto-write: byte range [$start,$end) out of bounds for '
+              'writeInput length ${writeInput.length} (variable=${variable.shortName}, '
+              'bytePosition=${variable.bytePosition})');
+          return 'IQA write failed: byte layout mismatch for this ECU — '
+              'check PID dataset for ${variable.shortName}';
+        }
 
         writeInput.setRange(
           start,
-          start + bytes.length,
+          end,
           bytes,
         );
 
@@ -729,7 +747,6 @@ class HomePageController extends GetxController {
         final status = response?.first.status?.toUpperCase();
 
         if (response != null && response.isNotEmpty && status == "NOERROR") {
-          await _readIqaCurrentValues(iqaPid);
           _log('✅ IQA write successful');
           return 'IQA write: Successful';
         }
@@ -798,38 +815,6 @@ class HomePageController extends GetxController {
     return null;
   }
 
-  Future<List<String>?> _readIqaCurrentValues(pid_ds.Code iqaPid) async {
-    try {
-      final datasetId = _currentPidDatasetId;
-      if (datasetId == null) {
-        print('_readIqaCurrentValues: no datasetId, skipping read');
-        return null;
-      }
-
-      _accessToken ??= await SecureStorageService.getAccessToken();
-      final dataset = await _authService.getPidDataset(
-        id: datasetId,
-        accessToken: _accessToken,
-      );
-
-      App.dllFunctions!.readPID(dataset);
-      print('_readIqaCurrentValues: converted dataset via readPID, '
-          'but no actual device-read call exists yet — returning null');
-    } catch (e) {
-      print('Read current IQA values failed: $e');
-      return null;
-    }
-    return null;
-  }
-
-  final RxList<harness_ds.Receipe> harnessReceipes = <harness_ds.Receipe>[].obs;
-
-  // ── Live PLC value per sensor. The ONLY way this ever gets populated
-  // is writeSensorValue() below (write, then read back for real
-  // confirmation) — there is NO automatic read when a harness is
-  // scanned. Until a sensor's value is explicitly written, the Recipe
-  // dialog just shows the static reference value straight from the
-  // harness API.
   final RxMap<int, String> livePlcValues = <int, String>{}.obs;
   final RxBool isReadingPlcValues = false.obs;
 
@@ -837,12 +822,7 @@ class HomePageController extends GetxController {
   final RxBool isWritingSensor = false.obs;
   final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
 
-  /// Writes [value] to [sensor]'s register on the PLC, then reads the
-  /// register back for real confirmation (not just an echo of what was
-  /// requested) and stores that in livePlcValues. This is the ONLY
-  /// place a live PLC value ever gets set — the harness scan itself
-  /// only shows the static API reference values.
-  Future<void> writeSensorValue(harness_ds.Receipe sensor, int value) async {
+  Future<void> writeSensorValue(list_ds.Receipe sensor, int value) async {
     final id = sensor.id;
     final reg = sensor.regAddress;
     if (id == null || reg == null) return;
@@ -905,11 +885,6 @@ class HomePageController extends GetxController {
     }
   }
 
-  /// TODO: this only handles "Linear" directly (raw value as-is, since
-  /// the recipe API doesn't currently give us multiplier/offset — the
-  /// register is assumed to already be PLC-scaled). Extend the other
-  /// branches once the real formulas/constants for Resistance/Current
-  /// sensors are confirmed for this API.
   double _applySensorFormula(String? type, int raw) {
     final t = (type ?? '').toLowerCase();
     if (t.contains('resistance')) {
@@ -921,29 +896,44 @@ class HomePageController extends GetxController {
     return raw.toDouble();
   }
 
+  final RxList<list_ds.Receipe> harnessReceipes = <list_ds.Receipe>[].obs;
+
   Future<bool> _isValidHarness(String value) async {
-    final scanned = value.trim();
-    final harnessList = await _authService.getHarnessList(
-      harnessName: scanned,
-      accessToken: _accessToken,
+    final scannedHarness = value.trim();
+    final scannedList = stepControllers[1].text.trim().toUpperCase();
+
+    final list = await _ensureVariantList();
+    final variant = (list.results ?? []).firstWhereOrNull(
+      (r) => (r.variantCode ?? '').trim().toUpperCase() == scannedList,
     );
 
-    final match = (harnessList.results ?? []).firstWhereOrNull(
-      (r) => (r.name ?? '').trim().toUpperCase() == scanned.toUpperCase(),
+    if (variant == null) {
+      _log(
+          'Harness validation: no variant found for list number "$scannedList"');
+      return false;
+    }
+
+    final harnesses = variant.prodbudVariantHarness ?? [];
+
+    final match = harnesses.firstWhereOrNull(
+      (h) =>
+          (h.name ?? '').trim().toUpperCase() == scannedHarness.toUpperCase() &&
+          h.isActive == true,
     );
 
-    if (match == null) return false;
-    if (match.isActive != true) return false;
+    if (match == null) {
+      _log('Harness mismatch: scanned "$scannedHarness" not found in variant '
+          '$scannedList\'s harness list (available: '
+          '${harnesses.map((h) => h.name).join(', ')})');
+      return false;
+    }
 
+    // No conversion needed — match.receipes is already List<list_ds.Receipe>,
+    // exactly what harnessReceipes now holds.
     harnessReceipes.assignAll(match.receipes ?? []);
-    _log(
-        'Harness matched: "${match.name}" (${harnessReceipes.length} recipe sensor(s))');
+    _log('Harness matched: "${match.name}" '
+        '(${harnessReceipes.length} recipe sensor(s))');
 
-    // Static reference data straight from the harness API only —
-    // sensor name / reg address / type / pin no / value / unit. NO
-    // automatic PLC read here. A sensor's live value is only ever
-    // fetched when the operator explicitly uses Write in the Recipe
-    // dialog (see writeSensorValue() above).
     for (final sensor in harnessReceipes.reversed) {
       _log(
           '  • Sensor: ${sensor.sensorName ?? '-'}  |  Reg Address: ${sensor.regAddress ?? '-'}  |  Type: ${sensor.type ?? '-'}  |  Pin No: ${sensor.pinNo ?? '-'}  |  Value: ${sensor.value ?? '-'} ${sensor.unit ?? ''}'
@@ -1014,10 +1004,13 @@ class HomePageController extends GetxController {
     esnError.value = '';
     listError.value = '';
     currentStepIndex.value = 0;
-
     canConnectDongle.value = false;
     dongleConnected.value = false;
+    _dongleIp = null;
+    dongleIp.value = '';
     _dongleRetryTimer?.cancel();
+    canConnectDongle.value = false;
+    dongleConnected.value = false;
   }
 
   // ── Single-field steps (ESN, List, Harness) ──
@@ -1029,6 +1022,200 @@ class HomePageController extends GetxController {
     if (index != currentStepIndex.value) return;
     _idleTimers[index]?.cancel();
     _idleTimers[index] = Timer(_idleDuration, () => submitStep(index));
+  }
+
+  final Map<String, String> _fileToHexUrl = {};
+
+  Future<void> _resolveInjectorConfig(String scannedListValue) async {
+    try {
+      final list = await _ensureVariantList();
+      final scanned = scannedListValue.trim().toUpperCase();
+
+      final variant = (list.results ?? []).firstWhereOrNull(
+        (r) => (r.variantCode ?? '').trim().toUpperCase() == scanned,
+      );
+      if (variant == null) {
+        _log('Injector config: no matching variant for "$scannedListValue"');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final vehicleModelId = variant.vehicleModel;
+      final subModelId = variant.subModel;
+
+      // Testing/flashable ECU config comes from the active D-dataset
+      // entries (production/deployment hex), not the old variantEcu field
+      // which doesn't exist on this model.
+      final activeDDatasets =
+          (variant.dDatasetEcu ?? []).where((d) => d.isActive == true);
+      final ecuId =
+          activeDDatasets.map((d) => d.ecu).whereType<int>().firstOrNull;
+
+      if (vehicleModelId == null || subModelId == null || ecuId == null) {
+        _log('Injector config: variant missing model/submodel/ecu ids '
+            '(active D-dataset ECU entries: ${activeDDatasets.length})');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final models = await _ensureModels();
+      all_ds.SubmodelModelecu? matched;
+
+      for (final result in models.results ?? <all_ds.Result>[]) {
+        if (result.id != vehicleModelId) continue;
+        for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
+          if (subModel.id != subModelId) continue;
+
+          final candidates =
+              subModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
+          if (candidates.isEmpty) continue;
+          matched =
+              candidates.firstWhereOrNull((sme) => sme.ecu?.id == ecuId) ??
+                  candidates.first;
+
+          if (matched.ecu?.id != ecuId) {
+            _log(
+                'Injector config: ecu mismatch (variant says $ecuId, models/get-models/ has ${matched.ecu?.id}) — using the submodel\'s entry anyway');
+          }
+        }
+      }
+
+      if (matched == null) {
+        _log(
+            'Injector config: no submodel_modelecu match in models/get-models/');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final noOfInjectors = matched.noOfInjectors;
+      final firingSequenceStr = matched.firingSequence ?? '';
+
+      if (noOfInjectors == null || noOfInjectors <= 0) {
+        _log(
+            'Injector config: no_of_injectors missing/invalid — using default');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final firingOrder = firingSequenceStr
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      _log(
+          'Injector config resolved: $noOfInjectors injector(s), firing sequence [${firingOrder.join(',')}]');
+      _configureIqaFields(
+        noOfInjectors,
+        firingOrder.length == noOfInjectors ? firingOrder : null,
+      );
+    } catch (e) {
+      _log('Injector config resolution failed: $e — using default');
+      _configureIqaFields(_defaultIqaCount, null);
+    }
+  }
+
+  Future<void> loadAvailableFlashFiles() async {
+    print("============= loadAvailableFlashFiles() =============");
+
+    flashFilesLoading.value = true;
+    flashFilesError.value = '';
+
+    try {
+      final scannedList = stepControllers[1].text.trim().toUpperCase();
+
+      final variants = await _ensureVariantList();
+
+      list_ds.Result? variant;
+      for (final v in variants.results ?? []) {
+        if ((v.variantCode ?? '').trim().toUpperCase() == scannedList) {
+          variant = v;
+          break;
+        }
+      }
+
+      if (variant == null) {
+        print("Variant not found");
+        availableFlashFiles.clear();
+        selectedFlashFile.value = null;
+        _currentDtcDatasetId = null;
+        _currentPidDatasetId = null;
+        return;
+      }
+
+      final vehicleModelId = variant.vehicleModel;
+      final subModelId = variant.subModel;
+
+      final models = await _ensureModels();
+
+      final files = <String>[];
+      _fileToDtcDatasetId.clear();
+      _fileToPidDatasetId.clear();
+      _fileToEcuId.clear();
+      _fileToHexUrl.clear();
+
+      final activeDDatasets =
+          (variant.dDatasetEcu ?? []).where((d) => d.isActive == true);
+
+      for (final d in activeDDatasets) {
+        final ecuId = d.ecu;
+        if (ecuId == null) continue;
+
+        all_ds.SubmodelModelecu? ecuModel;
+
+        for (final model in models.results ?? []) {
+          if (model.id != vehicleModelId) continue;
+          for (final sub in model.subModels ?? []) {
+            if (sub.id != subModelId) continue;
+            for (final ecu in sub.submodelModelecu ?? []) {
+              if (ecu.ecu?.id == ecuId) {
+                ecuModel = ecu;
+                break;
+              }
+            }
+            if (ecuModel != null) break;
+          }
+          if (ecuModel != null) break;
+        }
+
+        if (ecuModel == null) {
+          print("ECU Model not found for ECU ID : $ecuId");
+          continue;
+        }
+
+        final dataFileUrl = d.dataFile;
+        if (dataFileUrl == null || dataFileUrl.isEmpty) continue;
+
+        final fileName = dataFileUrl.split('/').last;
+        print(
+            "Flash File : $fileName (D-dataset id=${d.id}, isLatest=${d.isLatest})");
+
+        files.add(fileName);
+        _fileToEcuId[fileName] = ecuId;
+        _fileToHexUrl[fileName] = dataFileUrl;
+
+        if (ecuModel.datasets != null && ecuModel.datasets!.isNotEmpty) {
+          _fileToDtcDatasetId[fileName] = ecuModel.datasets!.first.id!;
+        }
+        if (ecuModel.pidDatasets != null && ecuModel.pidDatasets!.isNotEmpty) {
+          _fileToPidDatasetId[fileName] = ecuModel.pidDatasets!.first.id!;
+        }
+      }
+
+      availableFlashFiles.assignAll(files);
+
+      selectedFlashFile.value = null;
+      _currentDtcDatasetId = null;
+      _currentPidDatasetId = null;
+
+      print("Available Files : $files");
+    } catch (e, s) {
+      print("loadAvailableFlashFiles ERROR : $e");
+      print(s);
+      flashFilesError.value = e.toString();
+    } finally {
+      flashFilesLoading.value = false;
+    }
   }
 
   Future<void> submitStep(int index) async {
@@ -1086,23 +1273,6 @@ class HomePageController extends GetxController {
       }
     }
 
-    // if (step.key == 'harness') {
-    //   try {
-    //     final isValid = await _isValidHarness(value);
-    //     if (!isValid) {
-    //       final message = 'Harness not recognized. Please rescan.';
-    //       _log('Harness mismatch: scanned "$value"');
-    //       _showErrorPopup(message, title: 'Harness Mismatch');
-    //       return;
-    //     }
-    //   } catch (e) {
-    //     final message = e.toString().replaceFirst('Exception: ', '');
-    //     _log('Failed to validate harness: $e');
-    //     _showErrorPopup(message, title: 'Harness Validation Failed');
-    //     return;
-    //   }
-    // }
-
     if (step.key == 'harness') {
       try {
         final isValid = await _isValidHarness(value);
@@ -1142,13 +1312,6 @@ class HomePageController extends GetxController {
   // ── IQA group ──
 
   final RxBool iqaAllFilled = false.obs;
-  // void onIqaFieldChanged(int subIndex) {
-  //   _iqaIdleTimers[subIndex]?.cancel();
-  //   _iqaIdleTimers[subIndex] =
-  //       Timer(_idleDuration, () => submitIqaField(subIndex));
-
-  //   iqaAllFilled.value = iqaControllers.every((c) => c.text.trim().length == 7);
-  // }
 
   void onIqaFieldChanged(int subIndex) {
     _iqaIdleTimers[subIndex]?.cancel();
@@ -1164,9 +1327,6 @@ class HomePageController extends GetxController {
     _iqaIdleTimers[subIndex]?.cancel();
     final value = iqaControllers[subIndex].text.trim();
 
-    // Only proceed once exactly 7 characters have been entered — not
-    // before. Anything shorter (including empty) just waits for more
-    // input instead of advancing early.
     if (value.length != 7) return;
 
     _log('${_iqaRecordLabel(subIndex)} scanned: $value');
@@ -1190,136 +1350,11 @@ class HomePageController extends GetxController {
     }
   }
 
-  // void submitIqaField(int subIndex) {
-  //   if (allStepsComplete) return;
-
-  //   _iqaIdleTimers[subIndex]?.cancel();
-  //   final value = iqaControllers[subIndex].text.trim();
-  //   if (value.isEmpty) return;
-
-  //   _log('${_iqaRecordLabel(subIndex)} scanned: $value');
-
-  //   if (subIndex < iqaLabels.length - 1) {
-  //     WidgetsBinding.instance.addPostFrameCallback((_) {
-  //       iqaFocusNodes[subIndex + 1].requestFocus();
-  //     });
-  //     return;
-  //   }
-
-  //   final allFilled = iqaControllers.every((c) => c.text.trim().isNotEmpty);
-  //   if (!allFilled) return;
-
-  //   _log('IQA group complete');
-  //   currentStepIndex.value = currentStepIndex.value + 1;
-
-  //   if (allStepsComplete) {
-  //     _log('All scan steps complete. Ready to flash.');
-  //     _onAllStepsComplete();
-  //   }
-  // }
-
   void _onAllStepsComplete() {
     _log('All scan steps complete.');
   }
 
   final Map<String, int> _fileToEcuId = {};
-
-  Future<void> loadAvailableFlashFiles() async {
-    print("============= loadAvailableFlashFiles() =============");
-
-    flashFilesLoading.value = true;
-    flashFilesError.value = '';
-
-    try {
-      final scannedList = stepControllers[1].text.trim().toUpperCase();
-
-      final variants = await _ensureVariantList();
-
-      list_ds.Result? variant;
-      for (final v in variants.results ?? []) {
-        if ((v.variantCode ?? '').trim().toUpperCase() == scannedList) {
-          variant = v;
-          break;
-        }
-      }
-
-      if (variant == null) {
-        print("Variant not found");
-        availableFlashFiles.clear();
-        selectedFlashFile.value = null;
-        _currentDtcDatasetId = null;
-        _currentPidDatasetId = null;
-        return;
-      }
-
-      final vehicleModelId = variant.vehicleModel;
-      final subModelId = variant.subModel;
-
-      final models = await _ensureModels();
-
-      final files = <String>[];
-      _fileToDtcDatasetId.clear();
-      _fileToPidDatasetId.clear();
-      _fileToEcuId.clear();
-
-      for (final variantEcu in variant.variantEcu ?? []) {
-        final ecuId = variantEcu.ecu;
-        if (ecuId == null) continue;
-
-        all_ds.SubmodelModelecu? ecuModel;
-
-        for (final model in models.results ?? []) {
-          if (model.id != vehicleModelId) continue;
-          for (final sub in model.subModels ?? []) {
-            if (sub.id != subModelId) continue;
-            for (final ecu in sub.submodelModelecu ?? []) {
-              if (ecu.ecu?.id == ecuId) {
-                ecuModel = ecu;
-                break;
-              }
-            }
-            if (ecuModel != null) break;
-          }
-          if (ecuModel != null) break;
-        }
-
-        if (ecuModel == null) {
-          print("ECU Model not found for ECU ID : $ecuId");
-          continue;
-        }
-
-        final dataFile = variantEcu.dataFile;
-        if (dataFile == null) continue;
-
-        final fileName = dataFile.dataFile.split('/').last;
-        print("Flash File : $fileName");
-
-        files.add(fileName);
-        _fileToEcuId[fileName] = ecuId;
-
-        if (ecuModel.datasets != null && ecuModel.datasets!.isNotEmpty) {
-          _fileToDtcDatasetId[fileName] = ecuModel.datasets!.first.id!;
-        }
-        if (ecuModel.pidDatasets != null && ecuModel.pidDatasets!.isNotEmpty) {
-          _fileToPidDatasetId[fileName] = ecuModel.pidDatasets!.first.id!;
-        }
-      }
-
-      availableFlashFiles.assignAll(files);
-
-      selectedFlashFile.value = null;
-      _currentDtcDatasetId = null;
-      _currentPidDatasetId = null;
-
-      print("Available Files : $files");
-    } catch (e, s) {
-      print("loadAvailableFlashFiles ERROR : $e");
-      print(s);
-      flashFilesError.value = e.toString();
-    } finally {
-      flashFilesLoading.value = false;
-    }
-  }
 
   void selectFlashFile(String? file) {
     selectedFlashFile.value = file;
@@ -1517,6 +1552,199 @@ class HomePageController extends GetxController {
     return result;
   }
 
+  // Future<void> startFlashing() async {
+  //   if (flashInProgress.value) {
+  //     return;
+  //   }
+
+  //   final fileName = selectedFlashFile.value;
+  //   if (fileName == null) {
+  //     _showErrorPopup('Select a flash file from the list first',
+  //         title: 'No File Selected');
+  //     return;
+  //   }
+
+  //   if (!dongleConnected.value || App.dllFunctions == null) {
+  //     _log('❌ Cannot flash — dongle not connected');
+  //     _showErrorPopup('Waiting for the dongle to connect before flashing',
+  //         title: 'Not Connected');
+  //     return;
+  //   }
+
+  //   flashErrorMessage.value = '';
+  //   flashComplete.value = false;
+  //   flashProgress.value = 0;
+  //   flashElapsedSeconds.value = 0;
+
+  //   await _withDongleBusy(() async {
+  //     flashInProgress.value = true;
+  //     _log('Flashing started');
+
+  //     _flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
+  //       flashElapsedSeconds.value++;
+  //     });
+
+  //     Timer? percentTimer;
+
+  //     String? result;
+  //     try {
+  //       final scannedList = stepControllers[1].text.trim().toUpperCase();
+  //       final variants = await _ensureVariantList();
+
+  //       final variant = (variants.results ?? []).firstWhereOrNull(
+  //         (v) => (v.variantCode ?? '').trim().toUpperCase() == scannedList,
+  //       );
+  //       if (variant == null) throw Exception("Variant not found");
+
+  //       final targetEcuId = _fileToEcuId[fileName];
+  //       if (targetEcuId == null) {
+  //         throw Exception(
+  //             "Could not resolve ECU for selected file \"$fileName\"");
+  //       }
+
+  //       final variantEcu = (variant.variantEcu ?? [])
+  //           .firstWhereOrNull((ve) => ve.ecu == targetEcuId);
+  //       if (variantEcu == null) {
+  //         throw Exception("Variant ECU entry not found for selected file");
+  //       }
+
+  //       print("ECU ID (selected file) : $targetEcuId");
+  //       print("HEX FILE                : ${variantEcu.dataFile?.dataFile}");
+
+  //       final models = await _ensureModels();
+  //       all_ds.SubmodelModelecu? selectedEcu;
+
+  //       for (final model in models.results ?? []) {
+  //         if (model.id != variant.vehicleModel) continue;
+  //         for (final sub in model.subModels ?? []) {
+  //           if (sub.id != variant.subModel) continue;
+  //           for (final ecu in sub.submodelModelecu ?? []) {
+  //             if (ecu.ecu?.id == targetEcuId) {
+  //               selectedEcu = ecu;
+  //               break;
+  //             }
+  //           }
+  //           if (selectedEcu != null) break;
+  //         }
+  //         if (selectedEcu != null) break;
+  //       }
+
+  //       if (selectedEcu == null) {
+  //         throw Exception("ECU configuration not found for selected file");
+  //       }
+  //       print("Selected ECU : ${selectedEcu.ecu?.name}");
+
+  //       if (selectedEcu.flashFile == null) {
+  //         final fallback = vehicleEcuEntries
+  //             .firstWhereOrNull((e) => e.ecu?.id == targetEcuId);
+  //         if (fallback?.flashFile != null) {
+  //           selectedEcu = fallback;
+  //         }
+  //       }
+
+  //       if (selectedEcu!.flashFile == null) {
+  //         throw Exception("Flash file missing");
+  //       }
+
+  //       final flashConfig = selectedEcu.flashFile!;
+
+  //       _log('Selected flash file: $fileName');
+
+  //       await App.dllFunctions!.setDongleProperties(
+  //         selectedEcu.ecu?.protocol?.name ?? '',
+  //         selectedEcu.ecu?.protocol?.autopeepal ?? '',
+  //         selectedEcu.ecu?.txHeader ?? '',
+  //         selectedEcu.ecu?.rxHeader ?? '',
+  //       );
+
+  //       _log('Downloading sequence file...');
+  //       final sequenceContent =
+  //           await _downloadAsRawString(flashConfig.sequenceFile!);
+
+  //       var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
+  //       if (ecuMapFiles.isEmpty) {
+  //         print('⚠️ API ecu_map_file empty — parsing from sequence file text.');
+  //         ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
+  //       }
+  //       if (ecuMapFiles.isEmpty) {
+  //         throw Exception("ECU MAP FILE missing — cannot generate flash JSON.");
+  //       }
+
+  //       _log('Downloading firmware file: $fileName');
+  //       final hexContent =
+  //           await _downloadAsRawString(variantEcu.dataFile!.dataFile!);
+
+  //       final flashJson = await readJson(
+  //         ecuMapFiles,
+  //         flashConfig.flashCheckSumType?.toString() ?? '',
+  //         Uint8List.fromList(hexContent.codeUnits),
+  //       );
+
+  //       if (flashJson.isEmpty) {
+  //         throw Exception("Flash JSON generation failed");
+  //       }
+  //       _currentDtcDatasetId = _fileToDtcDatasetId[fileName];
+  //       _currentPidDatasetId = _fileToPidDatasetId[fileName];
+
+  //       flashProgress.value = 0;
+  //       percentTimer =
+  //           Timer.periodic(const Duration(milliseconds: 500), (_) async {
+  //         try {
+  //           flashProgress.value = await App.dllFunctions!.flashingData();
+  //         } catch (_) {}
+  //       });
+
+  //       result = await App.dllFunctions!.startECUFlashing(
+  //         flashJson,
+  //         sequenceContent,
+  //         selectedEcu.ecu!,
+  //         selectedEcu.ecu?.seedkeyalgoFnIndex?.value ?? '',
+  //       );
+
+  //       print("Flash Result : $result");
+  //     } catch (e, s) {
+  //       print("❌ FATAL ERROR : $e");
+  //       print(s);
+  //       result = e.toString();
+  //     }
+
+  //     _flashStopwatch?.cancel();
+  //     percentTimer?.cancel();
+  //     flashInProgress.value = false;
+
+  //     if (result == null || result.isEmpty || result != 'NOERROR') {
+  //       flashComplete.value = false;
+  //       _log('❌ Flashing failed: $result');
+
+  //       final r = (result ?? '').toLowerCase();
+  //       final looksDisconnected = r.contains('no resp') ||
+  //           r.contains('socket_closed') ||
+  //           r.contains('noresponsefromecu');
+
+  //       if (looksDisconnected) {
+  //         dongleConnected.value = false;
+  //         _startDongleRetryTimer();
+  //         _showReconnectPopup();
+  //       }
+
+  //       flashErrorMessage.value = result ?? 'Unknown error';
+  //       return;
+  //     }
+
+  //     flashComplete.value = true;
+  //     _log('Flashing completed successfully (${formattedElapsed})');
+  //     await Future.delayed(const Duration(milliseconds: 500));
+  //     await _loadDtcResults();
+  //     await Future.delayed(const Duration(milliseconds: 300));
+  //     await _loadPidResults();
+
+  //     final iqaWriteStatus = await _autoWriteIqaValues();
+
+  //     // No Get.back() needed — we never navigated away.
+  //     _showFlashCompletePopup(iqaWriteStatus);
+  //   });
+  // }
+
   Future<void> startFlashing() async {
     if (flashInProgress.value) {
       return;
@@ -1536,14 +1764,10 @@ class HomePageController extends GetxController {
       return;
     }
 
-    // Reset ALL flash state synchronously BEFORE navigating, so the new
-    // page never renders a stale frame from the previous flash run.
     flashErrorMessage.value = '';
     flashComplete.value = false;
     flashProgress.value = 0;
     flashElapsedSeconds.value = 0;
-
-    Get.to(() => const EcuFlashingPage()); // navigate to flashing page
 
     await _withDongleBusy(() async {
       flashInProgress.value = true;
@@ -1571,14 +1795,20 @@ class HomePageController extends GetxController {
               "Could not resolve ECU for selected file \"$fileName\"");
         }
 
-        final variantEcu = (variant.variantEcu ?? [])
-            .firstWhereOrNull((ve) => ve.ecu == targetEcuId);
+        // Match against the active D-dataset entries (same set used to
+        // build availableFlashFiles in loadAvailableFlashFiles()) —
+        // variant.variantEcu doesn't exist on this model; the flashable
+        // hex lives on variant.dDatasetEcu instead.
+        final variantEcu = (variant.dDatasetEcu ?? []).firstWhereOrNull(
+          (d) => d.ecu == targetEcuId && d.isActive == true,
+        );
         if (variantEcu == null) {
-          throw Exception("Variant ECU entry not found for selected file");
+          throw Exception(
+              "Active D-dataset ECU entry not found for selected file");
         }
 
         print("ECU ID (selected file) : $targetEcuId");
-        print("HEX FILE                : ${variantEcu.dataFile?.dataFile}");
+        print("HEX FILE                : ${variantEcu.dataFile}");
 
         final models = await _ensureModels();
         all_ds.SubmodelModelecu? selectedEcu;
@@ -1601,7 +1831,6 @@ class HomePageController extends GetxController {
         if (selectedEcu == null) {
           throw Exception("ECU configuration not found for selected file");
         }
-
         print("Selected ECU : ${selectedEcu.ecu?.name}");
 
         if (selectedEcu.flashFile == null) {
@@ -1641,8 +1870,17 @@ class HomePageController extends GetxController {
         }
 
         _log('Downloading firmware file: $fileName');
-        final hexContent =
-            await _downloadAsRawString(variantEcu.dataFile!.dataFile!);
+
+        // variantEcu.dataFile is a plain String URL on this model (unlike
+        // the old variantEcu.dataFile.dataFile double-nesting) — fall back
+        // to _fileToHexUrl (populated in loadAvailableFlashFiles) just in
+        // case this particular entry's URL is somehow empty at this point.
+        final hexUrl = variantEcu.dataFile ?? _fileToHexUrl[fileName];
+        if (hexUrl == null || hexUrl.isEmpty) {
+          throw Exception("Hex file URL missing for selected D-dataset entry");
+        }
+
+        final hexContent = await _downloadAsRawString(hexUrl);
 
         final flashJson = await readJson(
           ecuMapFiles,
@@ -1656,9 +1894,6 @@ class HomePageController extends GetxController {
         _currentDtcDatasetId = _fileToDtcDatasetId[fileName];
         _currentPidDatasetId = _fileToPidDatasetId[fileName];
 
-        // Only NOW start polling the DLL for progress — right before the
-        // actual flash write begins, so we never display stale progress
-        // left over from a previous flash run.
         flashProgress.value = 0;
         percentTimer =
             Timer.periodic(const Duration(milliseconds: 500), (_) async {
@@ -1697,27 +1932,23 @@ class HomePageController extends GetxController {
         if (looksDisconnected) {
           dongleConnected.value = false;
           _startDongleRetryTimer();
-          _showReconnectPopup(); // still shows over the flashing page
+          _showReconnectPopup();
         }
 
-        // Inline error on the flashing page itself instead of a popup —
-        // gives the operator a Back button right there.
         flashErrorMessage.value = result ?? 'Unknown error';
         return;
       }
 
       flashComplete.value = true;
       _log('Flashing completed successfully (${formattedElapsed})');
-
+      await Future.delayed(const Duration(milliseconds: 500));
       await _loadDtcResults();
+      await Future.delayed(const Duration(milliseconds: 300));
       await _loadPidResults();
 
       final iqaWriteStatus = await _autoWriteIqaValues();
 
-      // Pop back to Home, then show the same complete popup as before.
-      if (Get.isDialogOpen != true) {
-        Get.back();
-      }
+      // No Get.back() needed — we never navigated away.
       _showFlashCompletePopup(iqaWriteStatus);
     });
   }
@@ -1786,7 +2017,92 @@ class HomePageController extends GetxController {
 
   void _resetLoader() => _setBusy(false, "");
 
-  Future<void> _loadDtcResults() {
+  // Future<void> _loadDtcResults() {
+  //   return _withDongleBusy(() async {
+  //     final datasetId = _currentDtcDatasetId;
+  //     if (datasetId == null) {
+  //       _log('No DTC dataset id available — skipping');
+  //       return;
+  //     }
+
+  //     final ecu =
+  //         StaticData.ecuInfo.firstWhereOrNull((e) => e.readDtcIndex != null);
+  //     if (ecu == null) {
+  //       _log('DTC read: no ECU with read_dtc_index configured — skipping');
+  //       return;
+  //     }
+
+  //     _accessToken ??= await SecureStorageService.getAccessToken();
+
+  //     try {
+  //       final dtc_ds.DtcDataset dtc = await _authService.getDtcDataset(
+  //         id: datasetId,
+  //         accessToken: _accessToken,
+  //       );
+
+  //       final serverCodes = <dtc_ds.DtcCode>[];
+  //       for (final result in dtc.results ?? <dtc_ds.Result>[]) {
+  //         serverCodes.addAll(result.dtcCode ?? <dtc_ds.DtcCode>[]);
+  //       }
+
+  //       await App.dllFunctions!.setDongleProperties(
+  //         ecu.protocol?.name ?? '',
+  //         ecu.protocol?.autopeepal ?? '',
+  //         ecu.txHeader ?? '',
+  //         ecu.rxHeader ?? '',
+  //       );
+
+  //       _log('Reading DTCs from ${ecu.ecuName}...');
+  //       final readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+
+  //       if (readResult == null) {
+  //         _log('DTC read: ECU_COMMUNICATION_ERROR');
+  //         dtcList.clear();
+  //         dongleConnected.value = false;
+  //         _startDongleRetryTimer();
+  //         _showReconnectPopup();
+  //         return;
+  //       }
+
+  //       if (readResult.status != 'NO_ERROR') {
+  //         _log('DTC read failed: ${readResult.status}');
+  //         dtcList.clear();
+  //         if (readResult.status == 'No Resp From Dongle' ||
+  //             readResult.status == 'SOCKET_CLOSED' ||
+  //             readResult.status.toString().toLowerCase().contains('no resp')) {
+  //           dongleConnected.value = false;
+  //           _startDongleRetryTimer();
+  //           _showReconnectPopup();
+  //         }
+  //         return;
+  //       }
+
+  //       final rows = readResult.dtcs ?? [];
+  //       final dummy = <String, String>{};
+
+  //       for (final row in rows) {
+  //         if (row.length < 2) continue;
+  //         final code = row[0];
+  //         final status = row[1];
+
+  //         final match = serverCodes.firstWhereOrNull((c) => c.code == code);
+  //         final desc = match?.description ?? 'Description not found';
+
+  //         dummy[code] = '$code - $desc ($status)';
+  //       }
+
+  //       dtcList.assignAll(dummy.values.toList());
+  //       _log('DTC (${dtcList.length}) data loaded');
+  //     } catch (e) {
+  //       final message = e.toString().replaceFirst('Exception: ', '');
+  //       _log('Failed to load DTC dataset: $e');
+  //       dtcList.clear();
+  //       _showErrorPopup(message, title: 'Failed to Load DTC');
+  //     }
+  //   });
+  // }
+
+    Future<void> _loadDtcResults() {
     return _withDongleBusy(() async {
       final datasetId = _currentDtcDatasetId;
       if (datasetId == null) {
@@ -2000,6 +2316,9 @@ class HomePageController extends GetxController {
           accessToken: _accessToken,
         );
 
+        // Builds livePidCodes / selection state for the Run/Play PID feature.
+        _buildLivePidGroups(pid);
+
         final pidStrings = <String>[];
         for (final result in pid.results ?? <pid_ds.Result>[]) {
           for (final code in result.codes ?? <pid_ds.Code>[]) {
@@ -2052,6 +2371,130 @@ class HomePageController extends GetxController {
     Get.offAllNamed('/login');
   }
 
+// ── Live PID (Play/Run) ──
+  final RxList<pid_ds.Code> livePidCodes = <pid_ds.Code>[].obs;
+  final RxSet<int> selectedPidCodeIds = <int>{}.obs;
+  final RxMap<int, String> livePidValues =
+      <int, String>{}.obs; // variable.id -> display value
+  final RxBool pidPlaying = false.obs;
+  bool _stopPidLoop = false;
+
+  bool get allPidsSelected =>
+      livePidCodes.isNotEmpty &&
+      livePidCodes.every((c) => selectedPidCodeIds.contains(c.id));
+
+  void _buildLivePidGroups(pid_ds.PidDataset pid) {
+    final codes = <pid_ds.Code>[];
+    for (final result in pid.results ?? <pid_ds.Result>[]) {
+      for (final code in result.codes ?? <pid_ds.Code>[]) {
+        if (code.read == true) codes.add(code);
+      }
+    }
+    codes.sort((a, b) => (a.priority ?? 0).compareTo(b.priority ?? 0));
+    livePidCodes.assignAll(codes);
+
+    // All PIDs are selected by default — no manual "Select All" step needed.
+    selectedPidCodeIds
+      ..clear()
+      ..addAll(codes.map((c) => c.id!));
+    livePidValues.clear();
+  }
+
+  void toggleSelectAllPids() {
+    if (allPidsSelected) {
+      selectedPidCodeIds.clear();
+    } else {
+      selectedPidCodeIds
+        ..clear()
+        ..addAll(livePidCodes.map((c) => c.id!));
+    }
+  }
+
+  void togglePidCodeSelection(int codeId) {
+    if (selectedPidCodeIds.contains(codeId)) {
+      selectedPidCodeIds.remove(codeId);
+    } else {
+      selectedPidCodeIds.add(codeId);
+    }
+  }
+
+  Future<void> togglePidPlayback() async {
+    if (pidPlaying.value) {
+      // Manual stop mid-run still works if the user taps again.
+      _stopPidLoop = true;
+      pidPlaying.value = false;
+      _log('Live PID read stopped');
+      return;
+    }
+
+    if (selectedPidCodeIds.isEmpty) {
+      _showErrorPopup('No parameters available to run',
+          title: 'Nothing to Read');
+      return;
+    }
+
+    _stopPidLoop = false;
+    pidPlaying.value = true;
+    _log('Live PID read started (${selectedPidCodeIds.length} parameter(s))');
+
+    final selectedCodes =
+        livePidCodes.where((c) => selectedPidCodeIds.contains(c.id)).toList();
+
+    final ok = await _readSelectedPidsOnce(selectedCodes);
+
+    if (!_stopPidLoop) {
+      // Ran to completion (wasn't manually stopped mid-read) — auto-stop.
+      pidPlaying.value = false;
+      if (ok) {
+        _log('✅ Live PID read complete');
+      } else {
+        _log('❌ Live PID read finished with errors');
+      }
+    }
+  }
+
+  Future<bool> _readSelectedPidsOnce(List<pid_ds.Code> codes) async {
+    return await _withDongleBusy(() async {
+      try {
+        final responses = await App.dllFunctions!.readPid(codes);
+
+        if (responses == null) {
+          _log('❌ Live PID read: no response from ECU');
+          return false;
+        }
+
+        for (final resp in responses) {
+          final code = codes.firstWhereOrNull((c) => c.id == resp.pidId);
+          if (code == null) continue;
+
+          if (resp.status == 'NOERROR') {
+            for (final variable
+                in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
+              final item = resp.variables
+                  .firstWhereOrNull((v) => v.pidNumber == variable.id);
+              if (variable.id != null) {
+                livePidValues[variable.id!] =
+                    item?.responseValue ?? 'Not Found';
+              }
+            }
+          } else {
+            for (final variable
+                in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
+              if (variable.id != null) {
+                livePidValues[variable.id!] = resp.status ?? 'ERROR';
+              }
+            }
+          }
+        }
+
+        return true;
+      } catch (e) {
+        _log('❌ Live PID read error: $e');
+        return false;
+      }
+    });
+  }
+
   @override
   void onClose() {
     for (final c in stepControllers) {
@@ -2078,4 +2521,17 @@ class HomePageController extends GetxController {
     _dongleHeartbeatTimer?.cancel();
     super.onClose();
   }
+}
+
+class _DongleEntry {
+  final String? macId;
+  final String? ip;
+  final bool isActive;
+  final List<int> ecuIds;
+  _DongleEntry({
+    this.macId,
+    this.ip,
+    this.isActive = false,
+    this.ecuIds = const [],
+  });
 }

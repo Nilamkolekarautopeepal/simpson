@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -72,7 +73,7 @@ class LoginController extends GetxController {
       errorMessage.value = '';
       debugPrint("🔵 [Login] Fetching macId and deviceType...");
 
-      final macId = await _getMacId();
+      final macId = await AndroidOperationsService.getDeviceUniqueId();
       final deviceType = _getDeviceType();
       debugPrint("🔵 [Login] macId=$macId deviceType=$deviceType");
 
@@ -112,24 +113,32 @@ class LoginController extends GetxController {
       final station = user.stationData?.firstOrNull;
       final stationType = station?.stationType?.trim();
 
-      // Pick the active dongle if there's more than one, else just the first.
-      final dongleIp = station?.prodbudDongles
-              ?.firstWhereOrNull((d) => d.isActive == true)
-              ?.ip ??
-          station?.prodbudDongles?.firstOrNull?.ip;
+      final dongleEntries = (station?.prodbudDongles ?? [])
+          .map((d) => {
+                'mac_id': d.macId,
+                'ip': d.ip,
+                'is_active': d.isActive,
+                'ecu_ids': (d.ecuStation ?? [])
+                    .map((e) => e.ecu)
+                    .whereType<int>()
+                    .toList(),
+              })
+          .toList();
 
-      // PLC IP/port come straight from this same station object —
-      // station_data[0].plc_ip / .plc_port in the raw login JSON,
-      // already mapped onto StationDatum.plcIp / .plcPort.
+      debugPrint("🔵 [Login] dongle_entries=$dongleEntries");
+
       final plcIp = station?.plcIp;
       final plcPort = station?.plcPort;
 
-      debugPrint(
-          "🔵 [Login] station_type='$stationType' dongle_ip='$dongleIp' plc_ip='$plcIp' plc_port='$plcPort'");
+      debugPrint("🔵 [Login] plc_ip='$plcIp' plc_port='$plcPort'");
 
-      await SecureStorageService.saveDongleIp(dongleIp);
+      await SecureStorageService.saveDongleList(jsonEncode(dongleEntries));
       await SecureStorageService.savePlcIp(plcIp);
       await SecureStorageService.savePlcPort(plcPort?.toString());
+
+      // await SecureStorageService.saveDongleIp(dongleIp);
+      // await SecureStorageService.savePlcIp(plcIp);
+      // await SecureStorageService.savePlcPort(plcPort?.toString());
 
       if (stationType == 'Testing') {
         Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
@@ -160,18 +169,6 @@ class LoginController extends GetxController {
   }
 
   /// ["true", "<mac>"] on success, ["false", "<reason>"] on failure.
-  Future<String> _getMacId() async {
-    final result = await AndroidOperationsService.getDeviceUniqueId();
-
-    if (result.length < 2) {
-      throw Exception("Could not determine device id.");
-    }
-    if (result[0] != "true") {
-      throw Exception(result[1]);
-    }
-
-    return result[1];
-  }
 
   String _getDeviceType() {
     if (Platform.isWindows) return "windows";

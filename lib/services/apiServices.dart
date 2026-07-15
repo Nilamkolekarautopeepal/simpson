@@ -5,7 +5,6 @@ import 'package:simpson/api/app_urls.dart';
 import 'package:simpson/modals/all.models.dart';
 import 'package:simpson/modals/esn.model.dart' as esn_ds;
 import 'package:simpson/modals/flashRecord.model.dart';
-import 'package:simpson/modals/harness.model.dart';
 import 'package:simpson/modals/listNumber.model.dart';
 import 'package:simpson/modals/pidDataset.model.dart'; // adjust to wherever PidDataset actually lives
 import 'package:simpson/modals/dtcDataset.model.dart'; // adjust to wherever DtcDataset actually lives
@@ -389,23 +388,6 @@ class AuthService {
 
       throw Exception(serverMessage ?? _friendlyMessage(e));
     }
-  }
-
-  Future<HarnessName> getHarnessList({
-    required String harnessName,
-    String? accessToken,
-  }) async {
-    final response = await _dio.get(
-      ApiUrls.harnessNumber,
-      queryParameters: {'name': harnessName},
-      options: Options(
-        headers: {'Authorization': 'JWT $accessToken'},
-      ),
-    );
-    print('🔵 [HarnessService] GET ${response.requestOptions.uri}');
-    print('🔵 [HarnessService] statusCode=${response.statusCode}');
-    print('🔵 [HarnessService] response.data=${response.data}');
-    return HarnessName.fromJson(response.data);
   }
 
   String _friendlyMessage(DioException e) {

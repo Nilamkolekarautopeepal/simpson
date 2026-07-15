@@ -6,7 +6,6 @@ import 'package:simpson/dev/dev_screen.dart';
 import 'package:simpson/themes/app_colors.dart';
 import '../controllers/home_page_controller.dart';
 
-
 class HomePageView extends GetView<HomePageController> {
   const HomePageView({super.key});
 
@@ -349,47 +348,48 @@ class HomePageView extends GetView<HomePageController> {
                   //   onChanged: (_) => controller.onIqaFieldChanged(i),
                   //   onSubmitted: (_) => controller.submitIqaField(i),
                   // ),
-               Focus(
-  onKeyEvent: (node, event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.tab) {
-      controller.submitIqaField(i);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  },
-  child: TextField(
-    cursorColor: AppColors.themeColor,
-    controller: controller.iqaControllers[i],
-    focusNode: controller.iqaFocusNodes[i],
-    enabled: true,
-    maxLength: 7,
-    style: const TextStyle(fontSize: 13),
-    decoration: InputDecoration(
-      isDense: true,
-      filled: true,
-      fillColor: Colors.white,
-      counterText: '',
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: Colors.grey.shade200),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: AppColors.themeColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: AppColors.themeColor, width: 1.5),
-      ),
-      hintText: 'Scan ${controller.iqaLabels[i]}',
-    ),
-    onChanged: (_) => controller.onIqaFieldChanged(i),
-    onSubmitted: (_) => controller.submitIqaField(i),
-  ),
-),
+                  Focus(
+                    onKeyEvent: (node, event) {
+                      if (event is KeyDownEvent &&
+                          event.logicalKey == LogicalKeyboardKey.tab) {
+                        controller.submitIqaField(i);
+                        return KeyEventResult.handled;
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: TextField(
+                      cursorColor: AppColors.themeColor,
+                      controller: controller.iqaControllers[i],
+                      focusNode: controller.iqaFocusNodes[i],
+                      enabled: true,
+                      maxLength: 7,
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                        counterText: '',
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: Colors.grey.shade200),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: AppColors.themeColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(
+                              color: AppColors.themeColor, width: 1.5),
+                        ),
+                        hintText: 'Scan ${controller.iqaLabels[i]}',
+                      ),
+                      onChanged: (_) => controller.onIqaFieldChanged(i),
+                      onSubmitted: (_) => controller.submitIqaField(i),
+                    ),
+                  ),
                 ],
               ),
             );
@@ -762,121 +762,218 @@ class HomePageView extends GetView<HomePageController> {
     });
   }
 
-  Widget _buildFlashBody() {
+ Widget _buildFlashBody() {
     return Obx(() {
+      // ── Error state ──
+      if (controller.flashErrorMessage.value.isNotEmpty) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.close_rounded,
+                    color: Colors.red.shade400, size: 30),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Flashing Failed',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                controller.flashErrorMessage.value,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+              const SizedBox(height: 20),
+              if (controller.selectedFlashFile.value != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    controller.selectedFlashFile.value!,
+                    textAlign: TextAlign.center,
+                    style:
+                        TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                  ),
+                ),
+              ElevatedButton(
+                onPressed: controller.dongleConnected.value
+                    ? controller.startFlashing
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.themeColor,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 50, vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Start Flashing',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              if (!controller.dongleConnected.value) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Waiting for the dongle to reconnect…',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 11.5, color: Colors.orange.shade800),
+                ),
+              ],
+            ],
+          ),
+        );
+      }
+
+      // ── Success state ──
       if (controller.flashComplete.value) {
+        return Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (controller.selectedFlashFile.value != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    controller.selectedFlashFile.value!,
+                    textAlign: TextAlign.center,
+                    style:
+                        TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                  ),
+                ),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: AppColors.themeColor,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_rounded,
+                    color: Colors.white, size: 30),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Flashing successful',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Completed in ${controller.formattedElapsed}',
+                style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        );
+      }
+
+      // ── In-progress state ──
+      if (controller.flashInProgress.value) {
+        final pct = (controller.flashProgress.value * 100).round();
+
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.themeColor.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor:
+                        AlwaysStoppedAnimation<Color>(AppColors.themeColor),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Flashing in progress',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black87),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Please keep the dongle connected',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
             if (controller.selectedFlashFile.value != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 18),
                 child: Text(
                   controller.selectedFlashFile.value!,
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.themeColor,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(child: SizedBox.shrink()),
                 Text(
-                  controller.formattedElapsed,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  'Elapsed  ${controller.formattedElapsed}',
+                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                ),
+                Text(
+                  '$pct%',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.themeColor,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             ClipRRect(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
-                value: 1.0,
-                minHeight: 6,
+                value: controller.flashProgress.value,
+                minHeight: 12,
                 backgroundColor: Colors.grey.shade200,
                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.themeColor),
               ),
             ),
-            const SizedBox(height: 16),
-            Center(
-              child: Column(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: AppColors.themeColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child:
-                        const Icon(Icons.check, color: Colors.white, size: 22),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Flashing successful',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         );
       }
 
-      if (controller.flashInProgress.value) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (controller.selectedFlashFile.value != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  controller.selectedFlashFile.value!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11.5, color: Colors.grey.shade500),
-                ),
-              ),
-            Text(
-              controller.formattedElapsed,
-              style: const TextStyle(
-                fontSize: 34,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: controller.flashProgress.value,
-                minHeight: 10,
-                backgroundColor: Colors.grey.shade300,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.themeColor),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${(controller.flashProgress.value * 100).round()}%',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            //const SizedBox(height: 24),
-            // Column(
-            //   children: [
-            //     Image.asset('asset/new/gifPhone.gif', height: 90),
-            //     Image.asset('asset/new/gifDownArrow.gif', height: 26),
-            //     Image.asset('asset/new/ic_engine.png', height: 90),
-            //   ],
-            // ),
-          ],
-        );
-      }
-
+      // ── File selection state (unchanged from before) ──
       if (controller.flashFilesLoading.value) {
         return const Padding(
           padding: EdgeInsets.symmetric(vertical: 20),
@@ -1028,7 +1125,6 @@ class HomePageView extends GetView<HomePageController> {
       );
     });
   }
-
   Widget _buildDtcSection() {
     return Obx(() => _buildExpandableSection(
           title: 'DTC',
@@ -1077,51 +1173,161 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
+  // Widget _buildPidSection() {
+  //   return Obx(() => _buildExpandableSection(
+  //         title: 'PID',
+  //         expanded: controller.pidExpanded.value,
+  //         onTap: controller.togglePid,
+  //         trailingLabel: null,
+  //         items: controller.pidList,
+  //         itemBuilder: _buildPidCard,
+  //       ));
+  // }
+
   Widget _buildPidSection() {
-    return Obx(() => _buildExpandableSection(
-          title: 'PID',
-          expanded: controller.pidExpanded.value,
-          onTap: controller.togglePid,
-          trailingLabel: null,
-          items: controller.pidList,
-          itemBuilder: _buildPidCard,
-        ));
-  }
+    return Obx(() {
+      final expanded = controller.pidExpanded.value;
 
-  Widget _buildPidCard(String raw) {
-    final splitIndex = raw.indexOf(' — ');
-    final label = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
-    final value = splitIndex == -1 ? '' : raw.substring(splitIndex + 3).trim();
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: controller.togglePid,
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    const Text('PID',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    Obx(() {
+                      final playing = controller.pidPlaying.value;
+                      return ElevatedButton.icon(
+                        onPressed: controller.togglePidPlayback,
+                        icon: Icon(
+                          playing
+                              ? Icons.stop_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 18,
+                        ),
+                        label: Text(playing ? 'Stop' : 'Run',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: playing
+                              ? Colors.red.shade600
+                              : AppColors.themeColor,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 10),
+                    Icon(expanded ? Icons.expand_less : Icons.expand_more),
+                  ],
+                ),
+              ),
+            ),
+            if (expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: Obx(() {
+                  if (controller.livePidCodes.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('No data yet',
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 13)),
+                    );
+                  }
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12.5,
-              color: Colors.black87,
-            ),
-          ),
-          if (value.isNotEmpty) ...[
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
-            ),
+                  final codes = controller.livePidCodes;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(codes.length, (index) {
+                      final code = codes[index];
+                      final variable = code.piCodeVariable?.firstOrNull;
+                      final label = variable?.longName ??
+                          variable?.shortName ??
+                          code.shortName ??
+                          code.code ??
+                          'PID';
+                      final liveValue = variable?.id != null
+                          ? controller.livePidValues[variable!.id]
+                          : null;
+                      final unit = variable?.unit ?? '';
+                      final isError = liveValue != null &&
+                          (liveValue == 'Not Found' ||
+                              liveValue.toString().contains('ERROR'));
+
+                      final row = Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 10, horizontal: 2),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                label,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade800,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              liveValue != null
+                                  ? '$liveValue ${unit.isNotEmpty ? unit : ''}'
+                                      .trim()
+                                  : '—',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: liveValue == null
+                                    ? Colors.grey.shade400
+                                    : (isError
+                                        ? Colors.red
+                                        : AppColors.themeColor),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          row,
+                          if (index != codes.length - 1)
+                            Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Colors.grey.shade100,
+                            ),
+                        ],
+                      );
+                    }),
+                  );
+                }),
+              ),
           ],
-        ],
-      ),
-    );
+        ),
+      );
+    });
   }
 
   Widget _buildExpandableSection({
@@ -1306,103 +1512,103 @@ class HomePageView extends GetView<HomePageController> {
 //     );
 //   }
 
-Color _activityLogColor(String entry) {
-  final lower = entry.toLowerCase();
+  Color _activityLogColor(String entry) {
+    final lower = entry.toLowerCase();
 
-  // Explicit markers used throughout HomePageController's _log() calls.
-  if (entry.contains('❌') ||
-      lower.contains('failed') ||
-      lower.contains('error') ||
-      lower.contains('mismatch') ||
-      lower.contains('not recognized') ||
-      lower.contains('not found')) {
-    return Colors.red.shade700;
+    // Explicit markers used throughout HomePageController's _log() calls.
+    if (entry.contains('❌') ||
+        lower.contains('failed') ||
+        lower.contains('error') ||
+        lower.contains('mismatch') ||
+        lower.contains('not recognized') ||
+        lower.contains('not found')) {
+      return Colors.red.shade700;
+    }
+
+    if (entry.contains('✅') ||
+        lower.contains('successful') ||
+        lower.contains('success') ||
+        lower.contains('connected') ||
+        lower.contains('complete')) {
+      return Colors.green.shade700;
+    }
+
+    return Colors.grey.shade700; // neutral/info lines unchanged
   }
 
-  if (entry.contains('✅') ||
-      lower.contains('successful') ||
-      lower.contains('success') ||
-      lower.contains('connected') ||
-      lower.contains('complete')) {
-    return Colors.green.shade700;
-  }
-
-  return Colors.grey.shade700; // neutral/info lines unchanged
-}
-
-Widget _buildActivitySection() {
-  return Container(
-    constraints: const BoxConstraints(maxHeight: 180),
-    margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: Colors.grey.shade300),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 8,
-          offset: const Offset(0, -2),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'Activity',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const Spacer(),
-            Obx(() => IconButton(
-                  icon: const Icon(Icons.save_alt, size: 18),
-                  tooltip: "Save Activity Log",
-                  color: AppColors.themeColor,
-                  onPressed: controller.activityLog.isEmpty
-                      ? null
-                      : () async {
-                          await controller.saveActivityLog();
-                        },
-                )),
-            Obx(() => IconButton(
-                  icon: const Icon(Icons.copy, size: 18),
-                  tooltip: "Copy Activity Log",
-                  color: AppColors.themeColor,
-                  onPressed: controller.activityLog.isEmpty
-                      ? null
-                      : () => _copyActivityLog(),
-                )),
-          ],
-        ),
-        const Divider(height: 16),
-        Expanded(
-          child: Obx(
-            () => ListView(
-              padding: EdgeInsets.zero,
-              children: controller.activityLog
-                  .map((entry) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Text(
-                          entry,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: _activityLogColor(entry),
-                            fontWeight: _activityLogColor(entry) ==
-                                    Colors.grey.shade700
-                                ? FontWeight.normal
-                                : FontWeight.w600,
+  Widget _buildActivitySection() {
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 180),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Activity',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.save_alt, size: 18),
+                    tooltip: "Save Activity Log",
+                    color: AppColors.themeColor,
+                    onPressed: controller.activityLog.isEmpty
+                        ? null
+                        : () async {
+                            await controller.saveActivityLog();
+                          },
+                  )),
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: "Copy Activity Log",
+                    color: AppColors.themeColor,
+                    onPressed: controller.activityLog.isEmpty
+                        ? null
+                        : () => _copyActivityLog(),
+                  )),
+            ],
+          ),
+          const Divider(height: 16),
+          Expanded(
+            child: Obx(
+              () => ListView(
+                padding: EdgeInsets.zero,
+                children: controller.activityLog
+                    .map((entry) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Text(
+                            entry,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: _activityLogColor(entry),
+                              fontWeight: _activityLogColor(entry) ==
+                                      Colors.grey.shade700
+                                  ? FontWeight.normal
+                                  : FontWeight.w600,
+                            ),
                           ),
-                        ),
-                      ))
-                  .toList(),
+                        ))
+                    .toList(),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
-}
+        ],
+      ),
+    );
+  }
 }
