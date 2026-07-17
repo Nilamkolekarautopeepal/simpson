@@ -8,14 +8,28 @@ const Color _kPrimary = Color(0xFF003874);
 
 /// Centered Live Parameter dialog for one lane, split into "Live
 /// Parameters" and "IQA" tabs based on each PID code's messageType.
+///
+/// Live Parameters tab shows real values read from the ECU
+/// (lane.livePidValues), driven by the Run/Stop button.
+///
+/// IQA tab shows exactly the values that were entered/written for
+/// this lane (lane.iqaControllers) — capped to that count, not every
+/// possible IQA variable the dataset happens to define — so a 4-cylinder
+/// lane always shows exactly 4 rows.
 class PsfLiveParameterDialog extends StatelessWidget {
-  const PsfLiveParameterDialog({super.key, required this.lane, required this.onRefresh});
+  const PsfLiveParameterDialog({
+    super.key,
+    required this.lane,
+    required this.onRefresh,
+    required this.onTogglePlayback,
+  });
 
   final PsfLane lane;
   final VoidCallback onRefresh;
+  final VoidCallback onTogglePlayback;
 
-  static void show(PsfLane lane, VoidCallback onRefresh) {
-    Get.dialog(PsfLiveParameterDialog(lane: lane, onRefresh: onRefresh));
+  static void show(PsfLane lane, VoidCallback onRefresh, VoidCallback onTogglePlayback) {
+    Get.dialog(PsfLiveParameterDialog(lane: lane, onRefresh: onRefresh, onTogglePlayback: onTogglePlayback));
   }
 
   @override
@@ -51,11 +65,23 @@ class PsfLiveParameterDialog extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    Obx(() {
+                      final playing = lane.pidPlaying.value;
+                      return TextButton.icon(
+                        onPressed: onTogglePlayback,
+                        icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 18),
+                        label: Text(playing ? 'Stop' : 'Run', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                        style: TextButton.styleFrom(
+                          foregroundColor: playing ? Colors.red.shade600 : _kPrimary,
+                        ),
+                      );
+                    }),
                     Obx(
                       () => IconButton(
                         icon: lane.isLoadingPid.value
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.refresh, size: 20, color: Colors.grey),
+                        tooltip: 'Reload parameter list',
                         onPressed: lane.isLoadingPid.value ? null : onRefresh,
                         splashRadius: 18,
                       ),
@@ -82,7 +108,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
                       labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
                       tabs: [
                         Tab(text: 'Live Parameters (${lane.liveParameterCodes.length})'),
-                        Tab(text: 'IQA (${lane.iqaParameterCodes.length})'),
+                        Tab(text: 'IQA (${lane.iqaControllers.length})'),
                       ],
                     ),
                   ),
@@ -102,8 +128,8 @@ class PsfLiveParameterDialog extends StatelessWidget {
                     }
                     return TabBarView(
                       children: [
-                        _codeList(lane.liveParameterCodes, emptyText: 'No live parameters found for this lane.'),
-                        _codeList(lane.iqaParameterCodes, emptyText: 'No IQA parameters found for this lane.'),
+                        _liveParameterList(),
+                        _iqaWrittenList(),
                       ],
                     );
                   }),
@@ -116,13 +142,13 @@ class PsfLiveParameterDialog extends StatelessWidget {
     );
   }
 
-  Widget _codeList(List<Code> codes, {required String emptyText}) {
-    // Flatten each Code's piCodeVariable list into individual rows —
-    // a single Code (e.g. "IQA", code 220079) can contain several
-    // named sub-variables (IQA 1, IQA 2, IQA 3...), and each one needs
-    // its own row rather than only showing the first.
+  // ═══════════════════════════════════════════════
+  // LIVE PARAMETERS TAB — real ECU reads
+  // ═══════════════════════════════════════════════
+
+  Widget _liveParameterList() {
     final rows = <_ParamRow>[];
-    for (final code in codes) {
+    for (final code in lane.liveParameterCodes) {
       final variables = code.piCodeVariable ?? [];
       if (variables.isEmpty) {
         rows.add(_ParamRow(code: code, variable: null));
@@ -134,15 +160,22 @@ class PsfLiveParameterDialog extends StatelessWidget {
     }
 
     if (rows.isEmpty) {
-      return Center(child: Text(emptyText, style: const TextStyle(color: Colors.grey)));
+      return const Center(child: Text('No live parameters found for this lane.', style: TextStyle(color: Colors.grey)));
     }
+
+    // Plain (non-reactive) ListView — each tile below owns its own Obx
+    // scoped to just the value it reads. Wrapping this whole builder in
+    // one outer Obx doesn't work: ListView.builder's itemBuilder runs
+    // lazily (as items scroll into view), which is *after* the Obx's
+    // build() already finished tracking — so GetX sees no observables
+    // read and throws "improper use of GetX".
     return ListView.builder(
       itemCount: rows.length,
-      itemBuilder: (context, i) => _codeTile(rows[i]),
+      itemBuilder: (context, i) => _liveParameterTile(rows[i]),
     );
   }
 
-  Widget _codeTile(_ParamRow row) {
+  Widget _liveParameterTile(_ParamRow row) {
     final code = row.code;
     final variable = row.variable;
     final unit = variable?.unit ?? '';
@@ -169,20 +202,91 @@ class PsfLiveParameterDialog extends StatelessWidget {
               ],
             ),
           ),
-          // TODO: replace this placeholder value with a live PLC read of
-          // this code's actual register/byte position, scaled by
-          // variable.resolution / variable.offset, once wired to PlcService.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-            child: Text(
-              unit.isEmpty ? '--' : '-- $unit',
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _kPrimary),
-            ),
-          ),
+          // Scoped Obx — only this value box rebuilds when
+          // lane.livePidValues changes, not the whole list.
+          Obx(() {
+            final liveValue = variable?.id != null ? lane.livePidValues[variable!.id] : null;
+            final isError = liveValue != null && (liveValue == 'Not Found' || liveValue.toUpperCase().contains('ERROR'));
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+              child: Text(
+                liveValue != null ? '$liveValue${unit.isNotEmpty ? ' $unit' : ''}' : (unit.isEmpty ? '--' : '-- $unit'),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: isError ? Colors.red : _kPrimary,
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════════
+  // IQA TAB — exactly the entered/written values,
+  // capped to lane.iqaControllers.length (e.g. 4)
+  // ═══════════════════════════════════════════════
+
+  Widget _iqaWrittenList() {
+    final count = lane.iqaControllers.length;
+    if (count == 0) {
+      return const Center(child: Text('No IQA fields configured for this lane.', style: TextStyle(color: Colors.grey)));
+    }
+
+    return ListView.builder(
+      itemCount: count,
+      itemBuilder: (context, i) => _iqaWrittenTile(i),
+    );
+  }
+
+  Widget _iqaWrittenTile(int i) {
+    // Each tile owns its own Obx, scoped to just this controller's text
+    // and the overall write-status line — same reasoning as the live
+    // parameter tiles above.
+    return Obx(() {
+      final value = lane.iqaControllers[i].text.trim();
+      final hasValue = value.isNotEmpty;
+      final writeStatus = lane.iqaWriteStatus.value;
+      final wasWritten = writeStatus.toLowerCase().contains('successful');
+
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(color: const Color(0xFFF5F7FA), borderRadius: BorderRadius.circular(10)),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(lane.iqaLabelFor(i), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  if (wasWritten) ...[
+                    const SizedBox(height: 3),
+                    Text('Written to ECU', style: TextStyle(fontSize: 11.5, color: Colors.green.shade700)),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+              child: Text(
+                hasValue ? value : '--',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: hasValue ? _kPrimary : Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 

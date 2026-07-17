@@ -218,23 +218,23 @@ class PsfLaneCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(
-                isResolved ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 13,
-                color: isResolved ? _LaneColors.green : _LaneColors.slate,
-              ),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  isResolved ? resolvedText : awaitingText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isResolved ? FontWeight.bold : FontWeight.w600,
-                    color: isResolved ? _LaneColors.green : _LaneColors.slate,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              //Icon(
+               // isResolved ? Icons.check_circle : Icons.radio_button_unchecked,
+               // size: 13,
+                //color: isResolved ? _LaneColors.green : _LaneColors.slate,
+             // ),
+              //const SizedBox(width: 5),
+              //Expanded(
+                // child: Text(
+                //   isResolved ? resolvedText : awaitingText,
+                //   style: TextStyle(
+                //     fontSize: 11,
+                //     fontWeight: isResolved ? FontWeight.bold : FontWeight.w600,
+                //     color: isResolved ? _LaneColors.green : _LaneColors.slate,
+                //   ),
+                //   overflow: TextOverflow.ellipsis,
+               // ),
+             // ),
             ],
           ),
           if (error.isNotEmpty)
@@ -530,6 +530,20 @@ class PsfLaneCard extends StatelessWidget {
                 color: failed ? _LaneColors.red : (completed ? _LaneColors.greenDark : Colors.black87),
               ),
             ),
+            if (completed && lane.iqaWriteStatus.value.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                lane.iqaWriteStatus.value,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: lane.iqaWriteStatus.value.toLowerCase().contains('successful')
+                      ? _LaneColors.greenDark
+                      : _LaneColors.red,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -557,7 +571,7 @@ class PsfLaneCard extends StatelessWidget {
         OutlinedButton(
           onPressed: () async {
             await controller.onOpenDtc(laneIndex);
-            PsfDtcDialog.show(lane, () => controller.loadDtcForLane(laneIndex));
+            PsfDtcDialog.show(lane, () => controller.readLiveDtcForLane(laneIndex));
           },
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: _LaneColors.navy),
@@ -570,7 +584,11 @@ class PsfLaneCard extends StatelessWidget {
         TextButton(
           onPressed: () async {
             await controller.onOpenLiveParameter(laneIndex);
-            PsfLiveParameterDialog.show(lane, () => controller.loadPidForLane(laneIndex));
+            PsfLiveParameterDialog.show(
+              lane,
+              () => controller.loadPidForLane(laneIndex),
+              () => controller.togglePidPlaybackForLane(laneIndex),
+            );
           },
           child: const Text('LIVE PARAMETER', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: _LaneColors.navy)),
         ),

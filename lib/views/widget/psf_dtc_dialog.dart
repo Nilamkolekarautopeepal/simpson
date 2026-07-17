@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:simpson/modals/dtcDataset.model.dart' show DtcCode;
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 
 
 const Color _kPrimary = Color(0xFF003874);
 
-/// Centered DTC dialog for one lane. Call [show] rather than
-/// constructing this directly.
+/// Centered DTC dialog for one lane. Shows the REAL codes read off
+/// the ECU (lane.dtcReadResults) — not just the dataset catalog of
+/// every possible code. Call [show] rather than constructing this
+/// directly.
 class PsfDtcDialog extends StatelessWidget {
   const PsfDtcDialog({super.key, required this.lane, required this.onRefresh});
 
@@ -50,10 +51,11 @@ class PsfDtcDialog extends StatelessWidget {
                   ),
                   Obx(
                     () => IconButton(
-                      icon: lane.isLoadingDtc.value
+                      icon: lane.isReadingDtc.value
                           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.refresh, size: 20, color: Colors.grey),
-                      onPressed: lane.isLoadingDtc.value ? null : onRefresh,
+                      tooltip: 'Read DTCs from ECU',
+                      onPressed: lane.isReadingDtc.value ? null : onRefresh,
                       splashRadius: 18,
                     ),
                   ),
@@ -67,7 +69,7 @@ class PsfDtcDialog extends StatelessWidget {
               const SizedBox(height: 4),
               Obx(
                 () => Text(
-                  '${lane.dtcCodes.length} code${lane.dtcCodes.length == 1 ? '' : 's'} found',
+                  '${lane.dtcReadResults.length} code${lane.dtcReadResults.length == 1 ? '' : 's'} found on ECU',
                   style: const TextStyle(fontSize: 12.5, color: Colors.grey),
                 ),
               ),
@@ -78,7 +80,7 @@ class PsfDtcDialog extends StatelessWidget {
               // ── Body ──
               Expanded(
                 child: Obx(() {
-                  if (lane.isLoadingDtc.value) {
+                  if (lane.isReadingDtc.value) {
                     return const Center(child: CircularProgressIndicator());
                   }
                   if (lane.dtcError.value.isNotEmpty) {
@@ -86,14 +88,23 @@ class PsfDtcDialog extends StatelessWidget {
                       child: Text(lane.dtcError.value, style: const TextStyle(color: Colors.red), textAlign: TextAlign.center),
                     );
                   }
-                  if (lane.dtcCodes.isEmpty) {
-                    return const Center(
-                      child: Text('No DTCs found for this lane.', style: TextStyle(color: Colors.grey)),
+                  if (lane.dtcReadResults.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 36),
+                          const SizedBox(height: 10),
+                          const Text('No DTCs detected on this ECU.', style: TextStyle(color: Colors.grey)),
+                          const SizedBox(height: 4),
+                          Text('Tap refresh to read again.', style: TextStyle(color: Colors.grey.shade500, fontSize: 11.5)),
+                        ],
+                      ),
                     );
                   }
                   return ListView.builder(
-                    itemCount: lane.dtcCodes.length,
-                    itemBuilder: (context, i) => _dtcTile(lane.dtcCodes[i]),
+                    itemCount: lane.dtcReadResults.length,
+                    itemBuilder: (context, i) => _dtcTile(lane.dtcReadResults[i]),
                   );
                 }),
               ),
@@ -104,7 +115,12 @@ class PsfDtcDialog extends StatelessWidget {
     );
   }
 
-  Widget _dtcTile(DtcCode dtc) {
+  /// raw is "CODE - description (status)" — split it back apart for display.
+  Widget _dtcTile(String raw) {
+    final splitIndex = raw.indexOf(' - ');
+    final code = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
+    final rest = splitIndex == -1 ? '' : raw.substring(splitIndex + 3).trim();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -125,20 +141,14 @@ class PsfDtcDialog extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(dtc.code ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                if ((dtc.description ?? '').isNotEmpty) ...[
+                Text(code, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                if (rest.isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(dtc.description!, style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700)),
+                  Text(rest, style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700)),
                 ],
               ],
             ),
           ),
-          if (dtc.pageNo != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-              child: Text('p.${dtc.pageNo}', style: const TextStyle(fontSize: 11)),
-            ),
         ],
       ),
     );

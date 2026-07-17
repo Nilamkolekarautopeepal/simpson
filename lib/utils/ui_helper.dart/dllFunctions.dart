@@ -6,6 +6,9 @@ import 'package:ap_diagnostic/enum/seedkeyIndexType.dart';
 import 'package:ap_diagnostic/enum/writeParameter.dart';
 import 'package:ap_diagnostic/models/flashingMtrixModel.dart';
 import 'package:ap_diagnostic/models/readDtcResponseModel.dart';
+import 'package:ap_diagnostic/models/readParameterPIDModel.dart'
+    show ReadParameterPID, SelectedParameterMessage, PidVariable;
+import 'package:ap_diagnostic/models/readParameterResponseModel.dart';
 import 'package:ap_diagnostic/models/writeParameterPIDModel.dart';
 import 'package:ap_diagnostic/structure/flash_structures.dart';
 import 'package:ap_diagnostic/usd_diagnostic.dart';
@@ -16,7 +19,6 @@ import 'package:ap_dongle_comm/utils/model/sessionLogModel.dart';
 import 'package:simpson/modals/all.models.dart' hide Protocol;
 import 'package:simpson/modals/liveParameter_model.dart';
 import 'package:simpson/modals/pidDataset.model.dart' as pid_ds;
-import 'package:simpson/modals/pidDataset.model.dart';
 import 'package:simpson/modals/staticData.dart';
 
 import '../../modals/writeParameter_model.dart';
@@ -133,9 +135,9 @@ class DLLFunctions {
   //     print(stack);
   //   }
   // }
-/// Single-dongle path only — no connectivity/RP1210 branching.
-  Future<void> setDongleProperties(
-      String protocolNameRaw, String protocolHex, String txHeaderTemp, String rxHeaderTemp) async {
+  /// Single-dongle path only — no connectivity/RP1210 branching.
+  Future<void> setDongleProperties(String protocolNameRaw, String protocolHex,
+      String txHeaderTemp, String rxHeaderTemp) async {
     try {
       print(
           "📡 [DEBUG] setDongleProperties Start | ProtocolName: $protocolNameRaw, Hex: $protocolHex, TX: $txHeaderTemp, RX: $rxHeaderTemp");
@@ -162,7 +164,8 @@ class DLLFunctions {
 
       final protocolInt = int.parse(protocolHex, radix: 16);
       await mDongleComm.dongleSetProtocol(protocolInt);
-      print("🔸 Protocol set to 0x${protocolInt.toRadixString(16)} ($matchedProtocol)");
+      print(
+          "🔸 Protocol set to 0x${protocolInt.toRadixString(16)} ($matchedProtocol)");
 
       await mDongleComm.canSetTxHeader(txHeaderTemp);
       print("🔸 TX Header set: $txHeaderTemp");
@@ -349,136 +352,144 @@ class DLLFunctions {
   // }
 
   Future<ReadDtcResponseModel?> readDtc(String dtcIndex) async {
-  print("🔹 [readDtc] Start - Received index string: $dtcIndex");
+    print("🔹 [readDtc] Start - Received index string: $dtcIndex");
 
-  try {
-    // Normalize to match C# ReadDtc(string dtc_index):
-    //   - "UDS-2BYTE-DTC" is a special legacy alias -> "UDS_2BYTE12_DTC"
-    //   - all other dashes get replaced with underscores
-    String normalized = dtcIndex == 'UDS-2BYTE-DTC'
-        ? 'UDS_2BYTE12_DTC'
-        : dtcIndex.replaceAll('-', '_');
+    try {
+      // Normalize to match C# ReadDtc(string dtc_index):
+      //   - "UDS-2BYTE-DTC" is a special legacy alias -> "UDS_2BYTE12_DTC"
+      //   - all other dashes get replaced with underscores
+      String normalized = dtcIndex == 'UDS-2BYTE-DTC'
+          ? 'UDS_2BYTE12_DTC'
+          : dtcIndex.replaceAll('-', '_');
 
-    if (normalized != dtcIndex) {
-      print("🔧 [readDtc] Normalized '$dtcIndex' -> '$normalized'");
-    }
-
-    ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
-      (e) => e.toString().split('.').last == normalized,
-      orElse: () {
-        print("❌ No matching ReadDtcIndex enum found for: $normalized");
-        throw Exception("Invalid DTC index: $normalized");
-      },
-    );
-    print("✅ [readDtc] Mapped string '$normalized' to enum: $index");
-
-    ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
-
-    int attempt = 0;
-
-    do {
-      attempt++;
-      print("⏳ [readDtc] Attempt #$attempt to read DTC...");
-
-      final rawResponse = await mUdsDiagnostic.readDTC(index);
-
-      readDtcResponseModel.dtcs = rawResponse.dtcs;
-      readDtcResponseModel.status = rawResponse.status;
-      readDtcResponseModel.noofdtc = rawResponse.noofdtc;
-
-      print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
-      print(
-          "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
-
-      if (readDtcResponseModel.status ==
-              "GENERALERROR_INVALIDRESPFROMDONGLE" ||
-          readDtcResponseModel.status?.contains("BUSY") == true) {
-        print("⏳ [readDtc] ECU busy or invalid response, retrying...");
-        await Future.delayed(const Duration(milliseconds: 100));
-      } else {
-        break;
+      if (normalized != dtcIndex) {
+        print("🔧 [readDtc] Normalized '$dtcIndex' -> '$normalized'");
       }
-    } while (attempt < 10);
 
-    if (readDtcResponseModel.dtcs != null) {
-      print(
-          "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
-    } else {
-      print("⚠️ [readDtc] Warning - dtcs array is null");
+      ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
+        (e) => e.toString().split('.').last == normalized,
+        orElse: () {
+          print("❌ No matching ReadDtcIndex enum found for: $normalized");
+          throw Exception("Invalid DTC index: $normalized");
+        },
+      );
+      print("✅ [readDtc] Mapped string '$normalized' to enum: $index");
+
+      ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
+
+      int attempt = 0;
+
+      do {
+        attempt++;
+        print("⏳ [readDtc] Attempt #$attempt to read DTC...");
+
+        final rawResponse = await mUdsDiagnostic.readDTC(index);
+
+        readDtcResponseModel.dtcs = rawResponse.dtcs;
+        readDtcResponseModel.status = rawResponse.status;
+        readDtcResponseModel.noofdtc = rawResponse.noofdtc;
+
+        print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
+        print(
+            "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
+
+        if (readDtcResponseModel.status ==
+                "GENERALERROR_INVALIDRESPFROMDONGLE" ||
+            readDtcResponseModel.status?.contains("BUSY") == true) {
+          print("⏳ [readDtc] ECU busy or invalid response, retrying...");
+          await Future.delayed(const Duration(milliseconds: 100));
+        } else {
+          break;
+        }
+      } while (attempt < 10);
+
+      if (readDtcResponseModel.dtcs != null) {
+        print(
+            "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
+      } else {
+        print("⚠️ [readDtc] Warning - dtcs array is null");
+      }
+
+      return readDtcResponseModel;
+    } catch (e, st) {
+      print("❌ [readDtc] EXCEPTION: $e");
+      print("❌ StackTrace: $st");
+      return null;
     }
-
-    return readDtcResponseModel;
-  } catch (e, st) {
-    print("❌ [readDtc] EXCEPTION: $e");
-    print("❌ StackTrace: $st");
-    return null;
   }
-}
 
-  List<Code> readPID(pid_ds.PidDataset dataset) {
-    final List<Code> pidCodes = [];
+  Future<List<ReadParameterResponse>?> readPid(
+      List<pid_ds.Code> pidList) async {
+    try {
+      print("🚀 readPid() called");
+      print("📌 Total PID requested: ${pidList.length}");
 
-    for (final result in dataset.results ?? <pid_ds.Result>[]) {
-      for (final code in result.codes ?? <pid_ds.Code>[]) {
-        final variables = <PiCodeVariables>[];
+      // Build ReadParameterPID list
+      List<ReadParameterPID> list = [];
 
-        for (final v in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
-          final dynamic rawStart = v.startBitPosition;
-          final int startBit = rawStart == null
-              ? 0
-              : rawStart is int
-                  ? rawStart
-                  : rawStart is num
-                      ? rawStart.toInt()
-                      : int.tryParse(rawStart.toString()) ?? 0;
+      for (var item in pidList) {
+        print("➡️ Building PID: ${item.id}, Code: ${item.code}");
 
-          final dynamic rawEnd = v.endBitPosition;
-          final int endBit = rawEnd == null
-              ? 0
-              : rawEnd is int
-                  ? rawEnd
-                  : rawEnd is num
-                      ? rawEnd.toInt()
-                      : int.tryParse(rawEnd.toString()) ?? 0;
+        List<PidVariable> variables = [];
 
-          final messageTypeName = v.messageType == null
-              ? null
-              : pid_ds.messageTypeValues.reverse[v.messageType];
+        for (var vari in item.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
+          int startBit = vari.startBitPosition ?? 0;
+          int endBit = vari.endBitPosition ?? 0;
+          int noOfBits = endBit - startBit + 1;
 
-          variables.add(PiCodeVariables(
-            id: v.id,
-            shortName: v.shortName,
-            bytePosition: v.bytePosition,
-            length: v.length,
-            bitcoded: v.bitcoded ?? false,
-            startBitPosition: startBit,
-            endBitPosition: endBit,
-            resolution: v.resolution ?? 1.0,
-            offset: v.offset ?? 0.0,
-            messageType: messageTypeName == null
+          print(
+              "   🔹 Variable ID: ${vari.id}, StartBit: $startBit, EndBit: $endBit");
+
+          final messages = (vari.messages ?? <pid_ds.Message>[])
+              .map((m) => SelectedParameterMessage(
+                    code: m.code,
+                    message: m.message,
+                  ))
+              .toList();
+
+          final pidVariable = PidVariable(
+            datatype: vari.messageType == null
                 ? null
-                : MessageType.values.firstWhere(
-                    (e) => e.name == messageTypeName,
-                    orElse: () => MessageType.ASCII,
-                  ),
-            messages: (v.messages ?? <pid_ds.Message>[])
-                .map((m) => Message(
-                      code: m.code ?? '',
-                      message: m.message ?? '',
-                    ))
-                .toList(),
-          ));
+                : pid_ds.messageTypeValues.reverse[vari.messageType],
+            isBitcoded: vari.bitcoded ?? false,
+            noofBits: noOfBits,
+            noOfBytes: vari.length ?? 0,
+            offset: vari.offset ?? 0.0,
+            resolution: vari.resolution ?? 1.0,
+            startBit: startBit,
+            startByte: vari.bytePosition ?? 0,
+            pidNumber: vari.id ?? 0,
+            pidName: vari.shortName ?? "",
+            messages: messages,
+          );
+
+          variables.add(pidVariable);
         }
 
-        pidCodes.add(Code(
-          id: code.id,
-          code: code.code,
-          memoryAddress: code.memoryAddress ?? false,
-          piCodeVariable: variables,
-        ));
+        list.add(
+          ReadParameterPID(
+            pidId: item.id ?? 0,
+            variables: variables,
+            totalLen: (item.code?.length ?? 0) ~/ 2,
+            pid: item.code ?? "",
+          ),
+        );
       }
+
+      print("📤 Reading ${list.length} PID(s) directly via dongle comm...");
+
+      final result = await mUdsDiagnostic.readParameters(list.length, list);
+
+      print("📥 Result count: ${result.length}");
+      for (var item in result) {
+        print("➡️ PID: ${item.pidId}, Status: ${item.status}");
+      }
+
+      return result;
+    } catch (ex) {
+      print("🔥 Error reading PIDs: $ex");
+      return null;
     }
-    return pidCodes;
   }
 
   String byteArrayToString(List<int> bytes) {
@@ -488,9 +499,14 @@ class DLLFunctions {
         .toUpperCase();
   }
 
-  void cancel() {
-    throw UnimplementedError('Cancel() is not implemented yet.');
+  Future<double> resetPercentage() async {
+  try {
+    await mUdsDiagnostic.resetPercentage();
+    return 0;
+  } catch (e) {
+    return 0;
   }
+}
 
   Future<String?> startECUFlashing(
     String flashJson,
@@ -535,9 +551,9 @@ class DLLFunctions {
 
       print("⚙️ [CONFIG] FlashConfig created");
 
-      print("📡 [UDS] Starting tester present...");
-     // await startTesterPresent();
-      print("✅ [UDS] Tester present started");
+      //print("📡 [UDS] Starting tester present...");
+      // await startTesterPresent();
+      //print("✅ [UDS] Tester present started");
 
       print("🚀 [FLASH] Calling flashInterpreter...");
       final response = await mUdsDiagnostic.flashInterpreter2(
@@ -549,9 +565,9 @@ class DLLFunctions {
 
       print("📥 [FLASH RESPONSE]: $response");
 
-      print("🛑 [UDS] Stopping tester present...");
-     // await stopTesterPresent();
-      print("✅ [UDS] Tester present stopped");
+      // print("🛑 [UDS] Stopping tester present...");
+      // // await stopTesterPresent();
+      // print("✅ [UDS] Tester present stopped");
 
       print("🎉 [FLASH] ===== COMPLETED SUCCESS =====");
 
@@ -602,14 +618,14 @@ class DLLFunctions {
     }
   }
 
-  Future<double> resetPercentage() async {
-    try {
-      await mUdsDiagnostic.resetPercentage();
-      return 0;
-    } catch (e) {
-      return 0;
-    }
-  }
+  // Future<double> resetPercentage() async {
+  //   try {
+  //     await mUdsDiagnostic.resetPercentage();
+  //     return 0;
+  //   } catch (e) {
+  //     return 0;
+  //   }
+  // }
 
   Future<bool> writeSSID(String routerSSID) async {
     try {
@@ -630,167 +646,169 @@ class DLLFunctions {
       return false;
     }
   }
-Future<List<WriteParameterStatus>?> writePid(
-    String writePidIndex, List<WriteParameterPid> pidList) async {
-  try {
-    print("========== WRITE PID START ==========");
-    print("Incoming writePidIndex: $writePidIndex");
-    print("PID List Length: ${pidList.length}");
 
-    // Parse write parameter index
-    late final WriteParameterIndex index;
+  Future<List<WriteParameterStatus>?> writePid(
+      String writePidIndex, List<WriteParameterPid> pidList) async {
     try {
-      index = WriteParameterIndex.values
-          .firstWhere((e) => e.toString().split('.').last == writePidIndex);
-    } catch (e) {
-      print("❌ Failed to parse WriteParameterIndex from "
-          "writePidIndex=\"$writePidIndex\": $e");
-      rethrow;
-    }
-
-    print("Parsed WriteParameterIndex: $index");
-
-    List<WriteParameterPID> list = [];
-
-    for (var item in pidList) {
-      print("------------- PID ITEM -------------");
-      print("writePid: ${item.writePid}");
-      print("seedKeyIndex (raw): ${item.seedKeyIndex}");
-      print("writePamIndex (raw): ${item.writePamIndex}");
-      print("writeParaDataSize: ${item.writeParaDataSize}");
-      print("writeInput: ${item.writeInput}");
-      print("pid: ${item.pid}");
-      print("startByte: ${item.startByte}");
-      print("totalBytes: ${item.totalBytes}");
-      print("readParameterPidDataType: ${item.readParameterPidDataType}");
-
-      // Parse seed key index
-      late final SEEDKEYINDEXTYPE seedIndex;
-      try {
-        seedIndex = SEEDKEYINDEXTYPE.values.firstWhere(
-            (e) => e.toString().split('.').last == item.seedKeyIndex);
-      } catch (e) {
-        print("❌ Failed to parse SEEDKEYINDEXTYPE from "
-            "seedKeyIndex=\"${item.seedKeyIndex}\" (pid=${item.pid}): $e");
-        rethrow;
-      }
-
-      print("Parsed SeedKeyIndex Enum: $seedIndex");
+      print("========== WRITE PID START ==========");
+      print("Incoming writePidIndex: $writePidIndex");
+      print("PID List Length: ${pidList.length}");
 
       // Parse write parameter index
-      late final WriteParameterIndex writeIndex;
+      late final WriteParameterIndex index;
       try {
-        writeIndex = WriteParameterIndex.values.firstWhere(
-            (e) => e.toString().split('.').last == item.writePamIndex);
+        index = WriteParameterIndex.values
+            .firstWhere((e) => e.toString().split('.').last == writePidIndex);
       } catch (e) {
         print("❌ Failed to parse WriteParameterIndex from "
-            "writePamIndex=\"${item.writePamIndex}\" (pid=${item.pid}): $e");
+            "writePidIndex=\"$writePidIndex\": $e");
         rethrow;
       }
 
-      print("Parsed WriteParamIndex Enum: $writeIndex");
+      print("Parsed WriteParameterIndex: $index");
 
-      // Build variant data list
-      List<VariantDataList> variantDataLists = [];
+      List<WriteParameterPID> list = [];
 
-      if (item.variantList != null) {
-        print("Variant List Count: ${item.variantList!.length}");
+      for (var item in pidList) {
+        print("------------- PID ITEM -------------");
+        print("writePid: ${item.writePid}");
+        print("seedKeyIndex (raw): ${item.seedKeyIndex}");
+        print("writePamIndex (raw): ${item.writePamIndex}");
+        print("writeParaDataSize: ${item.writeParaDataSize}");
+        print("writeInput: ${item.writeInput}");
+        print("pid: ${item.pid}");
+        print("startByte: ${item.startByte}");
+        print("totalBytes: ${item.totalBytes}");
+        print("readParameterPidDataType: ${item.readParameterPidDataType}");
 
-        for (var v in item.variantList!) {
-          print("  ---- Variant ----");
-          print("  pidId: ${v.pidId}");
-          print("  pidName: ${v.pidName}");
-          print("  datatype: ${v.datatype}");
-          print("  isBitcoded: ${v.isBitcoded}");
-          print("  noOfBits: ${v.noofBits}");
-          print("  noOfBytes: ${v.noOfBytes}");
-          print("  startByte: ${v.startByte}");
-          print("  startBit: ${v.startBit}");
-          print("  offset: ${v.offset}");
-          print("  resolution: ${v.resolution}");
-          print("  unit: ${v.unit}");
-
-          variantDataLists.add(VariantDataList(
-            datatype: v.datatype,
-            isBitcoded: v.isBitcoded,
-            noofBits: v.noofBits,
-            noOfBytes: v.noOfBytes,
-            offset: v.offset,
-            pidId: v.pidId,
-            pidName: v.pidName,
-            resolution: v.resolution,
-            startBit: v.startBit,
-            startByte: v.startByte,
-            unit: v.unit,
-          ));
+        // Parse seed key index
+        late final SEEDKEYINDEXTYPE seedIndex;
+        try {
+          seedIndex = SEEDKEYINDEXTYPE.values.firstWhere(
+              (e) => e.toString().split('.').last == item.seedKeyIndex);
+        } catch (e) {
+          print("❌ Failed to parse SEEDKEYINDEXTYPE from "
+              "seedKeyIndex=\"${item.seedKeyIndex}\" (pid=${item.pid}): $e");
+          rethrow;
         }
 
-        print("Built variantDataLists count: ${variantDataLists.length}");
-      } else {
-        print("Variant List: null (no variant entries for this pid)");
+        print("Parsed SeedKeyIndex Enum: $seedIndex");
+
+        // Parse write parameter index
+        late final WriteParameterIndex writeIndex;
+        try {
+          writeIndex = WriteParameterIndex.values.firstWhere(
+              (e) => e.toString().split('.').last == item.writePamIndex);
+        } catch (e) {
+          print("❌ Failed to parse WriteParameterIndex from "
+              "writePamIndex=\"${item.writePamIndex}\" (pid=${item.pid}): $e");
+          rethrow;
+        }
+
+        print("Parsed WriteParamIndex Enum: $writeIndex");
+
+        // Build variant data list
+        List<VariantDataList> variantDataLists = [];
+
+        if (item.variantList != null) {
+          print("Variant List Count: ${item.variantList!.length}");
+
+          for (var v in item.variantList!) {
+            print("  ---- Variant ----");
+            print("  pidId: ${v.pidId}");
+            print("  pidName: ${v.pidName}");
+            print("  datatype: ${v.datatype}");
+            print("  isBitcoded: ${v.isBitcoded}");
+            print("  noOfBits: ${v.noofBits}");
+            print("  noOfBytes: ${v.noOfBytes}");
+            print("  startByte: ${v.startByte}");
+            print("  startBit: ${v.startBit}");
+            print("  offset: ${v.offset}");
+            print("  resolution: ${v.resolution}");
+            print("  unit: ${v.unit}");
+
+            variantDataLists.add(VariantDataList(
+              datatype: v.datatype,
+              isBitcoded: v.isBitcoded,
+              noofBits: v.noofBits,
+              noOfBytes: v.noOfBytes,
+              offset: v.offset,
+              pidId: v.pidId,
+              pidName: v.pidName,
+              resolution: v.resolution,
+              startBit: v.startBit,
+              startByte: v.startByte,
+              unit: v.unit,
+            ));
+          }
+
+          print("Built variantDataLists count: ${variantDataLists.length}");
+        } else {
+          print("Variant List: null (no variant entries for this pid)");
+        }
+
+        list.add(WriteParameterPID(
+          seedKeyIndex: seedIndex,
+          writePamIndex: writeIndex,
+          writeInputSize: item.writeParaDataSize,
+          writeInput: item.writeInput,
+          writePid: item.writePid,
+          readParameterPidDataType: item.readParameterPidDataType,
+          pid: item.pid,
+          startByte: item.startByte,
+          totalBytes: item.totalBytes,
+          variantList: variantDataLists,
+        ));
+
+        print("PID Added to Write List");
       }
 
-      list.add(WriteParameterPID(
-        seedKeyIndex: seedIndex,
-        writePamIndex: writeIndex,
-        writeInputSize: item.writeParaDataSize,
-        writeInput: item.writeInput,
-        writePid: item.writePid,
-        readParameterPidDataType: item.readParameterPidDataType,
-        pid: item.pid,
-        startByte: item.startByte,
-        totalBytes: item.totalBytes,
-        variantList: variantDataLists,
-      ));
+      print("Final WriteParameterPID List Length: ${list.length}");
 
-      print("PID Added to Write List");
-    }
+      print("Calling writeParameters()...");
+      print("Parameters:");
+      print("  PID Count: ${pidList.length}");
+      print("  Write Index: $index");
 
-    print("Final WriteParameterPID List Length: ${list.length}");
+      // Call UDS diagnostic write method
+      final result =
+          await mUdsDiagnostic.writeParameters(pidList.length, index, list);
 
-    print("Calling writeParameters()...");
-    print("Parameters:");
-    print("  PID Count: ${pidList.length}");
-    print("  Write Index: $index");
+      print("Raw Result from writeParameters(): $result");
 
-    // Call UDS diagnostic write method
-    final result =
-        await mUdsDiagnostic.writeParameters(pidList.length, index, list);
+      if (result == null) {
+        print("⚠ writeParameters returned NULL");
+        return null;
+      }
 
-    print("Raw Result from writeParameters(): $result");
+      print("Converting result to JSON...");
 
-    if (result == null) {
-      print("⚠ writeParameters returned NULL");
+      final resJson = jsonEncode(result);
+
+      print("JSON Result: $resJson");
+
+      final resList = (jsonDecode(resJson) as List)
+          .map((e) => WriteParameterStatus.fromJson(e))
+          .toList();
+
+      print("Parsed WriteParameterStatus List Length: ${resList.length}");
+
+      for (int i = 0; i < resList.length; i++) {
+        print("  • Result[$i].status: ${resList[i].status}");
+      }
+
+      print("========== WRITE PID END ==========");
+
+      return resList;
+    } catch (e, stack) {
+      print("❌ Error in writePid: $e");
+      print("StackTrace: $stack");
+
       return null;
     }
-
-    print("Converting result to JSON...");
-
-    final resJson = jsonEncode(result);
-
-    print("JSON Result: $resJson");
-
-    final resList = (jsonDecode(resJson) as List)
-        .map((e) => WriteParameterStatus.fromJson(e))
-        .toList();
-
-    print("Parsed WriteParameterStatus List Length: ${resList.length}");
-
-    for (int i = 0; i < resList.length; i++) {
-      print("  • Result[$i].status: ${resList[i].status}");
-    }
-
-    print("========== WRITE PID END ==========");
-
-    return resList;
-  } catch (e, stack) {
-    print("❌ Error in writePid: $e");
-    print("StackTrace: $stack");
-
-    return null;
   }
-}
-   Future<List<WriteParameterStatus>?> writePid1(
+
+  Future<List<WriteParameterStatus>?> writePid1(
       String writePidIndex, List<WriteParameterPid> pidList) async {
     try {
       print("========== WRITE PID START ==========");
@@ -921,7 +939,6 @@ Future<List<WriteParameterStatus>?> writePid(
       return null;
     }
   }
-
 
   Future<bool> writePassword(String routerPassword) async {
     try {

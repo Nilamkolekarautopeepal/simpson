@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -113,7 +114,25 @@ class PsfLane {
   /// now. The controller enforces this (see dongleOwnerLaneIndex);
   /// these fields just reflect THIS lane's view of that shared state.
   final RxBool dongleConnected = false.obs;
+
+  /// This lane's OWN independent dongle connection object — not the
+  /// shared `App.dllFunctions` single global. Set once
+  /// ConnectionWifi.connectDongleForLane() succeeds; every dongle
+  /// call for this lane (setDongleProperties, startECUFlashing,
+  /// flashingData, readDtc, readPid, writePid) must go through THIS
+  /// field so multiple lanes can be connected and flashing at the
+  /// same time.
+  DLLFunctions? dllFunctions;
   final RxBool dongleConnecting = false.obs;
+
+  /// True whenever ANYTHING is actively using this lane's dongle
+  /// connection — Live Parameter read, DTC read, IQA write, or
+  /// flashing. All of those share the exact same socket
+  /// (lane.dllFunctions), so two of them running at once desyncs the
+  /// response stream (a flash command's response can get consumed by
+  /// a still-running PID read loop, or vice versa) — this flag is the
+  /// guard that stops that from happening.
+  bool isDongleBusy = false;
   final RxString dongleError = "".obs;
   Timer? dongleRetryTimer;
 
@@ -231,6 +250,12 @@ class PsfLane {
 
   final RxList<DtcCode> dtcCodes = <DtcCode>[].obs;
 
+  /// Real ECU read results (not just the dataset catalog above) —
+  /// "CODE - description (status)" strings, same shape as the Test
+  /// Station's dtcList.
+  final RxBool isReadingDtc = false.obs;
+  final RxList<String> dtcReadResults = <String>[].obs;
+
   // ===============================
   // LIVE PARAMETER
   // ===============================
@@ -242,6 +267,17 @@ class PsfLane {
   final RxList<Code> liveParameterCodes = <Code>[].obs;
 
   final RxList<Code> iqaParameterCodes = <Code>[].obs;
+
+  /// Real-time values read from the ECU during Live Parameter
+  /// playback — keyed by variable.id, same as the Test Station.
+  final RxMap<int, String> livePidValues = <int, String>{}.obs;
+  final RxBool pidPlaying = false.obs;
+  bool stopPidLoop = false;
+
+  /// Result message from writing the IQA values to the ECU right
+  /// after a successful flash (mirrors the Test Station's
+  /// _autoWriteIqaValues status string).
+  final RxString iqaWriteStatus = "".obs;
 
   // ===============================
   // PID FILTER
@@ -315,6 +351,8 @@ class PsfLane {
     dongleConnecting.value = false;
     dongleError.value = "";
     dongleRetryTimer?.cancel();
+    dllFunctions = null;
+    isDongleBusy = false;
 
     ecuModelName.value = "ECU MODEL NAME";
 
@@ -340,10 +378,17 @@ class PsfLane {
     flashElapsedSeconds.value = 0;
 
     dtcCodes.clear();
+    dtcReadResults.clear();
+    isReadingDtc.value = false;
 
     liveParameterCodes.clear();
 
     iqaParameterCodes.clear();
+
+    livePidValues.clear();
+    pidPlaying.value = false;
+    stopPidLoop = false;
+    iqaWriteStatus.value = "";
 
     for (int i = 0; i < injectorStatus.length; i++) {
       injectorStatus[i] = false;

@@ -75,7 +75,7 @@ class PlcService extends GetxService {
       );
     } on SocketException catch (e) {
       status.value = 'Unreachable';
-      print('❌ [PLC] Unreachable: ${e.message}');
+      //print('❌ [PLC] Unreachable: ${e.message}');
       await disconnect();
       rethrow;
     } catch (e) {

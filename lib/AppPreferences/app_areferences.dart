@@ -23,47 +23,43 @@ class SecureStorageService {
   static const _plcIpKey = 'plc_ip';
   static const _plcPortKey = 'plc_port';
 
-static Future<void> saveDongleIp(String? ip) async {
-  if (ip == null || ip.isEmpty) return;
-  await _storage.write(key: _dongleIpKey, value: ip);
+  static Future<void> saveDongleIp(String? ip) async {
+    if (ip == null || ip.isEmpty) return;
+    await _storage.write(key: _dongleIpKey, value: ip);
+  }
 
-}
-static Future<void> savePlcIp(String? ip) async {
-  if (ip == null || ip.isEmpty) return;
-  await _storage.write(key: _plcIpKey, value: ip);
-}
+  static Future<void> savePlcIp(String? ip) async {
+    if (ip == null || ip.isEmpty) return;
+    await _storage.write(key: _plcIpKey, value: ip);
+  }
 
-static Future<void> savePlcPort(String? port) async {
-  if (port == null || port.isEmpty) return;
-  await _storage.write(key: _plcPortKey, value: port);
-}
+  static const _dongleListKey = 'dongle_list';
 
+  static Future<void> saveDongleList(String? json) async {
+    if (json == null) return;
+    await _storage.write(key: _dongleListKey, value: json);
+  }
 
-static Future<String?> getDongleIp() async {
-  return await _storage.read(key: _dongleIpKey);
+  static Future<String?> getDongleList() async {
+    return await _storage.read(key: _dongleListKey);
+  }
 
-}
+  static Future<void> savePlcPort(String? port) async {
+    if (port == null || port.isEmpty) return;
+    await _storage.write(key: _plcPortKey, value: port);
+  }
 
-static Future<String?> getPlcIp() async {
-  return await _storage.read(key: _plcIpKey);
-}
+  static Future<String?> getDongleIp() async {
+    return await _storage.read(key: _dongleIpKey);
+  }
 
-static Future<String?> getPlcPort() async {
-  return await _storage.read(key: _plcPortKey);
-}
+  static Future<String?> getPlcIp() async {
+    return await _storage.read(key: _plcIpKey);
+  }
 
-// ── Full dongle list (PFS stations — multiple dongles, each pre-wired
-// to a specific ECU id via ecu_station) — saved as a JSON string at
-// login time, read back fresh whenever the PFS screen loads. ──
-static const _dongleListKey = 'dongle_list';
-
-static Future<void> saveDongleList(String jsonList) async {
-  await _storage.write(key: _dongleListKey, value: jsonList);
-}
-
-static Future<String?> getDongleList() async {
-  return await _storage.read(key: _dongleListKey);
-}
+  static Future<String?> getPlcPort() async {
+    return await _storage.read(key: _plcPortKey);
+  }
 
   static Future<void> setRememberMe(bool value) =>
       _storage.write(key: _rememberMeKey, value: value.toString());
@@ -83,11 +79,9 @@ static Future<String?> getDongleList() async {
     await _storage.write(key: _passwordKey, value: password);
   }
 
-  static Future<String?> getSavedUsername() =>
-      _storage.read(key: _usernameKey);
+  static Future<String?> getSavedUsername() => _storage.read(key: _usernameKey);
 
-  static Future<String?> getSavedPassword() =>
-      _storage.read(key: _passwordKey);
+  static Future<String?> getSavedPassword() => _storage.read(key: _passwordKey);
 
   static Future<void> clearCredentials() async {
     await _storage.delete(key: _usernameKey);

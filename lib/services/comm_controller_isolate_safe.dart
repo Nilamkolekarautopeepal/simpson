@@ -23,8 +23,9 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/helper/crc16_ccitt_kermit.dart';
+import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 import 'package:convert/convert.dart';
-import 'i_comm_controller.dart';
+//import 'i_comm_controller.dart';
 
 class CommControllerIsolateSafe implements ICommController {
   @override
