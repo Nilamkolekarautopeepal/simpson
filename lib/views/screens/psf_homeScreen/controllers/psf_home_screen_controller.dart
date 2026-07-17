@@ -1207,24 +1207,12 @@ import 'package:simpson/services/getJson_service.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'pfs_lane.dart' hide psfLaneRegisterMap;
 
-/// Top-level (isolate-compatible) latin1 decode for large downloaded
-/// files — used by _downloadAsRawStringFast via compute() so this
-/// runs on a background isolate instead of blocking the main one.
 String _decodeLatin1Isolate(Uint8List bytes) {
   return latin1.decode(bytes);
 }
 
 class PsfHomeScreenController extends GetxController {
-  /// Shared across every download, every lane, for the lifetime of
-  /// this controller. Creating a fresh HttpClient() per download (the
-  /// old behavior) throws away the TCP+TLS connection after every
-  /// single file — meaning EVERY download pays a full new handshake
-  /// to the same server (sidia.simpsons.in) instead of reusing one.
-  /// Reusing this client lets Dart's HTTP stack keep the connection
-  /// alive and pipeline further requests to the same host, which is
-  /// usually a large, easy win when downloading several files from
-  /// the same server in a row (sequence file, then hex file, per lane,
-  /// times N lanes).
+  
   static final HttpClient _sharedHttpClient = HttpClient()
     ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
     ..connectionTimeout = const Duration(seconds: 15);
@@ -1253,20 +1241,6 @@ class PsfHomeScreenController extends GetxController {
   list_ds.ListNumber? _variantListCache;
 
   final ConnectionWifi _connectionWifi = ConnectionWifi();
-
-  /// Tracks when the last lane's actual flash command sequence began,
-  /// so a new one can be nudged a couple seconds later instead of
-  /// starting in the exact same instant. See _staggerFlashKickoff().
-  /// Serializes the actual flash command sequence across ALL lanes.
-  /// Confirmed root cause: two lanes flashing at the same time produced
-  /// ECUERROR_WRONGBLOCKSEQCOUNTER — a genuine UDS protocol error
-  /// meaning the ECU received data blocks with the sequence counter
-  /// out of order. That means the block-counter tracking inside the
-  /// ap_dongle_comm/ap_diagnostic packages isn't scoped per-connection
-  /// (it's compiled/external code I can't see into or fix) — running
-  /// two flashes at once corrupts both. Everything else (connect, ESN
-  /// scan, List Number, IQA, DTC, Live Parameter) stays fully parallel
-  /// across lanes — only this one call is serialized.
   Future<T> _runFlashSerialized<T>(Future<T> Function() action) {
     final previous = _flashQueue;
     final completer = Completer<void>();
@@ -1282,15 +1256,7 @@ class PsfHomeScreenController extends GetxController {
 
   Future<void> _flashQueue = Future.value();
 
-  /// Wraps ANY block of code that talks to a lane's dongle, so two
-  /// dongle operations for the SAME lane can never run at once (e.g.
-  /// Live Parameter read still in flight when Start Flash is pressed).
-  /// They share one socket/DLLFunctions instance per lane, so running
-  /// two at a time desyncs the response stream — exactly what caused
-  /// "No Resp From Dongle" to cascade through an in-progress flash.
-  /// Returns null (instead of running the action) if the lane is
-  /// already busy, rather than queuing — the caller decides what a
-  /// null means for its own UI (a snackbar, a quiet no-op, etc).
+
   Future<T?> _withLaneDongleBusy<T>(int laneIndex, Future<T> Function() action) async {
     final lane = lanes[laneIndex];
     if (lane.isDongleBusy) {
@@ -1305,11 +1271,6 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  /// Each lane now holds its OWN independent dongle connection
-  /// (`lane.dllFunctions`, set via ConnectionWifi.connectDongleForLane)
-  /// — no shared global connection object, so multiple lanes can be
-  /// connected and flashing at the same time. True in the app bar's
-  /// Dongle status dot whenever at least one lane is connected.
   bool get isDongleConnectedAnywhere => lanes.any((l) => l.dongleConnected.value);
 
   // ===============================
@@ -1329,11 +1290,7 @@ class PsfHomeScreenController extends GetxController {
 
     station = Get.arguments is String ? Get.arguments : "PFS Station";
 
-    // Lanes are built dynamically — one per dongle in the login
-    // response's station_data[0].prodbud_dongles list, each pre-wired
-    // to a specific ECU id via ecu_station. Loaded here since it's
-    // async; the view should handle an initially-empty lanes list
-    // gracefully for one frame.
+
     _loadLanesFromDongleList();
 
     _loadAccessToken();
@@ -2307,21 +2264,6 @@ class PsfHomeScreenController extends GetxController {
     client.close();
     return latin1.decode(bytes);
   }
-
-  /// PFS-only faster download, used instead of _downloadAsRawString
-  /// above (kept untouched — it's what the Test Station's own
-  /// controller also uses, so this doesn't touch that code at all).
-  ///
-  /// Two real problems with the old version for PFS's large hex/sequence
-  /// files (multi-MB): (1) `fold` + `List<int>.addAll()` per network
-  /// chunk is inefficient for accumulating megabytes — BytesBuilder is
-  /// built exactly for this. (2) `latin1.decode()` on a multi-MB byte
-  /// list is a real synchronous CPU-bound call that runs on the main
-  /// isolate and blocks EVERYTHING else while it runs — including other
-  /// lanes' flash progress polling and UI updates, which is very likely
-  /// the "pause" during flashing. Moving the decode to compute() (a
-  /// background isolate, same pattern as the JSON conversion fix)
-  /// means this large decode no longer blocks anything.
   Future<String> _downloadAsRawStringFast(String url) async {
     final request = await _sharedHttpClient.getUrl(Uri.parse(url));
     final response = await request.close();
