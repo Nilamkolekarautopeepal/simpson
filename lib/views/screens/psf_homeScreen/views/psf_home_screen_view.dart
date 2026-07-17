@@ -16,7 +16,7 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonAppBar(
-        title: controller.station,
+        title: controller.station??'',
         actions: [
           Obx(
             () => InkWell(

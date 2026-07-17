@@ -115,8 +115,8 @@ class SecureStorageService {
 
   /// Call on logout.
   static Future<void> clearAll() async {
-    await clearCredentials();
+    //await clearCredentials();
     await clearTokens();
-    await _storage.delete(key: _rememberMeKey);
+    //await _storage.delete(key: _rememberMeKey);
   }
 }
