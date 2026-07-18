@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:core';
 import 'dart:typed_data';
-import 'package:ap_diagnostic/enum/readDTCIndex.dart' show ReadDtcIndex;
+import 'package:ap_diagnostic/enum/readDTCIndex.dart' show ReadDtcIndex, ClearDtcIndex;
 import 'package:ap_diagnostic/enum/seedkeyIndexType.dart';
 import 'package:ap_diagnostic/enum/writeParameter.dart';
 import 'package:ap_diagnostic/models/flashingMtrixModel.dart';
@@ -418,6 +418,54 @@ class DLLFunctions {
     }
   }
 
+  Future<String?> clearDtc(String dtcIndex) async {
+  print("🔹 [clearDtc] Start - Received index string: $dtcIndex");
+
+  try {
+    // Matches C#'s alias handling:
+    //   if (dtc_index == "UDS-4BYTES") dtc_index = "UDS_4BYTES";
+    // plus normalizing any other dashes to underscores so the enum
+    // lookup below succeeds regardless of which separator the API sent.
+    String normalized = dtcIndex == 'UDS-4BYTES'
+        ? 'UDS_4BYTES'
+        : dtcIndex.replaceAll('-', '_');
+
+    if (normalized != dtcIndex) {
+      print("🔧 [clearDtc] Normalized '$dtcIndex' -> '$normalized'");
+    }
+
+    final ClearDtcIndex index = ClearDtcIndex.values.firstWhere(
+      (e) => e.toString().split('.').last == normalized,
+      orElse: () {
+        print("❌ No matching ClearDtcIndex enum found for: $normalized");
+        throw Exception("Invalid Clear DTC index: $normalized");
+      },
+    );
+    print("✅ [clearDtc] Mapped string '$normalized' to enum: $index");
+
+    final result = await mUdsDiagnostic.clearDTC(index);
+
+    if (result == null) {
+      print("⚠️ [clearDtc] clearDTC returned null");
+      return null;
+    }
+
+    // result is the raw ResponseArrayStatus-style object from
+    // UDSDiagnostic.clearDTC() — pull the status field directly via
+    // dynamic dispatch, same field the C# version extracts through
+    // JsonConvert as Response.ECUResponseStatus.
+    final status = (result as dynamic).ecuResponseStatus as String?;
+
+    print("📡 [clearDtc] Status received: $status");
+
+    return status;
+  } catch (e, st) {
+    print("❌ [clearDtc] EXCEPTION: $e");
+    print("❌ StackTrace: $st");
+    return null;
+  }
+}
+
   Future<List<ReadParameterResponse>?> readPid(
       List<pid_ds.Code> pidList) async {
     try {
@@ -551,9 +599,9 @@ class DLLFunctions {
 
       print("⚙️ [CONFIG] FlashConfig created");
 
-      //print("📡 [UDS] Starting tester present...");
+      // print("📡 [UDS] Starting tester present...");
       // await startTesterPresent();
-      //print("✅ [UDS] Tester present started");
+      // print("✅ [UDS] Tester present started");
 
       print("🚀 [FLASH] Calling flashInterpreter...");
       final response = await mUdsDiagnostic.flashInterpreter2(
@@ -566,7 +614,7 @@ class DLLFunctions {
       print("📥 [FLASH RESPONSE]: $response");
 
       // print("🛑 [UDS] Stopping tester present...");
-      // // await stopTesterPresent();
+      //  await stopTesterPresent();
       // print("✅ [UDS] Tester present stopped");
 
       print("🎉 [FLASH] ===== COMPLETED SUCCESS =====");

@@ -565,34 +565,60 @@ class PsfLaneCard extends StatelessWidget {
     );
   }
 
+  
+
   Widget _dtcAndLiveParameter(BuildContext context) {
-    return Column(
-      children: [
-        OutlinedButton(
-          onPressed: () async {
-            await controller.onOpenDtc(laneIndex);
-            PsfDtcDialog.show(lane, () => controller.readLiveDtcForLane(laneIndex));
-          },
-          style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: _LaneColors.navy),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
+  final buttonStyle = TextButton.styleFrom(
+  foregroundColor: _LaneColors.navy,
+  side: const BorderSide(color: _LaneColors.navy),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(4),
+  ),
+  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 8),
+);
+
+  return Column(
+    children: [
+      TextButton(
+        onPressed: () async {
+          await controller.onOpenDtc(laneIndex);
+          PsfDtcDialog.show(
+            lane,
+            () => controller.readLiveDtcForLane(laneIndex),
+          );
+        },
+        style: buttonStyle,
+        child: const Text(
+          'DTC',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: _LaneColors.navy,
           ),
-          child: const Text('DTC', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _LaneColors.navy)),
         ),
-        const SizedBox(height: 10),
-        TextButton(
-          onPressed: () async {
-            await controller.onOpenLiveParameter(laneIndex);
-            PsfLiveParameterDialog.show(
-              lane,
-              () => controller.loadPidForLane(laneIndex),
-              () => controller.togglePidPlaybackForLane(laneIndex),
-            );
-          },
-          child: const Text('LIVE PARAMETER', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: _LaneColors.navy)),
+      ),
+      const SizedBox(height: 10),
+      TextButton(
+        onPressed: () async {
+          await controller.onOpenLiveParameter(laneIndex);
+
+          PsfLiveParameterDialog.show(
+            lane,
+            () => controller.loadPidForLane(laneIndex),
+            () => controller.togglePidPlaybackForLane(laneIndex),
+          );
+        },
+        style: buttonStyle,
+        child: const Text(
+          'LIVE PARAMETER',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: _LaneColors.navy,
+          ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 }

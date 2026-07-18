@@ -1010,13 +1010,6 @@ import 'i_comm_controller.dart';
 
 class CommController extends GetxController implements ICommController {
   var connectivityRx = Connectivity.none.obs;
-  // 🔥 ADDED: implements ICommController so DongleComm (which now
-  // accepts the shared interface) can use this exact same class as
-  // before — no behavior change, GetX/.obs reactivity is untouched.
-  // This getter just exposes the unwrapped enum value for interface
-  // compliance; existing code that uses `connectivityRx.value` directly
-  // (the .obs field) is renamed below to connectivityRx to avoid a
-  // name collision with the interface's `connectivity` getter.
   @override
   Connectivity get connectivity => connectivityRx.value;
   SerialPort? serialPort;
@@ -1056,15 +1049,6 @@ class CommController extends GetxController implements ICommController {
         timeout: const Duration(minutes: 1),
       );
 
-      // CRITICAL FIX: without this, Windows' default TCP behavior
-      // (Nagle's algorithm combined with delayed ACK) can add
-      // 200-500ms of pure network-stack latency to EVERY small
-      // send/response round-trip — and this flash protocol does
-      // thousands of them (one per ~4KB block, plus every UDS
-      // command). That alone can turn a ~2.5 min flash into a
-      // ~12 min flash with zero code logic changed. TCP_NODELAY
-      // disables Nagle's batching so small packets go out immediately
-      // instead of waiting to be combined with more data.
       try {
         _socket!.setOption(SocketOption.tcpNoDelay, true);
         print('⚡ TCP_NODELAY enabled — small packets sent immediately, no Nagle delay');

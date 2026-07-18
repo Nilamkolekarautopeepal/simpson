@@ -40,7 +40,9 @@ class CommControllerIsolateSafe implements ICommController {
     required Connectivity selectedType,
   }) async {
     try {
-      print("🌐 [connectWifi] Attempting $selectedType connection to $host:$port...");
+      print(
+        "🌐 [connectWifi] Attempting $selectedType connection to $host:$port...",
+      );
       await disconnect();
 
       _socket = await Socket.connect(
@@ -57,7 +59,9 @@ class CommControllerIsolateSafe implements ICommController {
       // this isolate-safe twin was missing it.
       try {
         _socket!.setOption(SocketOption.tcpNoDelay, true);
-        print('⚡ TCP_NODELAY enabled — small packets sent immediately, no Nagle delay');
+        print(
+          '⚡ TCP_NODELAY enabled — small packets sent immediately, no Nagle delay',
+        );
       } catch (e) {
         print('⚠️ Could not set TCP_NODELAY: $e');
       }
@@ -114,8 +118,9 @@ class CommControllerIsolateSafe implements ICommController {
     return builder.toBytes();
   }
 
-  String formatHex(Uint8List bytes) =>
-      bytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+  String formatHex(Uint8List bytes) => bytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+      .join(' ');
 
   @override
   Uint8List hexToBytes(String hexStr) {
@@ -123,8 +128,9 @@ class CommControllerIsolateSafe implements ICommController {
     return Uint8List.fromList(hex.decode(hexStr));
   }
 
-  String bytesToHex(Uint8List bytes) =>
-      bytes.map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase()).join(' ');
+  String bytesToHex(Uint8List bytes) => bytes
+      .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+      .join(' ');
 
   @override
   Future<Uint8List?> sendCommand(
@@ -174,6 +180,23 @@ class CommControllerIsolateSafe implements ICommController {
     }
   }
 
+  @override
+  Future<void> disconnectVCI() async {
+    try {
+      await _socketSub?.cancel();
+      _socketSub = null;
+      if (_socket != null) {
+        await _socket!.flush();
+        await _socket!.close();
+        _socket = null;
+      }
+      isConnected = false;
+      print("VCI Disconnected successfully.");
+    } catch (e) {
+      print("Error during disconnectVCI: $e");
+    }
+  }
+
   void _handleDisconnect() async {
     print("⚠️ Handling unexpected disconnect...");
     await disconnect();
@@ -188,7 +211,9 @@ class CommControllerIsolateSafe implements ICommController {
     int discardedCount = _buffer.length;
     String discardedHex = bytesToHex(Uint8List.fromList(_buffer));
     _buffer.clear();
-    print("🧹 [clearBuffer] Drain complete. Discarded $discardedCount bytes: [$discardedHex]");
+    print(
+      "🧹 [clearBuffer] Drain complete. Discarded $discardedCount bytes: [$discardedHex]",
+    );
   }
 
   @override
@@ -209,7 +234,9 @@ class CommControllerIsolateSafe implements ICommController {
     while (_buffer.length < length) {
       await Future.delayed(const Duration(milliseconds: 1));
       if (DateTime.now().difference(startTime).inSeconds > timeoutSec) {
-        print("❌ TIMEOUT: Needed $length, Have ${_buffer.length}. Clearing Buffer.");
+        print(
+          "❌ TIMEOUT: Needed $length, Have ${_buffer.length}. Clearing Buffer.",
+        );
         _buffer.clear();
         return Uint8List(0);
       }
@@ -220,13 +247,17 @@ class CommControllerIsolateSafe implements ICommController {
     return result;
   }
 
-  Future<Uint8List?> _readDirect(Socket socket,
-      {Duration timeout = const Duration(seconds: 10)}) async {
+  Future<Uint8List?> _readDirect(
+    Socket socket, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final deadline = DateTime.now().add(timeout);
 
     while (_buffer.length < 2) {
       if (DateTime.now().isAfter(deadline)) {
-        print('⏰ _readDirect: timeout waiting for header, buf=${_buffer.length}');
+        print(
+          '⏰ _readDirect: timeout waiting for header, buf=${_buffer.length}',
+        );
         return Uint8List.fromList(utf8.encode('No Resp From Dongle'));
       }
       await Future.delayed(const Duration(milliseconds: 1));
@@ -240,7 +271,9 @@ class CommControllerIsolateSafe implements ICommController {
 
     while (_buffer.length < totalExpected) {
       if (DateTime.now().isAfter(deadline)) {
-        print('⏰ _readDirect: timeout waiting for body, have=${_buffer.length} need=$totalExpected');
+        print(
+          '⏰ _readDirect: timeout waiting for body, have=${_buffer.length} need=$totalExpected',
+        );
         break;
       }
       await Future.delayed(const Duration(milliseconds: 1));
@@ -274,9 +307,13 @@ class CommControllerIsolateSafe implements ICommController {
         builder.add(remData);
         Uint8List retArray = builder.toBytes();
 
-        print("WiFi Communication : ---------Response Received = ${bytesToHex(retArray)} -----------");
+        print(
+          "WiFi Communication : ---------Response Received = ${bytesToHex(retArray)} -----------",
+        );
 
-        if (retArray.length >= 6 && retArray[3] == 0x7F && retArray[5] == 0x78) {
+        if (retArray.length >= 6 &&
+            retArray[3] == 0x7F &&
+            retArray[5] == 0x78) {
           print("⚠️ NRC 0x78 Detected: ECU Busy. Reading again...");
           continue;
         }

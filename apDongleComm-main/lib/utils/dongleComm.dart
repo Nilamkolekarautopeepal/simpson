@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:ap_dongle_comm/utils/commController.dart';
-import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 import 'package:ap_dongle_comm/utils/enums/command_ids.dart';
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/enums/protocol.dart';
@@ -10,16 +9,11 @@ import 'package:ap_dongle_comm/utils/helper/responseArrayDecoding.dart';
 import 'package:ap_dongle_comm/utils/model/responseArrayStatusModel.dart';
 import 'package:ap_dongle_comm/utils/model/sessionLogModel.dart';
 import 'package:convert/convert.dart';
+import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 
 class DongleComm {
-  // 🔥 CHANGED: was `CommController? comm` — now accepts the shared
-  // ICommController interface so either the GetX-based CommController
-  // (main isolate) or CommControllerIsolateSafe (worker isolate) can
-  // be used interchangeably. DongleComm only ever calls connectivity/
-  // hexToBytes/readData/sendCommand on this field — all 4 are part
-  // of the interface, so no other code in this file needs to change.
-  // ICommController? comm;
-  CommController? comm;
+
+  ICommController? comm;
   bool isChannel;
   String? channelId;
   List<SessionLogsModel> logs = []; // nullable, could be null

@@ -320,12 +320,10 @@ class UDSDiagnostic {
           dtcIndex == ReadDtcIndex.UDS_2BYTE12_DTC ||
           dtcIndex == ReadDtcIndex.UDS_2BYTE13_DTC ||
           dtcIndex == ReadDtcIndex.UDS_3BYTE_DTC) {
-        // Standard DTC read — mask 0C matches the reference C# implementation
-        // (confirmedDTC | testFailed), not 0xFF (all statuses).
         int frameLength = 3;
         final responseBytes = await _dongleComm.can2xTxRx(
           frameLength,
-          '19020C',
+          '1902AF',
         );
         status = responseBytes.ecuResponseStatus ?? '';
         final actualData = responseBytes.actualDataBytes;

@@ -115,10 +115,18 @@ class LoginScreen extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 6),
-                      TextField(
-                        controller: controller.usernameController.value,
-                        cursorColor: AppColors.themeColor,
-                        decoration: _fieldDecoration('Enter Username'),
+                      Theme(
+                        data: Theme.of(context).copyWith(
+                          textSelectionTheme: TextSelectionThemeData(
+                            selectionColor: Colors.blueAccent[100],
+                            selectionHandleColor: AppColors.themeColor,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: controller.usernameController.value,
+                          cursorColor: AppColors.themeColor,
+                          decoration: _fieldDecoration('Enter Username'),
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -129,20 +137,29 @@ class LoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
                       Obx(
-                        () => TextField(
-                          controller: controller.passwordController.value,
-                          cursorColor: AppColors.themeColor,
-                          obscureText: controller.hidePassword.value,
-                          decoration:
-                              _fieldDecoration('Enter Password').copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                controller.hidePassword.value
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.grey.shade400,
+                        () => Theme(
+                          data: Theme.of(context).copyWith(
+                            textSelectionTheme: TextSelectionThemeData(
+                              selectionColor: Colors.blueAccent[100],
+                              selectionHandleColor: AppColors.themeColor,
+                            ),
+                          ),
+                          child: TextField(
+                            controller: controller.passwordController.value,
+                            cursorColor: AppColors.themeColor,
+                            obscureText: controller.hidePassword.value,
+                            decoration:
+                                _fieldDecoration('Enter Password').copyWith(
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  controller.hidePassword.value
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey.shade400,
+                                ),
+                                onPressed: () =>
+                                    controller.hidePassword.toggle(),
                               ),
-                              onPressed: () => controller.hidePassword.toggle(),
                             ),
                           ),
                         ),
