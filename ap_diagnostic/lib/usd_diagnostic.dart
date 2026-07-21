@@ -2587,14 +2587,676 @@ class UDSDiagnostic {
     }
   }
 
+  // // Use 'int' in Dart as it handles 64-bit integers (replaces uint/long)
+  // int totalBytesToBeFlashed = 0;
+  // int realTimeBytesFlashed = 0;
+
+  // Future<double> getRuntimeFlashPercent() async {
+  //   if (totalBytesToBeFlashed == 0) return 0.0;
+
+  //   // In Dart, int / double automatically returns a double
+  //   double runtimeFlashPercent = realTimeBytesFlashed / totalBytesToBeFlashed;
+  //   return runtimeFlashPercent;
+  // }
+
+  // /// Resets the flashing counters
+  // Future<void> resetPercentage() async {
+  //   totalBytesToBeFlashed = 0;
+  //   realTimeBytesFlashed = 0;
+  // }
+
+  // //   // Equivalent to List<LoopModel> loopModelList = new List<LoopModel>();
+  // List<LoopModel> loopModelList = [];
+
+  // Future<String?> flashInterpreter(
+  //   FlashConfig flashConfigData,
+  //   int noofsectors,
+  //   List<FlashingMatrix> sectordata,
+  //   String interpreterFile,
+  // ) async {
+  //   ResponseArrayStatus reprogrammingResponse = ResponseArrayStatus();
+
+  //   try {
+  //     // _dongleComm!.saveLog("------Start Flashing------\n");
+
+  //     // ── ENTRY DIAGNOSTICS ─────────────────────────────────────────────────
+  //     print("🚀 flashInterpreter START");
+  //     print("📋 noofsectors: $noofsectors");
+  //     print("📋 sectordata count: ${sectordata.length}");
+  //     print("📋 interpreterFile length: ${interpreterFile.length}");
+  //     print(
+  //       "📋 interpreterFile preview: ${interpreterFile.length > 300 ? interpreterFile.substring(0, 300) : interpreterFile}",
+  //     );
+
+  //     if (interpreterFile.isEmpty) {
+  //       print("❌ interpreterFile is EMPTY — cannot flash");
+  //       return "ERROR : interpreter file is empty";
+  //     }
+  //     if (noofsectors == 0 || sectordata.isEmpty) {
+  //       print(
+  //         "❌ No sector data — noofsectors=$noofsectors sectordata=${sectordata.length}",
+  //       );
+  //       return "ERROR : no sector data";
+  //     }
+
+  //     List<String> lineData = interpreterFile.split('\n');
+  //     print("📋 Total interpreter lines: ${lineData.length}");
+
+  //     // ── TOTAL BYTES CALCULATION ───────────────────────────────────────────
+  //     totalBytesToBeFlashed = 0;
+  //     for (int i = 0; i < noofsectors; i++) {
+  //       Uint8List sectorDataArray = hexStringToBytes(
+  //         sectordata[i].jsonData ?? "",
+  //       );
+  //       int sectorNumBytes = sectorDataArray.length;
+  //       totalBytesToBeFlashed += sectorNumBytes;
+  //       realTimeBytesFlashed = 0;
+  //       print(
+  //         "📦 Sector[$i] jsonData length (bytes): $sectorNumBytes | startAddr: ${sectordata[i].jsonStartAddress} | endAddr: ${sectordata[i].jsonEndAddress}",
+  //       );
+  //     }
+  //     print("📦 totalBytesToBeFlashed: $totalBytesToBeFlashed");
+
+  //     Uint8List seedKey = Uint8List(0);
+  //     int currSectorIndex = 0;
+  //     bool isLoopPresent = false;
+  //     int loopInit = 0;
+  //     bool skipKey = false;
+
+  //     // ── INTERPRETER LOOP ──────────────────────────────────────────────────
+  //     for (int i = 0; i < lineData.length; i++) {
+  //       String formattedLine = lineData[i].replaceAll('\r', '').trim();
+
+  //       if (formattedLine.isEmpty || formattedLine.startsWith("//")) {
+  //         continue;
+  //       } else if (skipKey) {
+  //         print("⏭ Skipping line (skipKey=true): $formattedLine");
+  //         skipKey = false;
+  //         continue;
+  //       }
+
+  //       List<String> parts = formattedLine.split(':');
+  //       String command = parts[0];
+  //       String info = parts.length > 1 ? parts[1] : "";
+
+  //       print("🔄 Line[$i] command='$command' info='$info'");
+
+  //       if (command == "send" ||
+  //           command == "sendroutine" ||
+  //           command == "sendignore" ||
+  //           command == "sendroutineignore") {
+  //         List<String> splitData = info.split('+');
+  //         List<int> txFrameList = [];
+
+  //         for (var item in splitData) {
+  //           if (!item.contains("<")) {
+  //             txFrameList.addAll(hexStringToBytes(item));
+  //           } else {
+  //             int endIndex = item.indexOf('>');
+  //             String bracketString = item.substring(1, endIndex);
+  //             List<String> bParts = bracketString.split(',');
+  //             String reference = bParts[0];
+  //             int copyLength = int.parse(bParts[1]);
+  //             print("   🔧 reference='$reference' copyLength=$copyLength");
+
+  //             Uint8List copyArray = Uint8List(0);
+
+  //             if (reference.contains("key")) {
+  //               copyArray = seedKey;
+  //               print("   🔑 key bytes: ${bytesToHex(seedKey)}");
+  //             } else if (reference.contains("json_strt_addr") ||
+  //                 reference.contains("ecu_memmap_strt_addr")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String addrHex = reference.contains("json_strt_addr")
+  //                   ? (sectordata[index].jsonStartAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     )
+  //                   : (sectordata[index].ecuMemMapStartAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     );
+  //               copyArray = hexStringToBytes(addrHex);
+  //               print("   📍 start_addr[$index]: $addrHex");
+  //             } else if (reference.contains("json_end_addr") ||
+  //                 reference.contains("ecu_memmap_end_addr")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String addrHex = reference.contains("json_end_addr")
+  //                   ? (sectordata[index].jsonEndAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     )
+  //                   : (sectordata[index].ecuMemMapEndAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     );
+  //               copyArray = hexStringToBytes(addrHex);
+  //               print("   📍 end_addr[$index]: $addrHex");
+  //             } else if (reference.contains("json_checksum")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String checkSumHex = (sectordata[index].jsonCheckSum ?? "")
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(checkSumHex);
+  //               print("   🔢 checksum[$index]: $checkSumHex");
+  //             } else if (reference.contains("json_sector_len") ||
+  //                 reference.contains("ecu_memmap_len")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               int sectorNumBytes;
+  //               if (reference.contains("json_sector_len")) {
+  //                 sectorNumBytes =
+  //                     int.parse(sectordata[index].jsonEndAddress!, radix: 16) -
+  //                     int.parse(
+  //                       sectordata[index].jsonStartAddress!,
+  //                       radix: 16,
+  //                     ) +
+  //                     1;
+  //               } else {
+  //                 sectorNumBytes =
+  //                     int.parse(
+  //                       sectordata[index].ecuMemMapEndAddress!,
+  //                       radix: 16,
+  //                     ) -
+  //                     int.parse(
+  //                       sectordata[index].ecuMemMapStartAddress!,
+  //                       radix: 16,
+  //                     ) +
+  //                     1;
+  //               }
+  //               String hexLen = sectorNumBytes
+  //                   .toRadixString(16)
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(hexLen);
+  //               print(
+  //                 "   📏 sector_len[$index]: $sectorNumBytes bytes → $hexLen",
+  //               );
+  //             } else if (reference.contains("calculate_sector_len")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               int sectorNumBytes = (sectordata[index].jsonData!.length ~/ 2);
+  //               String hexLen = sectorNumBytes
+  //                   .toRadixString(16)
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(hexLen);
+  //               print(
+  //                 "   📏 calc_sector_len[$index]: $sectorNumBytes bytes → $hexLen",
+  //               );
+  //             } else if (reference.contains("i")) {
+  //               copyArray = Uint8List.fromList([
+  //                 loopModelList.last.i! + loopInit,
+  //               ]);
+  //               print(
+  //                 "   🔢 loop i value: ${loopModelList.last.i! + loopInit}",
+  //               );
+  //             } else {
+  //               print(
+  //                 "   ⚠️ Unknown reference: '$reference' — copyArray will be empty",
+  //               );
+  //             }
+
+  //             Uint8List finalBuffer = Uint8List(copyLength);
+  //             int actualToCopy = copyArray.length > copyLength
+  //                 ? copyLength
+  //                 : copyArray.length;
+  //             finalBuffer.setRange(0, actualToCopy, copyArray);
+  //             txFrameList.addAll(finalBuffer);
+  //           }
+  //         }
+
+  //         Uint8List txFrame = Uint8List.fromList(txFrameList);
+  //         print(
+  //           "📤 send[$command]: ${bytesToHex(txFrame)} (${txFrame.length} bytes)",
+  //         );
+
+  //         var sendResp = await _dongleComm.can2xTxRx(
+  //           txFrame.length,
+  //           bytesToHex(txFrame),
+  //         );
+  //         print("📥 send response: '${sendResp.ecuResponseStatus}'");
+
+  //         if (command != "sendignore") {
+  //           reprogrammingResponse = sendResp;
+  //         }
+
+  //         while (reprogrammingResponse.ecuResponseStatus ==
+  //             "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
+  //           print("⏳ RequiredTimeDelay — retrying in 300ms...");
+  //           //  await Future.delayed(const Duration(milliseconds: 300));
+  //           reprogrammingResponse = await _dongleComm.can2xTxRx(
+  //             txFrame.length,
+  //             bytesToHex(txFrame),
+  //           );
+  //           print(
+  //             "📥 retry response: '${reprogrammingResponse.ecuResponseStatus}'",
+  //           );
+  //         }
+
+  //         if (reprogrammingResponse.ecuResponseStatus != "NOERROR" &&
+  //             command != "sendignore") {
+  //           print("❌ send ERROR: '${reprogrammingResponse.ecuResponseStatus}'");
+  //           return reprogrammingResponse.ecuResponseStatus;
+  //         }
+
+  //         if (command == "sendroutine" || command == "sendroutineignore") {
+  //           String routineReqCommand =
+  //               "3103" + splitData[0].trim().substring(4);
+  //           print("🔁 sendroutine polling: $routineReqCommand");
+  //           bool isRoutineLoop = true;
+  //           while (isRoutineLoop) {
+  //             // await Future.delayed(const Duration(milliseconds: 500));
+  //             var routineResp = await _dongleComm.can2xTxRx(
+  //               routineReqCommand.length ~/ 2,
+  //               routineReqCommand,
+  //             );
+  //             print(
+  //               "📥 routine response: '${routineResp.ecuResponseStatus}' data: ${routineResp.actualDataBytes != null ? bytesToHex(routineResp.actualDataBytes!) : 'null'}",
+  //             );
+
+  //             if (command != "sendroutineignore") {
+  //               reprogrammingResponse = routineResp;
+  //             }
+
+  //             if (reprogrammingResponse.ecuResponseStatus != "NOERROR" &&
+  //                 command != "sendroutineignore") {
+  //               print(
+  //                 "❌ routine ERROR: '${reprogrammingResponse.ecuResponseStatus}'",
+  //               );
+  //               isRoutineLoop = false;
+  //               return reprogrammingResponse.ecuResponseStatus;
+  //             } else if (routineResp.ecuResponseStatus != "NOERROR" &&
+  //                 command == "sendroutineignore") {
+  //               isRoutineLoop = false;
+  //             } else {
+  //               int statusByte = reprogrammingResponse.actualDataBytes![4];
+  //               print(
+  //                 "   routine statusByte[4]: 0x${statusByte.toRadixString(16).padLeft(2, '0')}",
+  //               );
+  //               if (statusByte == 0x02 ||
+  //                   statusByte == 0x01 ||
+  //                   statusByte == 0x04) {
+  //                 print("   ✅ routine complete");
+  //                 isRoutineLoop = false;
+  //               }
+  //             }
+  //           }
+  //         }
+  //       } else if (command == "sleep") {
+  //         int ms = int.parse(info);
+  //         print("💤 sleep ${ms}ms");
+  //         await Future.delayed(Duration(milliseconds: ms));
+  //       } else if (command == "function") {
+  //         if (info.contains("CalculateKeyFromSeed")) {
+  //           String seedkeynumbytes = "";
+
+  //           // 1. Extract content inside [ ... ]
+  //           int start = info.indexOf('[');
+  //           int end = info.indexOf(']');
+  //           if (start == -1 || end == -1) return "ERROR_PARSING_INFO";
+
+  //           String sqrBktInfo = info.substring(start + 1, end);
+
+  //           if (sqrBktInfo.contains(',')) {
+  //             List<String> parts = sqrBktInfo.split(',');
+  //             String enumName = parts[0].trim().replaceAll('-', '_');
+
+  //             // Safety: Use firstWhere with orElse to prevent "No element" error
+  //             flashConfigData.seedKeyIndex = SEEDKEYINDEXTYPE.values.firstWhere(
+  //               (e) => e.toString().split('.').last == enumName,
+  //               orElse: () => SEEDKEYINDEXTYPE.GREAVES_BOSCH_BS6_PROD,
+  //             );
+  //             seedkeynumbytes = parts[1].trim();
+  //           } else {
+  //             seedkeynumbytes = sqrBktInfo.trim();
+  //           }
+
+  //           // 2. Determine seed length (Handle both Hex "08" and Decimal "8")
+  //           int seedLength = int.tryParse(seedkeynumbytes, radix: 16) ?? 0;
+  //           if (seedLength == 0)
+  //             seedLength = int.tryParse(seedkeynumbytes) ?? 0;
+
+  //           Uint8List seedArray = Uint8List(seedLength);
+
+  //           // 3. Extract Seed from ECU Response
+  //           List<int> actualData = reprogrammingResponse.actualDataBytes ?? [];
+
+  //           if (actualData.length >= 2) {
+  //             // Correctly extract only the seed portion
+  //             int availableBytes = actualData.length - 2;
+  //             int bytesToCopy = availableBytes < seedLength
+  //                 ? availableBytes
+  //                 : seedLength;
+
+  //             for (int i = 0; i < bytesToCopy; i++) {
+  //               seedArray[i] = actualData[i + 2];
+  //             }
+  //           }
+
+  //           print(
+  //             "-------seed array = ${byteArrayToHexString(seedArray)}-------",
+  //           );
+
+  //           if (seedArray.every((x) => x == 0)) {
+  //             skipKey = true;
+  //             print("-------seed is zeros, skipping security-------");
+  //           } else {
+  //             calculateSeedkey = ECUCalculateSeedkey();
+
+  //             // 4. Call calculation
+  //             Map<String, dynamic> result = calculateSeedkey.calculateSeedKey(
+  //               flashConfigData.seedKeyIndex!,
+  //               seedArray.length,
+  //               seedArray,
+  //             );
+
+  //             // 5. CRITICAL SAFETY CHECK: Prevent the RangeError
+  //             if (result.containsKey('key') && result['key'] != null) {
+  //               Uint8List tempKey = result['key'] is Uint8List
+  //                   ? result['key']
+  //                   : Uint8List.fromList(List<int>.from(result['key']));
+
+  //               if (tempKey.isNotEmpty) {
+  //                 // Success! Assign the generated key
+  //                 seedKey = tempKey;
+  //                 print(
+  //                   "-------get key response = ${byteArrayToHexString(seedKey)}-------",
+  //                 );
+  //               } else {
+  //                 print("❌ Calculation returned empty key buffer");
+  //                 return "ERROR_CALCULATION_EMPTY";
+  //               }
+  //             } else {
+  //               print("❌ Seed-Key Calculation Failed internally");
+  //               return "ERROR_KEY_CALCULATION_FAILED";
+  //             }
+  //           }
+  //         }
+  //       } else if (command == "repeatstart") {
+  //         isLoopPresent = true;
+  //         List<String> sData = info.split(',');
+  //         int maxIdx = sData[3] == "noofsectors"
+  //             ? noofsectors
+  //             : int.parse(sData[3]);
+  //         loopInit = int.parse(sData[2]);
+  //         loopModelList.add(
+  //           LoopModel(
+  //             i: 0,
+  //             loopId: int.parse(sData[0]),
+  //             maxIndex: maxIdx,
+  //             loopLocation: i,
+  //           ),
+  //         );
+  //         print(
+  //           "🔁 repeatstart — loopId=${sData[0]} maxIdx=$maxIdx loopInit=$loopInit",
+  //         );
+  //       } else if (command == "repeatend") {
+  //         loopModelList.last.i = (loopModelList.last.i ?? 0) + 1;
+  //         print(
+  //           "🔁 repeatend — i=${loopModelList.last.i} / maxIndex=${loopModelList.last.maxIndex}",
+  //         );
+  //         if (loopModelList.last.i == loopModelList.last.maxIndex) {
+  //           print("✅ Loop complete — removing from stack");
+  //           loopModelList.removeLast();
+  //         } else {
+  //           i = loopModelList.last.loopLocation ?? 0;
+  //           print("↩️ Loop back to line $i");
+  //         }
+  //       }
+  //       //else if (command == "sendbulkdata") {
+  //       //   List<String> sInfo = info.split(',');
+  //       //   int seqVarInitValue = int.parse(sInfo[1]);
+  //       //   String transferInfo = sInfo[2];
+  //       //   // --- RESOLVED PARSING LOGIC ---
+  //       //   int startBracket = info.indexOf('[') + 1;
+  //       //   int endBracket = info.indexOf(']');
+  //       //   String sqrBktInfo = info.substring(startBracket, endBracket);
+  //       //   // Split by comma and take the last element to ensure we get the value
+  //       //   // regardless of whether the format is [ffd] or [prefix, ffd]
+  //       //   List<String> bktParts = sqrBktInfo.split(',');
+  //       //   int sectorFrameTransferLen = int.parse(
+  //       //     bktParts.last.trim(),
+  //       //     radix: 16,
+  //       //   );
+  //       //   // ------------------------------
+  //       //   int blkSeqCnt = seqVarInitValue;
+  //       //   int index = isLoopPresent
+  //       //       ? loopModelList.last.i ?? 0
+  //       //       : currSectorIndex;
+  //       //   print(
+  //       //     "📦 sendbulkdata — sectorIndex=$index seqVarInitValue=$seqVarInitValue sectorFrameTransferLen=$sectorFrameTransferLen",
+  //       //   );
+  //       //   Uint8List sectorDataArray = hexStringToBytes(
+  //       //     sectordata[index].jsonData ?? "",
+  //       //   );
+  //       //   int sectorNumBytes = sectorDataArray.length;
+  //       //   print("📦 sectorDataArray length: $sectorNumBytes bytes");
+  //       //   for (int j = 0; j < sectorNumBytes;) {
+  //       //     try {
+  //       //       int currentTransferLen =
+  //       //           (sectorNumBytes - j) < sectorFrameTransferLen
+  //       //           ? (sectorNumBytes - j)
+  //       //           : sectorFrameTransferLen;
+  //       //       List<String> tSplitData = transferInfo.split('+');
+  //       //       List<int> nTxFrameList = [];
+  //       //       for (var item in tSplitData) {
+  //       //         String trimmedItem = item.trim();
+  //       //         if (RegExp(r'^\d+$').hasMatch(trimmedItem)) {
+  //       //           nTxFrameList.addAll(hexStringToBytes(trimmedItem));
+  //       //         } else if (trimmedItem.contains("bsc")) {
+  //       //           nTxFrameList.add(blkSeqCnt & 0xFF);
+  //       //         } else if (trimmedItem.contains("json_sectordata")) {
+  //       //           nTxFrameList.addAll(
+  //       //             sectorDataArray.sublist(j, j + currentTransferLen),
+  //       //           );
+  //       //         }
+  //       //       }
+  //       //       j += currentTransferLen;
+  //       //       Uint8List nTxFrame = Uint8List.fromList(nTxFrameList);
+  //       //       print(
+  //       //         "📤 bulk[blk=$blkSeqCnt j=$j/${sectorNumBytes}]: ${nTxFrame.length} bytes",
+  //       //       );
+  //       //       var bulkResp = await _dongleComm.can2xTxRx(
+  //       //         nTxFrame.length,
+  //       //         byteArrayToHexString(nTxFrame),
+  //       //       );
+  //       //       print("📥 bulk response: '${bulkResp.ecuResponseStatus}'");
+  //       //       blkSeqCnt++;
+  //       //       if (bulkResp.ecuResponseStatus != "NOERROR") {
+  //       //         print("❌ bulk ERROR: '${bulkResp.ecuResponseStatus}'");
+  //       //         return bulkResp.ecuResponseStatus;
+  //       //       }
+  //       //       realTimeBytesFlashed += currentTransferLen;
+  //       //     } catch (e) {
+  //       //       print("❌ bulk exception: $e");
+  //       //       return e.toString();
+  //       //     }
+  //       //   }
+  //       //   print(
+  //       //     "✅ sendbulkdata complete — totalFlashed so far: $realTimeBytesFlashed",
+  //       //   );
+  //       // }
+  //       else if (command == "sendbulkdata") {
+  //         List<String> sInfo = info.split(',');
+  //         int seqVarInitValue = int.parse(sInfo[1]);
+  //         String transferInfo = sInfo[2];
+
+  //         int startBracket = info.indexOf('[');
+  //         int endBracket = info.indexOf(']');
+  //         if (startBracket == -1 || endBracket == -1) {
+  //           throw FormatException("Missing brackets");
+  //         }
+
+  //         String sqrBktInfo = info.substring(startBracket + 1, endBracket);
+  //         int sectorFrameTransferLen = int.parse(
+  //           sqrBktInfo.split(',').last.trim(),
+  //           radix: 16,
+  //         );
+
+  //         int blkSeqCnt = seqVarInitValue;
+  //         int index = isLoopPresent
+  //             ? (loopModelList.last.i ?? 0)
+  //             : currSectorIndex;
+
+  //         Uint8List sectorDataArray = hexStringToBytes(
+  //           sectordata[index].jsonData ?? "",
+  //         );
+  //         int sectorNumBytes = sectorDataArray.length;
+
+  //         // Build the frame layout ONCE — static hex bytes + placeholder slots for
+  //         // bsc (block sequence counter) and the variable-length data chunk.
+  //         final List<String> tSplitData = transferInfo.split('+');
+  //         final RegExp hexRe = RegExp(r'^[0-9a-fA-F]+$');
+
+  //         final List<int> layout = [];
+  //         int bscPos = -1;
+  //         int dataPos = -1;
+
+  //         for (final raw in tSplitData) {
+  //           final trimmed = raw.trim();
+  //           if (hexRe.hasMatch(trimmed)) {
+  //             layout.addAll(hexStringToBytes(trimmed));
+  //           } else if (trimmed.contains("bsc")) {
+  //             bscPos = layout.length;
+  //             layout.add(0);
+  //           } else if (trimmed.contains("json_sectordata")) {
+  //             dataPos = layout.length;
+  //           }
+  //         }
+
+  //         // One reusable buffer sized for the largest possible frame.
+  //         final int maxFrameLen = layout.length + sectorFrameTransferLen;
+  //         final Uint8List frameBuf = Uint8List(maxFrameLen);
+
+  //         print("📦 Starting bulk transfer...");
+  //         Stopwatch sw = Stopwatch()..start();
+
+  //         for (int j = 0; j < sectorNumBytes;) {
+  //           try {
+  //             final int currentTransferLen =
+  //                 (sectorNumBytes - j) < sectorFrameTransferLen
+  //                 ? (sectorNumBytes - j)
+  //                 : sectorFrameTransferLen;
+
+  //             frameBuf.setRange(0, layout.length, layout);
+  //             if (bscPos != -1) frameBuf[bscPos] = blkSeqCnt & 0xFF;
+
+  //             int frameLen = layout.length;
+  //             if (dataPos != -1) {
+  //               frameBuf.setRange(
+  //                 dataPos,
+  //                 dataPos + currentTransferLen,
+  //                 sectorDataArray,
+  //                 j,
+  //               );
+  //               frameLen = layout.length + currentTransferLen;
+  //             }
+
+  //             j += currentTransferLen;
+  //             final Uint8List nTxFrame = Uint8List.sublistView(
+  //               frameBuf,
+  //               0,
+  //               frameLen,
+  //             );
+
+  //             var bulkResp = await _dongleComm.can2xTxRx(
+  //               nTxFrame.length,
+  //               byteArrayToHexString(nTxFrame),
+  //             );
+
+  //             if (bulkResp.ecuResponseStatus != "NOERROR") {
+  //               print("❌ Error at byte $j: ${bulkResp.ecuResponseStatus}");
+  //               return bulkResp.ecuResponseStatus;
+  //             }
+
+  //             blkSeqCnt++;
+  //             realTimeBytesFlashed += currentTransferLen;
+  //           } catch (e) {
+  //             print("❌ bulk exception: $e");
+  //             return e.toString();
+  //           }
+  //         }
+
+  //         sw.stop();
+  //         print("✅ Bulk transfer finished in ${sw.elapsed.inSeconds} seconds");
+  //       } else if (command == "txid") {
+  //         print("🔧 txid: $info");
+  //         await _dongleComm.canSetTxHeader(info);
+  //       } else if (command == "rxid") {
+  //         print("🔧 rxid: $info");
+  //         await _dongleComm.canSetRxHeaderMask(info);
+  //       } else if (command == "startpadding") {
+  //         print("🔧 startpadding: $info");
+  //         await _dongleComm.canStartPadding(info);
+  //       } else if (command == "stoppadding") {
+  //         print("🔧 stoppadding");
+  //         await _dongleComm.canStopPadding();
+  //       } else if (command == "setstmin") {
+  //         print("🔧 setstmin: $info");
+  //         await _dongleComm.canSetP1Min(info.trim());
+  //       } else if (command == "setP2Max") {
+  //         print("🔧 setP2Max: $info");
+  //         await _dongleComm.canSetP2Max(info.trim());
+  //       } else if (command == "stopTP") {
+  //         print("🔧 stopTP");
+  //         await _dongleComm.canStopTP();
+  //       } else if (command == "startTP") {
+  //         print("🔧 startTP");
+  //         await _dongleComm.canStartTP();
+  //       } else {
+  //         print("⚠️ Unknown command '$command' — skipping");
+  //       }
+  //     }
+
+  //     print(
+  //       "🏁 flashInterpreter END — final status: '${reprogrammingResponse.ecuResponseStatus}'",
+  //     );
+  //   } catch (ex, stack) {
+  //     print("❌ flashInterpreter EXCEPTION: $ex");
+  //     print("❌ StackTrace: $stack");
+  //     return ex.toString();
+  //   }
+
+  //   return reprogrammingResponse.ecuResponseStatus;
+  // }
+
   // Use 'int' in Dart as it handles 64-bit integers (replaces uint/long)
   int totalBytesToBeFlashed = 0;
   int realTimeBytesFlashed = 0;
 
   Future<double> getRuntimeFlashPercent() async {
     if (totalBytesToBeFlashed == 0) return 0.0;
-
-    // In Dart, int / double automatically returns a double
     double runtimeFlashPercent = realTimeBytesFlashed / totalBytesToBeFlashed;
     return runtimeFlashPercent;
   }
@@ -2605,11 +3267,9 @@ class UDSDiagnostic {
     realTimeBytesFlashed = 0;
   }
 
-  //   // Equivalent to List<LoopModel> loopModelList = new List<LoopModel>();
   List<LoopModel> loopModelList = [];
-
-  Future<String?> flashInterpreter2(
-    FlashConfig flashConfigData,
+  Future<String?> flashInterpreter(
+    FlashConfig flashconfigData,
     int noofsectors,
     List<FlashingMatrix> sectordata,
     String interpreterFile,
@@ -2617,7 +3277,7 @@ class UDSDiagnostic {
     ResponseArrayStatus reprogrammingResponse = ResponseArrayStatus();
 
     try {
-      // _dongleComm!.saveLog("------Start Flashing------\n");
+      //_dongleComm!.saveLog("------Start Flashing------\n");
 
       // ── ENTRY DIAGNOSTICS ─────────────────────────────────────────────────
       print("🚀 flashInterpreter START");
@@ -2644,13 +3304,13 @@ class UDSDiagnostic {
 
       // ── TOTAL BYTES CALCULATION ───────────────────────────────────────────
       totalBytesToBeFlashed = 0;
+      realTimeBytesFlashed = 0;
       for (int i = 0; i < noofsectors; i++) {
-        Uint8List sectorDataArray = hexStringToBytes(
+        Uint8List sectorDataArray = hexStringToByteArray(
           sectordata[i].jsonData ?? "",
         );
         int sectorNumBytes = sectorDataArray.length;
         totalBytesToBeFlashed += sectorNumBytes;
-        realTimeBytesFlashed = 0;
         print(
           "📦 Sector[$i] jsonData length (bytes): $sectorNumBytes | startAddr: ${sectordata[i].jsonStartAddress} | endAddr: ${sectordata[i].jsonEndAddress}",
         );
@@ -2681,6 +3341,7 @@ class UDSDiagnostic {
 
         print("🔄 Line[$i] command='$command' info='$info'");
 
+        // ── send / sendroutine / sendignore / sendroutineignore ──────────
         if (command == "send" ||
             command == "sendroutine" ||
             command == "sendignore" ||
@@ -2690,7 +3351,7 @@ class UDSDiagnostic {
 
           for (var item in splitData) {
             if (!item.contains("<")) {
-              txFrameList.addAll(hexStringToBytes(item));
+              txFrameList.addAll(hexStringToByteArray(item));
             } else {
               int endIndex = item.indexOf('>');
               String bracketString = item.substring(1, endIndex);
@@ -2703,7 +3364,7 @@ class UDSDiagnostic {
 
               if (reference.contains("key")) {
                 copyArray = seedKey;
-                print("   🔑 key bytes: ${bytesToHex(seedKey)}");
+                print("   🔑 key bytes: ${byteArrayToHexString(seedKey)}");
               } else if (reference.contains("json_strt_addr") ||
                   reference.contains("ecu_memmap_strt_addr")) {
                 int index;
@@ -2723,7 +3384,7 @@ class UDSDiagnostic {
                         copyLength * 2,
                         '0',
                       );
-                copyArray = hexStringToBytes(addrHex);
+                copyArray = hexStringToByteArray(addrHex);
                 print("   📍 start_addr[$index]: $addrHex");
               } else if (reference.contains("json_end_addr") ||
                   reference.contains("ecu_memmap_end_addr")) {
@@ -2744,7 +3405,7 @@ class UDSDiagnostic {
                         copyLength * 2,
                         '0',
                       );
-                copyArray = hexStringToBytes(addrHex);
+                copyArray = hexStringToByteArray(addrHex);
                 print("   📍 end_addr[$index]: $addrHex");
               } else if (reference.contains("json_checksum")) {
                 int index;
@@ -2757,7 +3418,7 @@ class UDSDiagnostic {
                 }
                 String checkSumHex = (sectordata[index].jsonCheckSum ?? "")
                     .padLeft(copyLength * 2, '0');
-                copyArray = hexStringToBytes(checkSumHex);
+                copyArray = hexStringToByteArray(checkSumHex);
                 print("   🔢 checksum[$index]: $checkSumHex");
               } else if (reference.contains("json_sector_len") ||
                   reference.contains("ecu_memmap_len")) {
@@ -2793,7 +3454,7 @@ class UDSDiagnostic {
                 String hexLen = sectorNumBytes
                     .toRadixString(16)
                     .padLeft(copyLength * 2, '0');
-                copyArray = hexStringToBytes(hexLen);
+                copyArray = hexStringToByteArray(hexLen);
                 print(
                   "   📏 sector_len[$index]: $sectorNumBytes bytes → $hexLen",
                 );
@@ -2810,7 +3471,7 @@ class UDSDiagnostic {
                 String hexLen = sectorNumBytes
                     .toRadixString(16)
                     .padLeft(copyLength * 2, '0');
-                copyArray = hexStringToBytes(hexLen);
+                copyArray = hexStringToByteArray(hexLen);
                 print(
                   "   📏 calc_sector_len[$index]: $sectorNumBytes bytes → $hexLen",
                 );
@@ -2838,12 +3499,12 @@ class UDSDiagnostic {
 
           Uint8List txFrame = Uint8List.fromList(txFrameList);
           print(
-            "📤 send[$command]: ${bytesToHex(txFrame)} (${txFrame.length} bytes)",
+            "📤 send[$command]: ${byteArrayToHexString(txFrame)} (${txFrame.length} bytes)",
           );
 
-          var sendResp = await _dongleComm.can2xTxRx(
+          var sendResp = await _dongleComm!.can2xTxRx(
             txFrame.length,
-            bytesToHex(txFrame),
+            byteArrayToHexString(txFrame),
           );
           print("📥 send response: '${sendResp.ecuResponseStatus}'");
 
@@ -2854,10 +3515,10 @@ class UDSDiagnostic {
           while (reprogrammingResponse.ecuResponseStatus ==
               "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
             print("⏳ RequiredTimeDelay — retrying in 300ms...");
-            await Future.delayed(const Duration(milliseconds: 300));
-            reprogrammingResponse = await _dongleComm.can2xTxRx(
+          //  await Future.delayed(const Duration(milliseconds: 300));
+            reprogrammingResponse = await _dongleComm!.can2xTxRx(
               txFrame.length,
-              bytesToHex(txFrame),
+              byteArrayToHexString(txFrame),
             );
             print(
               "📥 retry response: '${reprogrammingResponse.ecuResponseStatus}'",
@@ -2876,13 +3537,13 @@ class UDSDiagnostic {
             print("🔁 sendroutine polling: $routineReqCommand");
             bool isRoutineLoop = true;
             while (isRoutineLoop) {
-              await Future.delayed(const Duration(milliseconds: 500));
-              var routineResp = await _dongleComm.can2xTxRx(
+             // await Future.delayed(const Duration(milliseconds: 500));
+              var routineResp = await _dongleComm!.can2xTxRx(
                 routineReqCommand.length ~/ 2,
                 routineReqCommand,
               );
               print(
-                "📥 routine response: '${routineResp.ecuResponseStatus}' data: ${routineResp.actualDataBytes != null ? bytesToHex(routineResp.actualDataBytes!) : 'null'}",
+                "📥 routine response: '${routineResp.ecuResponseStatus}' data: ${routineResp.actualDataBytes != null ? byteArrayToHexString(routineResp.actualDataBytes!) : 'null'}",
               );
 
               if (command != "sendroutineignore") {
@@ -2913,15 +3574,20 @@ class UDSDiagnostic {
               }
             }
           }
-        } else if (command == "sleep") {
+        }
+
+        // ── sleep ──────────────────────────────────────────────────────
+        else if (command == "sleep") {
           int ms = int.parse(info);
           print("💤 sleep ${ms}ms");
           await Future.delayed(Duration(milliseconds: ms));
-        } else if (command == "function") {
+        }
+
+        // ── function (seed/key calc) ──────────────────────────────────
+        else if (command == "function") {
           if (info.contains("CalculateKeyFromSeed")) {
             String seedkeynumbytes = "";
 
-            // 1. Extract content inside [ ... ]
             int start = info.indexOf('[');
             int end = info.indexOf(']');
             if (start == -1 || end == -1) return "ERROR_PARSING_INFO";
@@ -2929,38 +3595,35 @@ class UDSDiagnostic {
             String sqrBktInfo = info.substring(start + 1, end);
 
             if (sqrBktInfo.contains(',')) {
-              List<String> parts = sqrBktInfo.split(',');
-              String enumName = parts[0].trim().replaceAll('-', '_');
+              List<String> partsX = sqrBktInfo.split(',');
+              String enumName = partsX[0].trim().replaceAll('-', '_');
 
-              // Safety: Use firstWhere with orElse to prevent "No element" error
-              flashConfigData.seedKeyIndex = SEEDKEYINDEXTYPE.values.firstWhere(
+              flashconfigData.seedKeyIndex = SEEDKEYINDEXTYPE.values.firstWhere(
                 (e) => e.toString().split('.').last == enumName,
                 orElse: () => SEEDKEYINDEXTYPE.GREAVES_BOSCH_BS6_PROD,
               );
-              seedkeynumbytes = parts[1].trim();
+              seedkeynumbytes = partsX[1].trim();
             } else {
               seedkeynumbytes = sqrBktInfo.trim();
             }
 
-            // 2. Determine seed length (Handle both Hex "08" and Decimal "8")
             int seedLength = int.tryParse(seedkeynumbytes, radix: 16) ?? 0;
-            if (seedLength == 0)
+            if (seedLength == 0) {
               seedLength = int.tryParse(seedkeynumbytes) ?? 0;
+            }
 
             Uint8List seedArray = Uint8List(seedLength);
 
-            // 3. Extract Seed from ECU Response
             List<int> actualData = reprogrammingResponse.actualDataBytes ?? [];
 
             if (actualData.length >= 2) {
-              // Correctly extract only the seed portion
               int availableBytes = actualData.length - 2;
               int bytesToCopy = availableBytes < seedLength
                   ? availableBytes
                   : seedLength;
 
-              for (int i = 0; i < bytesToCopy; i++) {
-                seedArray[i] = actualData[i + 2];
+              for (int k = 0; k < bytesToCopy; k++) {
+                seedArray[k] = actualData[k + 2];
               }
             }
 
@@ -2974,21 +3637,18 @@ class UDSDiagnostic {
             } else {
               calculateSeedkey = ECUCalculateSeedkey();
 
-              // 4. Call calculation
               Map<String, dynamic> result = calculateSeedkey.calculateSeedKey(
-                flashConfigData.seedKeyIndex!,
+                flashconfigData.seedKeyIndex!,
                 seedArray.length,
                 seedArray,
               );
 
-              // 5. CRITICAL SAFETY CHECK: Prevent the RangeError
               if (result.containsKey('key') && result['key'] != null) {
                 Uint8List tempKey = result['key'] is Uint8List
                     ? result['key']
                     : Uint8List.fromList(List<int>.from(result['key']));
 
                 if (tempKey.isNotEmpty) {
-                  // Success! Assign the generated key
                   seedKey = tempKey;
                   print(
                     "-------get key response = ${byteArrayToHexString(seedKey)}-------",
@@ -3003,7 +3663,10 @@ class UDSDiagnostic {
               }
             }
           }
-        } else if (command == "repeatstart") {
+        }
+
+        // ── repeatstart / repeatend ────────────────────────────────────
+        else if (command == "repeatstart") {
           isLoopPresent = true;
           List<String> sData = info.split(',');
           int maxIdx = sData[3] == "noofsectors"
@@ -3033,114 +3696,241 @@ class UDSDiagnostic {
             i = loopModelList.last.loopLocation ?? 0;
             print("↩️ Loop back to line $i");
           }
-        } else if (command == "sendbulkdata") {
+        }
+
+        // ── sendbulkdata (SINGLE block — no dead duplicate) ─────────────
+        else if (command == "sendbulkdata") {
           List<String> sInfo = info.split(',');
-          int seqVarInitValue = int.parse(sInfo[1]);
+          int blkSeqCnt = int.parse(sInfo[1]);
           String transferInfo = sInfo[2];
 
-          // --- RESOLVED PARSING LOGIC ---
-          int startBracket = info.indexOf('[') + 1;
+          int startBracket = info.indexOf('[');
           int endBracket = info.indexOf(']');
-          String sqrBktInfo = info.substring(startBracket, endBracket);
+          if (startBracket == -1 || endBracket == -1) {
+            throw FormatException("Missing brackets");
+          }
 
-          // Split by comma and take the last element to ensure we get the value
-          // regardless of whether the format is [ffd] or [prefix, ffd]
-          List<String> bktParts = sqrBktInfo.split(',');
+          String sqrBktInfo = info.substring(startBracket + 1, endBracket);
           int sectorFrameTransferLen = int.parse(
-            bktParts.last.trim(),
+            sqrBktInfo.split(',').last.trim(),
             radix: 16,
           );
-          // ------------------------------
 
-          int blkSeqCnt = seqVarInitValue;
           int index = isLoopPresent
-              ? loopModelList.last.i ?? 0
+              ? (loopModelList.last.i ?? 0)
               : currSectorIndex;
 
           print(
-            "📦 sendbulkdata — sectorIndex=$index seqVarInitValue=$seqVarInitValue sectorFrameTransferLen=$sectorFrameTransferLen",
+            "📦 sendbulkdata — sectorIndex=$index blkSeqCnt=$blkSeqCnt sectorFrameTransferLen=$sectorFrameTransferLen",
           );
 
-          Uint8List sectorDataArray = hexStringToBytes(
+          Uint8List sectorDataArray = hexStringToByteArray(
             sectordata[index].jsonData ?? "",
           );
           int sectorNumBytes = sectorDataArray.length;
           print("📦 sectorDataArray length: $sectorNumBytes bytes");
 
-          for (int j = 0; j < sectorNumBytes;) {
-            try {
-              int currentTransferLen =
-                  (sectorNumBytes - j) < sectorFrameTransferLen
-                  ? (sectorNumBytes - j)
-                  : sectorFrameTransferLen;
+          List<String> tSplitData = transferInfo.split('+');
+          final RegExp hexRe = RegExp(r'^[0-9a-fA-F]+$');
 
-              List<String> tSplitData = transferInfo.split('+');
-              List<int> nTxFrameList = [];
+          bool needsDynamicAddr = tSplitData.any(
+            (t) => t.trim().contains("json_strt_addr") ||
+                t.trim().contains("sectordatasent"),
+          );
 
-              for (var item in tSplitData) {
-                String trimmedItem = item.trim();
-                if (RegExp(r'^\d+$').hasMatch(trimmedItem)) {
-                  nTxFrameList.addAll(hexStringToBytes(trimmedItem));
-                } else if (trimmedItem.contains("bsc")) {
-                  nTxFrameList.add(blkSeqCnt & 0xFF);
-                } else if (trimmedItem.contains("json_sectordata")) {
-                  nTxFrameList.addAll(
-                    sectorDataArray.sublist(j, j + currentTransferLen),
+          Stopwatch sw = Stopwatch()..start();
+
+          if (!needsDynamicAddr) {
+     
+            final List<int> layout = [];
+            int bscPos = -1;
+            int dataPos = -1;
+
+            for (final raw in tSplitData) {
+              final trimmed = raw.trim();
+              if (trimmed.contains("bsc")) {
+                bscPos = layout.length;
+                layout.add(0);
+              } else if (trimmed.contains("json_sectordata")) {
+                dataPos = layout.length;
+              } else if (hexRe.hasMatch(trimmed)) {
+                layout.addAll(hexStringToByteArray(trimmed));
+              }
+            }
+
+            final int maxFrameLen = layout.length + sectorFrameTransferLen;
+            final Uint8List frameBuf = Uint8List(maxFrameLen);
+
+            for (int j = 0; j < sectorNumBytes;) {
+              try {
+                final int currentTransferLen =
+                    (sectorNumBytes - j) < sectorFrameTransferLen
+                    ? (sectorNumBytes - j)
+                    : sectorFrameTransferLen;
+
+                frameBuf.setRange(0, layout.length, layout);
+                if (bscPos != -1) frameBuf[bscPos] = blkSeqCnt & 0xFF;
+
+                int frameLen = layout.length;
+                if (dataPos != -1) {
+                  frameBuf.setRange(
+                    dataPos,
+                    dataPos + currentTransferLen,
+                    sectorDataArray,
+                    j,
                   );
+                  frameLen = layout.length + currentTransferLen;
                 }
+
+                j += currentTransferLen;
+                final Uint8List nTxFrame = Uint8List.sublistView(
+                  frameBuf,
+                  0,
+                  frameLen,
+                );
+
+                var bulkResp = await _dongleComm!.can2xTxRx(
+                  nTxFrame.length,
+                  byteArrayToHexString(nTxFrame),
+                );
+
+                if (bulkResp.ecuResponseStatus != "NOERROR") {
+                  print("❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}");
+                  return bulkResp.ecuResponseStatus;
+                }
+
+                blkSeqCnt = (blkSeqCnt + 1) & 0xFF;
+                // Update EVERY frame, not batched — this is just an int
+                // add, it costs nothing, and it's what keeps the progress
+                // bar from freezing then jumping between UI polls.
+                realTimeBytesFlashed += currentTransferLen;
+              } catch (e) {
+                print("❌ bulk exception: $e");
+                return e.toString();
               }
+            }
+          } else {
+            // ---- GENERAL PATH: template needs a per-frame-varying
+            // value (address or sent-length) — rebuild each frame. ----
+            int startAddr = int.parse(
+              sectordata[index].jsonStartAddress!,
+              radix: 16,
+            );
 
-              j += currentTransferLen;
-              Uint8List nTxFrame = Uint8List.fromList(nTxFrameList);
-              print(
-                "📤 bulk[blk=$blkSeqCnt j=$j/${sectorNumBytes}]: ${nTxFrame.length} bytes",
-              );
+            for (int j = 0; j < sectorNumBytes;) {
+              try {
+                final int currentTransferLen =
+                    (sectorNumBytes - j) < sectorFrameTransferLen
+                    ? (sectorNumBytes - j)
+                    : sectorFrameTransferLen;
 
-              var bulkResp = await _dongleComm.can2xTxRx(
-                nTxFrame.length,
-                byteArrayToHexString(nTxFrame),
-              );
-              print("📥 bulk response: '${bulkResp.ecuResponseStatus}'");
-              blkSeqCnt++;
+                List<int> nTxFrameList = [];
 
-              if (bulkResp.ecuResponseStatus != "NOERROR") {
-                print("❌ bulk ERROR: '${bulkResp.ecuResponseStatus}'");
-                return bulkResp.ecuResponseStatus;
+                for (final raw in tSplitData) {
+                  final trimmed = raw.trim();
+
+                  if (trimmed.contains("bsc")) {
+                    nTxFrameList.add(blkSeqCnt & 0xFF);
+                  } else if (trimmed.contains("json_sectordata")) {
+                    nTxFrameList.addAll(
+                      sectorDataArray.sublist(j, j + currentTransferLen),
+                    );
+                  } else if (trimmed.contains("json_strt_addr")) {
+                    int endIdx = trimmed.indexOf('>');
+                    String bracketStr = trimmed.substring(1, endIdx);
+                    int copyLength = int.parse(
+                      bracketStr.split(',')[1].trim(),
+                      radix: 16,
+                    );
+
+                    Uint8List addrBig = (ByteData(4)
+                          ..setUint32(0, startAddr, Endian.big))
+                        .buffer
+                        .asUint8List();
+
+                    Uint8List trimmedAddr = addrBig.length > copyLength
+                        ? addrBig.sublist(addrBig.length - copyLength)
+                        : addrBig;
+
+                    nTxFrameList.addAll(trimmedAddr);
+                    startAddr += sectorFrameTransferLen;
+                  } else if (trimmed.contains("sectordatasent")) {
+                    int endIdx = trimmed.indexOf('>');
+                    String bracketStr = trimmed.substring(1, endIdx);
+                    int copyLength = int.parse(
+                      bracketStr.split(',')[1].trim(),
+                      radix: 16,
+                    );
+
+                    Uint8List lenBig = (ByteData(4)
+                          ..setUint32(0, currentTransferLen, Endian.big))
+                        .buffer
+                        .asUint8List();
+
+                    Uint8List trimmedLen = lenBig.length > copyLength
+                        ? lenBig.sublist(lenBig.length - copyLength)
+                        : lenBig;
+
+                    nTxFrameList.addAll(trimmedLen);
+                  } else if (hexRe.hasMatch(trimmed) &&
+                      !trimmed.contains('<')) {
+                    nTxFrameList.addAll(hexStringToByteArray(trimmed));
+                  }
+                }
+
+                j += currentTransferLen;
+                Uint8List nTxFrame = Uint8List.fromList(nTxFrameList);
+
+                var bulkResp = await _dongleComm!.can2xTxRx(
+                  nTxFrame.length,
+                  byteArrayToHexString(nTxFrame),
+                );
+
+                if (bulkResp.ecuResponseStatus != "NOERROR") {
+                  print("❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}");
+                  return bulkResp.ecuResponseStatus;
+                }
+
+                blkSeqCnt = (blkSeqCnt + 1) & 0xFF;
+                realTimeBytesFlashed += currentTransferLen;
+              } catch (e) {
+                print("❌ bulk exception: $e");
+                return e.toString();
               }
-
-              realTimeBytesFlashed += currentTransferLen;
-            } catch (e) {
-              print("❌ bulk exception: $e");
-              return e.toString();
             }
           }
+
+          sw.stop();
           print(
-            "✅ sendbulkdata complete — totalFlashed so far: $realTimeBytesFlashed",
+            "✅ sendbulkdata complete in ${sw.elapsed.inSeconds}s — totalFlashed so far: $realTimeBytesFlashed",
           );
-        } else if (command == "txid") {
+        }
+
+        // ── dongle config commands ────────────────────────────────────
+        else if (command == "txid") {
           print("🔧 txid: $info");
-          await _dongleComm.canSetTxHeader(info);
+          await _dongleComm!.canSetTxHeader(info);
         } else if (command == "rxid") {
           print("🔧 rxid: $info");
-          await _dongleComm.canSetRxHeaderMask(info);
+          await _dongleComm!.canSetRxHeaderMask(info);
         } else if (command == "startpadding") {
           print("🔧 startpadding: $info");
-          await _dongleComm.canStartPadding(info);
+          await _dongleComm!.canStartPadding(info);
         } else if (command == "stoppadding") {
           print("🔧 stoppadding");
-          await _dongleComm.canStopPadding();
+          await _dongleComm!.canStopPadding();
         } else if (command == "setstmin") {
           print("🔧 setstmin: $info");
-          await _dongleComm.canSetP1Min(info.trim());
+          await _dongleComm!.canSetP1Min(info.trim());
         } else if (command == "setP2Max") {
           print("🔧 setP2Max: $info");
-          await _dongleComm.canSetP2Max(info.trim());
+          await _dongleComm!.canSetP2Max(info.trim());
         } else if (command == "stopTP") {
           print("🔧 stopTP");
-          await _dongleComm.canStopTP();
+          await _dongleComm!.canStopTP();
         } else if (command == "startTP") {
           print("🔧 startTP");
-          await _dongleComm.canStartTP();
+          await _dongleComm!.canStartTP();
         } else {
           print("⚠️ Unknown command '$command' — skipping");
         }
@@ -3157,6 +3947,672 @@ class UDSDiagnostic {
 
     return reprogrammingResponse.ecuResponseStatus;
   }
+
+  // Future<String?> flashInterpreter(
+  //   FlashConfig flashConfigData,
+  //   int noofsectors,
+  //   List<FlashingMatrix> sectordata,
+  //   String interpreterFile,
+  // ) async {
+  //   ResponseArrayStatus reprogrammingResponse = ResponseArrayStatus();
+
+  //   try {
+  //     print("🚀 flashInterpreter START");
+  //     print("📋 noofsectors: $noofsectors");
+  //     print("📋 sectordata count: ${sectordata.length}");
+  //     print("📋 interpreterFile length: ${interpreterFile.length}");
+
+  //     if (interpreterFile.isEmpty) {
+  //       print("❌ interpreterFile is EMPTY — cannot flash");
+  //       return "ERROR : interpreter file is empty";
+  //     }
+  //     if (noofsectors == 0 || sectordata.isEmpty) {
+  //       print(
+  //         "❌ No sector data — noofsectors=$noofsectors sectordata=${sectordata.length}",
+  //       );
+  //       return "ERROR : no sector data";
+  //     }
+
+  //     List<String> lineData = interpreterFile.split('\n');
+  //     print("📋 Total interpreter lines: ${lineData.length}");
+
+  //     // ── TOTAL BYTES CALCULATION ───────────────────────────────────────────
+  //     totalBytesToBeFlashed = 0;
+  //     realTimeBytesFlashed = 0;
+  //     for (int i = 0; i < noofsectors; i++) {
+  //       Uint8List sectorDataArray = hexStringToBytes(
+  //         sectordata[i].jsonData ?? "",
+  //       );
+  //       int sectorNumBytes = sectorDataArray.length;
+  //       totalBytesToBeFlashed += sectorNumBytes;
+  //       print(
+  //         "📦 Sector[$i] jsonData length (bytes): $sectorNumBytes | startAddr: ${sectordata[i].jsonStartAddress} | endAddr: ${sectordata[i].jsonEndAddress}",
+  //       );
+  //     }
+  //     print("📦 totalBytesToBeFlashed: $totalBytesToBeFlashed");
+
+  //     Uint8List seedKey = Uint8List(0);
+  //     int currSectorIndex = 0;
+  //     bool isLoopPresent = false;
+  //     int loopInit = 0;
+  //     bool skipKey = false;
+
+  //     // ── INTERPRETER LOOP ──────────────────────────────────────────────────
+  //     for (int i = 0; i < lineData.length; i++) {
+  //       String formattedLine = lineData[i].replaceAll('\r', '').trim();
+
+  //       if (formattedLine.isEmpty || formattedLine.startsWith("//")) {
+  //         continue;
+  //       } else if (skipKey) {
+  //         print("⏭ Skipping line (skipKey=true): $formattedLine");
+  //         skipKey = false;
+  //         continue;
+  //       }
+
+  //       List<String> parts = formattedLine.split(':');
+  //       String command = parts[0];
+  //       String info = parts.length > 1 ? parts[1] : "";
+
+  //       print("🔄 Line[$i] command='$command' info='$info'");
+
+  //       // ── send / sendroutine / sendignore / sendroutineignore ──────────
+  //       if (command == "send" ||
+  //           command == "sendroutine" ||
+  //           command == "sendignore" ||
+  //           command == "sendroutineignore") {
+  //         List<String> splitData = info.split('+');
+  //         List<int> txFrameList = [];
+
+  //         for (var item in splitData) {
+  //           if (!item.contains("<")) {
+  //             txFrameList.addAll(hexStringToBytes(item));
+  //           } else {
+  //             int endIndex = item.indexOf('>');
+  //             String bracketString = item.substring(1, endIndex);
+  //             List<String> bParts = bracketString.split(',');
+  //             String reference = bParts[0];
+  //             int copyLength = int.parse(bParts[1]);
+  //             print("   🔧 reference='$reference' copyLength=$copyLength");
+
+  //             Uint8List copyArray = Uint8List(0);
+
+  //             if (reference.contains("key")) {
+  //               copyArray = seedKey;
+  //               print("   🔑 key bytes: ${bytesToHex(seedKey)}");
+  //             } else if (reference.contains("json_strt_addr") ||
+  //                 reference.contains("ecu_memmap_strt_addr")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String addrHex = reference.contains("json_strt_addr")
+  //                   ? (sectordata[index].jsonStartAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     )
+  //                   : (sectordata[index].ecuMemMapStartAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     );
+  //               copyArray = hexStringToBytes(addrHex);
+  //               print("   📍 start_addr[$index]: $addrHex");
+  //             } else if (reference.contains("json_end_addr") ||
+  //                 reference.contains("ecu_memmap_end_addr")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String addrHex = reference.contains("json_end_addr")
+  //                   ? (sectordata[index].jsonEndAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     )
+  //                   : (sectordata[index].ecuMemMapEndAddress ?? "").padLeft(
+  //                       copyLength * 2,
+  //                       '0',
+  //                     );
+  //               copyArray = hexStringToBytes(addrHex);
+  //               print("   📍 end_addr[$index]: $addrHex");
+  //             } else if (reference.contains("json_checksum")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               String checkSumHex = (sectordata[index].jsonCheckSum ?? "")
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(checkSumHex);
+  //               print("   🔢 checksum[$index]: $checkSumHex");
+  //             } else if (reference.contains("json_sector_len") ||
+  //                 reference.contains("ecu_memmap_len")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               int sectorNumBytes;
+  //               if (reference.contains("json_sector_len")) {
+  //                 sectorNumBytes =
+  //                     int.parse(sectordata[index].jsonEndAddress!, radix: 16) -
+  //                     int.parse(
+  //                       sectordata[index].jsonStartAddress!,
+  //                       radix: 16,
+  //                     ) +
+  //                     1;
+  //               } else {
+  //                 sectorNumBytes =
+  //                     int.parse(
+  //                       sectordata[index].ecuMemMapEndAddress!,
+  //                       radix: 16,
+  //                     ) -
+  //                     int.parse(
+  //                       sectordata[index].ecuMemMapStartAddress!,
+  //                       radix: 16,
+  //                     ) +
+  //                     1;
+  //               }
+  //               String hexLen = sectorNumBytes
+  //                   .toRadixString(16)
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(hexLen);
+  //               print(
+  //                 "   📏 sector_len[$index]: $sectorNumBytes bytes → $hexLen",
+  //               );
+  //             } else if (reference.contains("calculate_sector_len")) {
+  //               int index;
+  //               if (reference.contains("[i]")) {
+  //                 index = loopModelList.last.i ?? 0;
+  //               } else {
+  //                 String match = RegExp(r'\d+').stringMatch(reference) ?? "0";
+  //                 index = int.parse(match);
+  //                 currSectorIndex = index;
+  //               }
+  //               int sectorNumBytes = (sectordata[index].jsonData!.length ~/ 2);
+  //               String hexLen = sectorNumBytes
+  //                   .toRadixString(16)
+  //                   .padLeft(copyLength * 2, '0');
+  //               copyArray = hexStringToBytes(hexLen);
+  //               print(
+  //                 "   📏 calc_sector_len[$index]: $sectorNumBytes bytes → $hexLen",
+  //               );
+  //             } else if (reference.contains("i")) {
+  //               copyArray = Uint8List.fromList([
+  //                 loopModelList.last.i! + loopInit,
+  //               ]);
+  //               print(
+  //                 "   🔢 loop i value: ${loopModelList.last.i! + loopInit}",
+  //               );
+  //             } else {
+  //               print(
+  //                 "   ⚠️ Unknown reference: '$reference' — copyArray will be empty",
+  //               );
+  //             }
+
+  //             Uint8List finalBuffer = Uint8List(copyLength);
+  //             int actualToCopy = copyArray.length > copyLength
+  //                 ? copyLength
+  //                 : copyArray.length;
+  //             finalBuffer.setRange(0, actualToCopy, copyArray);
+  //             txFrameList.addAll(finalBuffer);
+  //           }
+  //         }
+
+  //         Uint8List txFrame = Uint8List.fromList(txFrameList);
+  //         print(
+  //           "📤 send[$command]: ${bytesToHex(txFrame)} (${txFrame.length} bytes)",
+  //         );
+
+  //         var sendResp = await _dongleComm.can2xTxRx(
+  //           txFrame.length,
+  //           bytesToHex(txFrame),
+  //         );
+  //         print("📥 send response: '${sendResp.ecuResponseStatus}'");
+
+  //         if (command != "sendignore") {
+  //           reprogrammingResponse = sendResp;
+  //         }
+
+  //         while (reprogrammingResponse.ecuResponseStatus ==
+  //             "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
+  //           print("⏳ RequiredTimeDelay — retrying in 300ms...");
+  //           //await Future.delayed(const Duration(milliseconds: 300));
+  //           reprogrammingResponse = await _dongleComm.can2xTxRx(
+  //             txFrame.length,
+  //             bytesToHex(txFrame),
+  //           );
+  //           print(
+  //             "📥 retry response: '${reprogrammingResponse.ecuResponseStatus}'",
+  //           );
+  //         }
+
+  //         if (reprogrammingResponse.ecuResponseStatus != "NOERROR" &&
+  //             command != "sendignore") {
+  //           print("❌ send ERROR: '${reprogrammingResponse.ecuResponseStatus}'");
+  //           return reprogrammingResponse.ecuResponseStatus;
+  //         }
+
+  //         if (command == "sendroutine" || command == "sendroutineignore") {
+  //           String routineReqCommand =
+  //               "3103" + splitData[0].trim().substring(4);
+  //           print("🔁 sendroutine polling: $routineReqCommand");
+  //           bool isRoutineLoop = true;
+  //           while (isRoutineLoop) {
+  //             var routineResp = await _dongleComm.can2xTxRx(
+  //               routineReqCommand.length ~/ 2,
+  //               routineReqCommand,
+  //             );
+  //             print(
+  //               "📥 routine response: '${routineResp.ecuResponseStatus}' data: ${routineResp.actualDataBytes != null ? bytesToHex(routineResp.actualDataBytes!) : 'null'}",
+  //             );
+
+  //             if (command != "sendroutineignore") {
+  //               reprogrammingResponse = routineResp;
+  //             }
+
+  //             if (reprogrammingResponse.ecuResponseStatus != "NOERROR" &&
+  //                 command != "sendroutineignore") {
+  //               print(
+  //                 "❌ routine ERROR: '${reprogrammingResponse.ecuResponseStatus}'",
+  //               );
+  //               isRoutineLoop = false;
+  //               return reprogrammingResponse.ecuResponseStatus;
+  //             } else if (routineResp.ecuResponseStatus != "NOERROR" &&
+  //                 command == "sendroutineignore") {
+  //               isRoutineLoop = false;
+  //             } else {
+  //               int statusByte = reprogrammingResponse.actualDataBytes![4];
+  //               print(
+  //                 "   routine statusByte[4]: 0x${statusByte.toRadixString(16).padLeft(2, '0')}",
+  //               );
+  //               if (statusByte == 0x02 ||
+  //                   statusByte == 0x01 ||
+  //                   statusByte == 0x04) {
+  //                 print("   ✅ routine complete");
+  //                 isRoutineLoop = false;
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+
+  //       // ── sleep ──────────────────────────────────────────────────────
+  //       else if (command == "sleep") {
+  //         int ms = int.parse(info);
+  //         print("💤 sleep ${ms}ms");
+  //         await Future.delayed(Duration(milliseconds: ms));
+  //       }
+
+  //       // ── function (seed/key calc) ──────────────────────────────────
+  //       else if (command == "function") {
+  //         if (info.contains("CalculateKeyFromSeed")) {
+  //           String seedkeynumbytes = "";
+
+  //           int start = info.indexOf('[');
+  //           int end = info.indexOf(']');
+  //           if (start == -1 || end == -1) return "ERROR_PARSING_INFO";
+
+  //           String sqrBktInfo = info.substring(start + 1, end);
+
+  //           if (sqrBktInfo.contains(',')) {
+  //             List<String> partsX = sqrBktInfo.split(',');
+  //             String enumName = partsX[0].trim().replaceAll('-', '_');
+
+  //             flashConfigData.seedKeyIndex = SEEDKEYINDEXTYPE.values.firstWhere(
+  //               (e) => e.toString().split('.').last == enumName,
+  //               orElse: () => SEEDKEYINDEXTYPE.GREAVES_BOSCH_BS6_PROD,
+  //             );
+  //             seedkeynumbytes = partsX[1].trim();
+  //           } else {
+  //             seedkeynumbytes = sqrBktInfo.trim();
+  //           }
+
+  //           int seedLength = int.tryParse(seedkeynumbytes, radix: 16) ?? 0;
+  //           if (seedLength == 0) {
+  //             seedLength = int.tryParse(seedkeynumbytes) ?? 0;
+  //           }
+
+  //           Uint8List seedArray = Uint8List(seedLength);
+
+  //           List<int> actualData = reprogrammingResponse.actualDataBytes ?? [];
+
+  //           if (actualData.length >= 2) {
+  //             int availableBytes = actualData.length - 2;
+  //             int bytesToCopy = availableBytes < seedLength
+  //                 ? availableBytes
+  //                 : seedLength;
+
+  //             for (int k = 0; k < bytesToCopy; k++) {
+  //               seedArray[k] = actualData[k + 2];
+  //             }
+  //           }
+
+  //           print(
+  //             "-------seed array = ${byteArrayToHexString(seedArray)}-------",
+  //           );
+
+  //           if (seedArray.every((x) => x == 0)) {
+  //             skipKey = true;
+  //             print("-------seed is zeros, skipping security-------");
+  //           } else {
+  //             calculateSeedkey = ECUCalculateSeedkey();
+
+  //             Map<String, dynamic> result = calculateSeedkey.calculateSeedKey(
+  //               flashConfigData.seedKeyIndex!,
+  //               seedArray.length,
+  //               seedArray,
+  //             );
+
+  //             if (result.containsKey('key') && result['key'] != null) {
+  //               Uint8List tempKey = result['key'] is Uint8List
+  //                   ? result['key']
+  //                   : Uint8List.fromList(List<int>.from(result['key']));
+
+  //               if (tempKey.isNotEmpty) {
+  //                 seedKey = tempKey;
+  //                 print(
+  //                   "-------get key response = ${byteArrayToHexString(seedKey)}-------",
+  //                 );
+  //               } else {
+  //                 print("❌ Calculation returned empty key buffer");
+  //                 return "ERROR_CALCULATION_EMPTY";
+  //               }
+  //             } else {
+  //               print("❌ Seed-Key Calculation Failed internally");
+  //               return "ERROR_KEY_CALCULATION_FAILED";
+  //             }
+  //           }
+  //         }
+  //       }
+
+  //       // ── repeatstart / repeatend ────────────────────────────────────
+  //       else if (command == "repeatstart") {
+  //         isLoopPresent = true;
+  //         List<String> sData = info.split(',');
+  //         int maxIdx = sData[3] == "noofsectors"
+  //             ? noofsectors
+  //             : int.parse(sData[3]);
+  //         loopInit = int.parse(sData[2]);
+  //         loopModelList.add(
+  //           LoopModel(
+  //             i: 0,
+  //             loopId: int.parse(sData[0]),
+  //             maxIndex: maxIdx,
+  //             loopLocation: i,
+  //           ),
+  //         );
+  //         print(
+  //           "🔁 repeatstart — loopId=${sData[0]} maxIdx=$maxIdx loopInit=$loopInit",
+  //         );
+  //       } else if (command == "repeatend") {
+  //         loopModelList.last.i = (loopModelList.last.i ?? 0) + 1;
+  //         print(
+  //           "🔁 repeatend — i=${loopModelList.last.i} / maxIndex=${loopModelList.last.maxIndex}",
+  //         );
+  //         if (loopModelList.last.i == loopModelList.last.maxIndex) {
+  //           print("✅ Loop complete — removing from stack");
+  //           loopModelList.removeLast();
+  //         } else {
+  //           i = loopModelList.last.loopLocation ?? 0;
+  //           print("↩️ Loop back to line $i");
+  //         }
+  //       }
+
+  //       // ── sendbulkdata ────────────────────────────────────────────────
+  //       else if (command == "sendbulkdata") {
+  //         List<String> sInfo = info.split(',');
+  //         int seqVarInitValue = int.parse(sInfo[1]);
+  //         String transferInfo = sInfo[2];
+
+  //         int startBracket = info.indexOf('[');
+  //         int endBracket = info.indexOf(']');
+  //         if (startBracket == -1 || endBracket == -1) {
+  //           throw FormatException("Missing brackets");
+  //         }
+
+  //         String sqrBktInfo = info.substring(startBracket + 1, endBracket);
+  //         int sectorFrameTransferLen = int.parse(
+  //           sqrBktInfo.split(',').last.trim(),
+  //           radix: 16,
+  //         );
+
+  //         int blkSeqCnt = seqVarInitValue;
+  //         int index = isLoopPresent
+  //             ? (loopModelList.last.i ?? 0)
+  //             : currSectorIndex;
+
+  //         Uint8List sectorDataArray = hexStringToBytes(
+  //           sectordata[index].jsonData ?? "",
+  //         );
+  //         int sectorNumBytes = sectorDataArray.length;
+
+  //         List<String> tSplitData = transferInfo.split('+');
+  //         final RegExp hexRe = RegExp(r'^[0-9a-fA-F]+$');
+
+  //         bool needsDynamicAddr = tSplitData.any(
+  //           (t) => t.trim().contains("json_strt_addr") ||
+  //               t.trim().contains("sectordatasent"),
+  //         );
+
+  //         print(
+  //           "📦 Starting bulk transfer... (dynamic-addr mode: $needsDynamicAddr)",
+  //         );
+  //         Stopwatch sw = Stopwatch()..start();
+
+  //         if (!needsDynamicAddr) {
+  //           // ---- FAST PATH: static layout, reused buffer ----
+  //           final List<int> layout = [];
+  //           int bscPos = -1;
+  //           int dataPos = -1;
+
+  //           for (final raw in tSplitData) {
+  //             final trimmed = raw.trim();
+  //             if (trimmed.contains("bsc")) {
+  //               bscPos = layout.length;
+  //               layout.add(0);
+  //             } else if (trimmed.contains("json_sectordata")) {
+  //               dataPos = layout.length;
+  //             } else if (hexRe.hasMatch(trimmed)) {
+  //               layout.addAll(hexStringToBytes(trimmed));
+  //             }
+  //           }
+
+  //           final int maxFrameLen = layout.length + sectorFrameTransferLen;
+  //           final Uint8List frameBuf = Uint8List(maxFrameLen);
+
+  //           for (int j = 0; j < sectorNumBytes;) {
+  //             try {
+  //               final int currentTransferLen =
+  //                   (sectorNumBytes - j) < sectorFrameTransferLen
+  //                   ? (sectorNumBytes - j)
+  //                   : sectorFrameTransferLen;
+
+  //               frameBuf.setRange(0, layout.length, layout);
+  //               if (bscPos != -1) frameBuf[bscPos] = blkSeqCnt & 0xFF;
+
+  //               int frameLen = layout.length;
+  //               if (dataPos != -1) {
+  //                 frameBuf.setRange(
+  //                   dataPos,
+  //                   dataPos + currentTransferLen,
+  //                   sectorDataArray,
+  //                   j,
+  //                 );
+  //                 frameLen = layout.length + currentTransferLen;
+  //               }
+
+  //               j += currentTransferLen;
+  //               final Uint8List nTxFrame = Uint8List.sublistView(
+  //                 frameBuf,
+  //                 0,
+  //                 frameLen,
+  //               );
+
+  //               var bulkResp = await _dongleComm.can2xTxRx(
+  //                 nTxFrame.length,
+  //                 byteArrayToHexString(nTxFrame),
+  //               );
+
+  //               if (bulkResp.ecuResponseStatus != "NOERROR") {
+  //                 print("❌ Error at byte $j: ${bulkResp.ecuResponseStatus}");
+  //                 return bulkResp.ecuResponseStatus;
+  //               }
+
+  //               blkSeqCnt++;
+  //               realTimeBytesFlashed += currentTransferLen;
+  //             } catch (e) {
+  //               print("❌ bulk exception: $e");
+  //               return e.toString();
+  //             }
+  //           }
+  //         } else {
+  //           // ---- GENERAL PATH: rebuild frame each iteration (matches C#) ----
+  //           int startAddr = int.parse(
+  //             sectordata[index].jsonStartAddress!,
+  //             radix: 16,
+  //           );
+
+  //           for (int j = 0; j < sectorNumBytes;) {
+  //             try {
+  //               final int currentTransferLen =
+  //                   (sectorNumBytes - j) < sectorFrameTransferLen
+  //                   ? (sectorNumBytes - j)
+  //                   : sectorFrameTransferLen;
+
+  //               List<int> nTxFrameList = [];
+
+  //               for (final raw in tSplitData) {
+  //                 final trimmed = raw.trim();
+
+  //                 if (trimmed.contains("bsc")) {
+  //                   nTxFrameList.add(blkSeqCnt & 0xFF);
+  //                 } else if (trimmed.contains("json_sectordata")) {
+  //                   nTxFrameList.addAll(
+  //                     sectorDataArray.sublist(j, j + currentTransferLen),
+  //                   );
+  //                 } else if (trimmed.contains("json_strt_addr")) {
+  //                   int endIdx = trimmed.indexOf('>');
+  //                   String bracketStr = trimmed.substring(1, endIdx);
+  //                   int copyLength = int.parse(
+  //                     bracketStr.split(',')[1].trim(),
+  //                     radix: 16,
+  //                   );
+
+  //                   Uint8List addrBig = (ByteData(4)
+  //                         ..setUint32(0, startAddr, Endian.big))
+  //                       .buffer
+  //                       .asUint8List();
+
+  //                   Uint8List trimmedAddr = addrBig.length > copyLength
+  //                       ? addrBig.sublist(addrBig.length - copyLength)
+  //                       : addrBig;
+
+  //                   nTxFrameList.addAll(trimmedAddr);
+  //                   startAddr += sectorFrameTransferLen;
+  //                 } else if (trimmed.contains("sectordatasent")) {
+  //                   int endIdx = trimmed.indexOf('>');
+  //                   String bracketStr = trimmed.substring(1, endIdx);
+  //                   int copyLength = int.parse(
+  //                     bracketStr.split(',')[1].trim(),
+  //                     radix: 16,
+  //                   );
+
+  //                   Uint8List lenBig = (ByteData(4)
+  //                         ..setUint32(0, currentTransferLen, Endian.big))
+  //                       .buffer
+  //                       .asUint8List();
+
+  //                   Uint8List trimmedLen = lenBig.length > copyLength
+  //                       ? lenBig.sublist(lenBig.length - copyLength)
+  //                       : lenBig;
+
+  //                   nTxFrameList.addAll(trimmedLen);
+  //                 } else if (hexRe.hasMatch(trimmed) &&
+  //                     !trimmed.contains('<')) {
+  //                   nTxFrameList.addAll(hexStringToBytes(trimmed));
+  //                 }
+  //               }
+
+  //               j += currentTransferLen;
+  //               Uint8List nTxFrame = Uint8List.fromList(nTxFrameList);
+
+  //               var bulkResp = await _dongleComm.can2xTxRx(
+  //                 nTxFrame.length,
+  //                 byteArrayToHexString(nTxFrame),
+  //               );
+
+  //               if (bulkResp.ecuResponseStatus != "NOERROR") {
+  //                 print("❌ Error at byte $j: ${bulkResp.ecuResponseStatus}");
+  //                 return bulkResp.ecuResponseStatus;
+  //               }
+
+  //               blkSeqCnt++;
+  //               realTimeBytesFlashed += currentTransferLen;
+  //             } catch (e) {
+  //               print("❌ bulk exception: $e");
+  //               return e.toString();
+  //             }
+  //           }
+  //         }
+
+  //         sw.stop();
+  //         print("✅ Bulk transfer finished in ${sw.elapsed.inSeconds} seconds");
+  //       }
+
+  //       // ── dongle config commands ────────────────────────────────────
+  //       else if (command == "txid") {
+  //         print("🔧 txid: $info");
+  //         await _dongleComm.canSetTxHeader(info);
+  //       } else if (command == "rxid") {
+  //         print("🔧 rxid: $info");
+  //         await _dongleComm.canSetRxHeaderMask(info);
+  //       } else if (command == "startpadding") {
+  //         print("🔧 startpadding: $info");
+  //         await _dongleComm.canStartPadding(info);
+  //       } else if (command == "stoppadding") {
+  //         print("🔧 stoppadding");
+  //         await _dongleComm.canStopPadding();
+  //       } else if (command == "setstmin") {
+  //         print("🔧 setstmin: $info");
+  //         await _dongleComm.canSetP1Min(info.trim());
+  //       } else if (command == "setP2Max") {
+  //         print("🔧 setP2Max: $info");
+  //         await _dongleComm.canSetP2Max(info.trim());
+  //       } else if (command == "stopTP") {
+  //         print("🔧 stopTP");
+  //         await _dongleComm.canStopTP();
+  //       } else if (command == "startTP") {
+  //         print("🔧 startTP");
+  //         await _dongleComm.canStartTP();
+  //       } else {
+  //         print("⚠️ Unknown command '$command' — skipping");
+  //       }
+  //     }
+
+  //     print(
+  //       "🏁 flashInterpreter END — final status: '${reprogrammingResponse.ecuResponseStatus}'",
+  //     );
+  //   } catch (ex, stack) {
+  //     print("❌ flashInterpreter EXCEPTION: $ex");
+  //     print("❌ StackTrace: $stack");
+  //     return ex.toString();
+  //   }
+
+  //   return reprogrammingResponse.ecuResponseStatus;
+  // }
 
   /// Converts an int value to a [byteLength]-long big-endian Uint8List
   Uint8List intToBytes(int value, int byteLength) {

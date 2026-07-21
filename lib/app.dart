@@ -10,9 +10,9 @@ import 'package:simpson/routes/app_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart' hide Response; // ← needed for Get.put
-import 'package:get/get_navigation/src/root/get_material_app.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
+import 'package:window_manager/window_manager.dart';
 
 class App {
   static App instance = App();
@@ -61,13 +61,31 @@ class App {
 
         // ── GetStorage (Windows safe) ─────────────────────────
         try {
-          if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-            final String appPath =
-                '${Platform.environment['APPDATA']}\\autopeepal';
-            final dir = Directory(appPath);
-            if (!await dir.exists()) {
-              await dir.create(recursive: true);
-            }
+          // if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+          //   final String appPath =
+          //       '${Platform.environment['APPDATA']}\\autopeepal';
+          //   final dir = Directory(appPath);
+          //   if (!await dir.exists()) {
+          //     await dir.create(recursive: true);
+          //   }
+          // }
+
+          if (Platform.isWindows) {
+            await windowManager.ensureInitialized();
+
+            WindowOptions windowOptions = const WindowOptions(
+              center: true,
+              backgroundColor: Colors.transparent,
+              skipTaskbar: false,
+              titleBarStyle: TitleBarStyle.normal,
+              // This sets the window to full screen at startup
+            );
+
+            windowManager.waitUntilReadyToShow(windowOptions, () async {
+              await windowManager.maximize();
+              await windowManager.show();
+              await windowManager.focus();
+            });
           }
           await GetStorage.init();
           print('✅ GetStorage initialized');

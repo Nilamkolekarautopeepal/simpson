@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:ap_dongle_comm/utils/commController.dart';
 import 'package:ap_dongle_comm/utils/enums/command_ids.dart';
 import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/enums/protocol.dart';
@@ -12,7 +11,6 @@ import 'package:convert/convert.dart';
 import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 
 class DongleComm {
-
   ICommController? comm;
   bool isChannel;
   String? channelId;
@@ -409,10 +407,10 @@ class DongleComm {
     ResponseArrayStatus responseStructure;
 
     try {
-    //  print("------ENTER CAN_TxRx------");
+      //  print("------ENTER CAN_TxRx------");
 
       // await semaphoreSlim.wait();
-     // print("[INFO] Semaphore acquired at ${DateTime.now()}");
+      // print("[INFO] Semaphore acquired at ${DateTime.now()}");
 
       logs.add(SessionLogsModel(header: "Tx", message: txdata));
 
@@ -439,7 +437,7 @@ class DongleComm {
             txdata;
       }
 
-     // print("[DEBUG] Command before CRC: $command");
+      // print("[DEBUG] Command before CRC: $command");
 
       Uint8List crcBytesComputation = hexToUint8List(txdata);
 
@@ -447,7 +445,7 @@ class DongleComm {
         crcBytesComputation,
       ).toRadixString(16).padLeft(4, '0').toUpperCase();
 
-     // print("[DEBUG] CRC Computed: $crc");
+      // print("[DEBUG] CRC Computed: $crc");
 
       Uint8List sendBytes = hexToUint8List(command + crc);
       //print("[DEBUG] Full Packet to Send: ${byteArrayToHex(sendBytes)}");
@@ -455,20 +453,20 @@ class DongleComm {
       int noOfTimesSent = 0;
 
       while (true) {
-       // print("[INFO] Sending attempt #${noOfTimesSent + 1}");
+        // print("[INFO] Sending attempt #${noOfTimesSent + 1}");
 
         if (comm!.connectivity == Connectivity.rp1210WiFi ||
             comm!.connectivity == Connectivity.rp1210Usb ||
             comm!.connectivity == Connectivity.canFdUsb ||
             comm!.connectivity == Connectivity.canFdWiFi) {
-         // print("[INFO] Using RP1210SendMessage path");
+          // print("[INFO] Using RP1210SendMessage path");
           response = await rp1210SendMessage(crcBytesComputation);
         } else if (comm!.connectivity == Connectivity.doipUsb ||
             comm!.connectivity == Connectivity.doipWiFi) {
-         //// print("[INFO] Using RP1210DoipSendMessage path");
+          //// print("[INFO] Using RP1210DoipSendMessage path");
           response = await rp1210DoipSendMessage(crcBytesComputation);
         } else {
-         // print("[INFO] Using regular SendCommand path");
+          // print("[INFO] Using regular SendCommand path");
           response = await comm!.sendCommand(sendBytes);
         }
 
@@ -484,7 +482,7 @@ class DongleComm {
 
           if (str.contains("Dongle disconnected") ||
               str.contains("No Resp From Dongle")) {
-           // print("[ERROR] Dongle disconnected or no response");
+            // print("[ERROR] Dongle disconnected or no response");
             responseStructure = ResponseArrayStatus(ecuResponseStatus: str);
 
             logs.add(
@@ -529,15 +527,15 @@ class DongleComm {
             }
           }
 
-         // print("[DEBUG] Response status: $dataStatus");
+          // print("[DEBUG] Response status: $dataStatus");
 
           if (dataStatus == "SENDAGAIN") {
-           // print("[INFO] SENDAGAIN triggered");
+            // print("[INFO] SENDAGAIN triggered");
 
             if (noOfTimesSent <= 5) {
               continue; // retry sending (replaces goto)
             } else {
-             // print("[ERROR] SENDAGAIN threshold crossed");
+              // print("[ERROR] SENDAGAIN threshold crossed");
               responseStructure = ResponseArrayStatus(
                 ecuResponse: ecuResponseBytes,
                 ecuResponseStatus: "DONGLEERROR_SENDAGAINTHRESHOLDCROSSED",
@@ -547,12 +545,12 @@ class DongleComm {
               return responseStructure;
             }
           } else if (dataStatus == "READAGAIN") {
-           // print("[INFO] READAGAIN triggered");
+            // print("[INFO] READAGAIN triggered");
 
             int readRetry = 0;
 
             while (dataStatus == "READAGAIN" && readRetry < 5) {
-             // print("[INFO] Performing ReadData() attempt ${readRetry + 1}");
+              // print("[INFO] Performing ReadData() attempt ${readRetry + 1}");
 
               var responseReadAgain = await comm!.readData();
 
@@ -565,10 +563,34 @@ class DongleComm {
               Uint8List ecuReadBytes = responseReadAgain;
               String strRead = utf8.decode(ecuReadBytes, allowMalformed: true);
 
-              if (strRead.contains("Dongle disconnected") ||
-                  strRead.contains("No Resp From Dongle")) {
-               // print("[ERROR] Dongle disconnected during READAGAIN");
-                return ResponseArrayStatus(ecuResponseStatus: strRead);
+              // 🔥 WIFI-ONLY FIX: a "No Resp From Dongle" here can mean two
+              // very different things — (a) the socket genuinely died, or
+              // (b) readData() simply timed out waiting for a slow ECU
+              // routine (e.g. an erase/unlock RoutineControl) to produce its
+              // second frame. Previously ANY "No Resp From Dongle" bailed
+              // out on the very first attempt, giving slow-but-healthy
+              // responses only 1 of the intended 5 retries. On WiFi, treat
+              // it as retryable within the existing readRetry<5 budget —
+              // if the socket really did die, every subsequent readAgain()
+              // will also fail fast and the loop still bounds out via
+              // readRetry<5 (each isolate-side read attempt has its own
+              // timeout), just with the intended retry budget instead of 1.
+              // USB/RP1210/CAN-FD/DoIP are untouched and keep the original
+              // immediate-bailout behavior below.
+              if (comm!.connectivity == Connectivity.wiFi) {
+                if (strRead.contains("Dongle disconnected")) {
+                  return ResponseArrayStatus(ecuResponseStatus: strRead);
+                }
+                if (strRead.contains("No Resp From Dongle")) {
+                  readRetry++;
+                  continue;
+                }
+              } else {
+                if (strRead.contains("Dongle disconnected") ||
+                    strRead.contains("No Resp From Dongle")) {
+                  // print("[ERROR] Dongle disconnected during READAGAIN");
+                  return ResponseArrayStatus(ecuResponseStatus: strRead);
+                }
               }
 
               if (comm!.connectivity == Connectivity.rp1210WiFi ||
@@ -633,7 +655,7 @@ class DongleComm {
           // );
           // print("ECUResponseStatus: ${responseStructure.ecuResponseStatus}");
         } else {
-         // print("[ERROR] Response is null, setting No Resp From Dongle");
+          // print("[ERROR] Response is null, setting No Resp From Dongle");
 
           responseStructure = ResponseArrayStatus(
             ecuResponse: null,
@@ -645,7 +667,7 @@ class DongleComm {
         return responseStructure;
       }
     } catch (ex) {
-     // print("[EXCEPTION] $ex");
+      // print("[EXCEPTION] $ex");
 
       responseStructure = ResponseArrayStatus(
         ecuResponse: null,
@@ -662,6 +684,8 @@ class DongleComm {
       // print("------EXIT CAN_TxRx------");
     }
   }
+
+  
 
   String byteArrayToHex(Uint8List bytes) {
     return bytes
@@ -1185,46 +1209,6 @@ class DongleComm {
 
   Uint8List txArray = Uint8List(0);
   Uint8List rxArray = Uint8List(0);
-
-  // Future<Uint8List?> canStartTP() async {
-  //   print("------CAN_StartTP------");
-  //   if (comm!.connectivity == Connectivity.usb ||
-  //       comm!.connectivity == Connectivity.wiFi ||
-  //       comm!.connectivity == Connectivity.ble) {
-  //     String command = "";
-  //     List<int> checksumBytes;
-  //     if (isChannel) {
-  //       command = "2001${ch}10";
-  //       Uint8List bytesCommand = hexToBytes(command);
-  //       checksumBytes = Crc16CcittKermit.computeChecksumBytes(
-  //         Uint8List.fromList([bytesCommand[3]]),
-  //       );
-  //     } else {
-  //       command = "200310";
-  //       Uint8List bytesCommand = hexToBytes(command);
-  //       checksumBytes = Crc16CcittKermit.computeChecksumBytes(
-  //         Uint8List.fromList([bytesCommand[2]]),
-  //       );
-  //     }
-  //     String crcHex = checksumBytes
-  //         .map((b) => b.toRadixString(16).padLeft(2, '0'))
-  //         .join();
-  //     Uint8List sendBytes = hexToBytes(command + crcHex);
-  //     return await comm!.sendCommand(sendBytes);
-  //   } else {
-  //     final Uint8List message = Uint8List(7);
-  //     message[0] = (SubCommandId.setTesterPresent.value >> 8) & 0xFF;
-  //     message[1] = SubCommandId.setTesterPresent.value & 0xFF;
-  //     message[2] = (txArray[0] == 0x00) ? 0 : 1;
-  //     message.setRange(3, 7, txArray.sublist(0, 4));
-  //     Uint8List? command = getRP1210Command(
-  //       DWCommandId.sendCommand.value,
-  //       message,
-  //     );
-  //     print("[CAN_StartTP] Sending RP1210 Command: ${bytesToHex(command)}");
-  //     return await comm!.sendCommand(command);
-  //   }
-  // }
 
   Future<Uint8List?> canStartTP() async {
     print("------CAN_StartTP------");
