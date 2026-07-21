@@ -2,13 +2,45 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/views/widget/psf_lane_card.dart';
-
 import '../controllers/psf_home_screen_controller.dart';
 
-/// Lanes are built dynamically — one per dongle from the login
-/// response, each pre-wired to a specific ECU id. ESN and List
-/// Number are both scanned per-lane now (see PsfLaneCard), each
-/// validated against that lane's pre-wired expected ECU id.
+class _LaneColors {
+  static const green = Color(0xFF2ECC71);
+  static const red = Color(0xFFD64545);
+  static const slateBg = Color(0xFFF7F8FA);
+}
+
+Widget _glowDot(Color core, {double size = 10}) {
+  return Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      gradient: RadialGradient(
+        center: const Alignment(-0.3, -0.3),
+        colors: [Colors.white.withOpacity(0.85), core, core],
+        stops: const [0.0, 0.35, 1.0],
+      ),
+      boxShadow: [
+        BoxShadow(
+            color: core.withOpacity(0.7), blurRadius: 6, spreadRadius: 0.4),
+      ],
+    ),
+  );
+}
+
+Widget _statusPill({required Widget child}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withOpacity(0.14)),
+    ),
+    child: child,
+  );
+}
+
 class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
   const PsfHomeScreenView({super.key});
 
@@ -16,40 +48,59 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonAppBar(
-        title: controller.station??'',
+        title: controller.station ?? '',
         actions: [
           Obx(
-            () => InkWell(
-              onTap: controller.onPlcButtonTapped,
-              borderRadius: BorderRadius.circular(6),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            () => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: InkWell(
+                onTap: controller.onPlcButtonTapped,
+                borderRadius: BorderRadius.circular(20),
+                child: _statusPill(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (controller.isPlcConnecting.value)
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.6, color: Colors.white),
+                        )
+                      else
+                        _glowDot(controller.isPlcConnected.value
+                            ? _LaneColors.green
+                            : _LaneColors.red),
+                      const SizedBox(width: 8),
+                      Text(
+                        controller.isPlcConnecting.value
+                            ? 'Connecting…'
+                            : 'PLC',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Obx(
+            () => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _statusPill(
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (controller.isPlcConnecting.value)
-                      const SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 1.6, color: Colors.white),
-                      )
-                    else
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: controller.isPlcConnected.value
-                              ? Colors.greenAccent
-                              : Colors.redAccent,
-                        ),
-                      ),
+                    _glowDot(controller.isDongleConnectedAnywhere
+                        ? _LaneColors.green
+                        : _LaneColors.red),
                     const SizedBox(width: 8),
-                    Text(
-                      controller.isPlcConnecting.value ? 'Connecting…' : 'PLC ',
-                      style: const TextStyle(
+                    const Text(
+                      'Dongle',
+                      style: TextStyle(
                           color: Colors.white,
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600),
@@ -59,34 +110,7 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
               ),
             ),
           ),
-          Obx(
-            () => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: controller.isDongleConnectedAnywhere
-                          ? Colors.greenAccent
-                          : Colors.redAccent,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Dongle ',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
@@ -94,7 +118,7 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
           ),
         ],
       ),
-      backgroundColor: const Color(0xFFF4F5F7),
+      backgroundColor: _LaneColors.slateBg,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -113,12 +137,6 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
                 }
                 return LayoutBuilder(
                   builder: (context, constraints) {
-                    // Boxes are always sized as if 5 fit on screen —
-                    // if there are fewer lanes (e.g. 2, from a
-                    // 2-dongle station), they stay that same fixed
-                    // width and the rest of the screen is left blank
-                    // rather than stretching to fill it. Horizontal
-                    // scroll only kicks in once there are more than 5.
                     const int slotsPerScreen = 5;
                     const double spacing = 16;
                     final double cardWidth = (constraints.maxWidth -

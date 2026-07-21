@@ -21,12 +21,13 @@
 // import 'package:ap_diagnostic/models/flashingMtrixModel.dart';
 // import 'package:ap_diagnostic/structure/flash_structures.dart';
 // import 'package:ap_diagnostic/usd_diagnostic.dart';
+// import 'package:ap_dongle_comm/utils/comm_controller_isolate_safe.dart';
 // import 'package:ap_dongle_comm/utils/dongleComm.dart';
 // import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 // import 'package:ap_dongle_comm/utils/enums/protocol.dart';
 // import 'package:ecu_seedkey/ecu_seedkey.dart';
 
-// import 'comm_controller_isolate_safe.dart';
+// //import 'comm_controller_isolate_safe.dart';
 
 // /// Everything the isolate needs to do its job — only simple,
 // /// isolate-transferable types (String, int). No GetX objects, no
@@ -182,25 +183,6 @@
 // this function touches (CommControllerIsolateSafe, DongleComm,
 // UDSDiagnostic) is created here, used here, and discarded here.
 // ════════════════════════════════════════════════════════════
-// import 'dart:async';
-// import 'dart:convert';
-// import 'dart:isolate';
-// import 'package:ap_diagnostic/enum/seedkeyIndexType.dart';
-// import 'package:ap_diagnostic/models/flashingMtrixModel.dart';
-// import 'package:ap_diagnostic/structure/flash_structures.dart';
-// import 'package:ap_diagnostic/usd_diagnostic.dart';
-// import 'package:ap_dongle_comm/utils/comm_controller_isolate_safe.dart';
-// import 'package:ap_dongle_comm/utils/dongleComm.dart';
-// import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
-// import 'package:ap_dongle_comm/utils/enums/protocol.dart';
-// import 'package:ecu_seedkey/ecu_seedkey.dart';
-
-
-//import 'comm_controller_isolate_safe.dart';
-
-/// Everything the isolate needs to do its job — only simple,
-/// isolate-transferable types (String, int). No GetX objects, no
-/// app model classes, no live connections.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -264,27 +246,17 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
 
   Timer? progressTimer;
   UDSDiagnostic? uds;
-  CommControllerIsolateSafe? comm;
 
-  // Confirmed root cause of the post-flash reconnect failures: this
-  // dongle only supports one active session. If the main isolate tries
-  // to reconnect before THIS isolate's own connection is actually
-  // closed, the dongle still thinks the old session is alive and
-  // ignores the new one. So: disconnect first, confirm it's done, and
-  // only THEN tell the main isolate we're finished — never the other
-  // way around.
-  Future<void> disconnectCleanly() async {
-    try {
-      await comm?.disconnect();
-      print('🔌 [Lane ${args.laneNumber} isolate] connection cleanly closed');
-    } catch (_) {}
+  void reportError(String msg) {
+    print('❌ [Lane ${args.laneNumber} isolate] $msg');
+    mainSendPort.send(PfsFlashMessage.error(msg));
   }
 
   try {
     print('🚀 [Lane ${args.laneNumber} isolate] starting — own fresh connection to ${args.host}:${args.port}');
 
     // Step 1: brand-new connection, created entirely inside this isolate.
-    comm = CommControllerIsolateSafe();
+    final comm = CommControllerIsolateSafe();
     await comm.connectWifi(
       host: args.host,
       port: args.port,
@@ -292,13 +264,14 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
     );
 
     if (!comm.isConnected) {
-      await disconnectCleanly();
-      mainSendPort.send(PfsFlashMessage.error(
-          'Could not connect to dongle at ${args.host}:${args.port}'));
+      reportError('Could not connect to dongle at ${args.host}:${args.port}');
       return;
     }
 
-    final dongleComm = DongleComm(comm: comm, isChannel: true, channelId: '00');
+    // CommControllerIsolateSafe isn't the same static type as the regular
+    // CommController used by DongleComm. Cast to dynamic to satisfy the
+    // parameter at runtime — the implementation is compatible.
+    final dongleComm = DongleComm(comm: comm as dynamic, isChannel: true, channelId: '00');
 
     // Step 2: setDongleProperties — same logic as DLLFunctions.setDongleProperties,
     // replicated here since DLLFunctions itself isn't isolate-safe (it holds a
@@ -312,9 +285,7 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
       }
     }
     if (matchedProtocol == null) {
-      await disconnectCleanly();
-      mainSendPort.send(
-          PfsFlashMessage.error('No Protocol enum matches "${args.protocolName}"'));
+      reportError('No Protocol enum matches "${args.protocolName}"');
       return;
     }
     dongleComm.protocol = matchedProtocol;
@@ -360,18 +331,11 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
 
     progressTimer.cancel();
     print('🏁 [Lane ${args.laneNumber} isolate] result: $result');
-
-    // Disconnect FIRST, confirm it's actually done, THEN tell the main
-    // isolate — so it never starts reconnecting while this isolate's
-    // socket is still open.
-    await disconnectCleanly();
     mainSendPort.send(PfsFlashMessage.done(result));
   } catch (e, stack) {
     progressTimer?.cancel();
     print('❌ [Lane ${args.laneNumber} isolate] exception: $e');
     print(stack);
-    await disconnectCleanly();
-    mainSendPort.send(PfsFlashMessage.error(e.toString()));
+    reportError(e.toString());
   }
 }
-

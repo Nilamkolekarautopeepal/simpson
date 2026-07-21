@@ -9,11 +9,10 @@ import 'package:ap_dongle_comm/utils/helper/responseArrayDecoding.dart';
 import 'package:ap_dongle_comm/utils/model/responseArrayStatusModel.dart';
 import 'package:ap_dongle_comm/utils/model/sessionLogModel.dart';
 import 'package:convert/convert.dart';
-import 'package:ap_dongle_comm/utils/i_comm_controller.dart';
 
 class DongleComm {
 
-  ICommController? comm;
+  CommController? comm;
   bool isChannel;
   String? channelId;
   List<SessionLogsModel> logs = []; // nullable, could be null

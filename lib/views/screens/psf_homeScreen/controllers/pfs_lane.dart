@@ -18,10 +18,6 @@ class PsfLane {
     this.macIdFromLogin,
   });
 
-  /// This lane's dongle IP and pre-wired ECU id, straight from the
-  /// login response's station_data[0].prodbud_dongles[i] — this is
-  /// what a scanned ESN's resolved ECU id gets matched against to
-  /// decide which physical lane lights up.
   final String? dongleIpFromLogin;
   final int? expectedEcuId;
   final String? macIdFromLogin;
@@ -38,10 +34,6 @@ class PsfLane {
 
   final RxString ecuModelName = "ECU MODEL NAME".obs;
 
-  /// ESN is scanned per-lane — validated against THIS lane's
-  /// pre-wired expectedEcuId (from login's ecu_station data), so
-  /// scanning the wrong engine into the wrong physical bay is caught
-  /// immediately rather than silently accepted.
   final RxString esn = "".obs;
   final TextEditingController esnController = TextEditingController();
   final FocusNode esnFocusNode = FocusNode();
@@ -54,19 +46,14 @@ class PsfLane {
   Timer? esnIdleTimer;
   Timer? listNumberIdleTimer;
 
-  /// List Number — scanned right after ESN, resolves to exactly one
-  /// flash file via the real API's d_dataset_ecu/t_dataset_ecu arrays
-  /// (matched against this lane's ECU id). Only shown/usable once
-  /// ESN has matched.
+
   final TextEditingController listNumberController = TextEditingController();
   final FocusNode listNumberFocusNode = FocusNode();
   final RxBool isLookingUpListNumber = false.obs;
   final RxString listNumberError = "".obs;
   final RxString listNumber = "".obs;
 
-  /// The single resolved flash file URL + display name for this lane,
-  /// found via the List Number lookup — there's exactly one, not a
-  /// list to choose from.
+ 
   final Rx<String?> resolvedFlashFileUrl = Rx<String?>(null);
   final Rx<String?> resolvedFlashFileName = Rx<String?>(null);
 
@@ -80,15 +67,10 @@ class PsfLane {
 
   final Rxn<int> pidDatasetId = Rxn<int>();
 
-  /// The real matched ECU entry for this lane's vehicle, once ESN
-  /// resolution succeeds — needed for flash file resolution and (once
-  /// dongle connectivity exists for PFS) real flashing/IQA write.
+
   SubmodelModelecu? matchedEcu;
 
-  /// The vehicle model / sub-model ids resolved from the scanned ESN
-  /// — the List Number scan cross-checks its own vehicle_model /
-  /// sub_model fields against these, so a List Number that matches by
-  /// code but belongs to a different vehicle gets rejected.
+ 
   int? matchedVehicleModelId;
   int? matchedSubModelId;
 
@@ -108,30 +90,12 @@ class PsfLane {
   // DONGLE
   // ===============================
 
-  /// NOTE: App.dllFunctions / ConnectionWifi's internal comm objects
-  /// are GLOBAL SINGLETONS (see connectionWifiService.dart) — only
-  /// ONE lane can safely hold the dongle connection at a time right
-  /// now. The controller enforces this (see dongleOwnerLaneIndex);
-  /// these fields just reflect THIS lane's view of that shared state.
+  
   final RxBool dongleConnected = false.obs;
 
-  /// This lane's OWN independent dongle connection object — not the
-  /// shared `App.dllFunctions` single global. Set once
-  /// ConnectionWifi.connectDongleForLane() succeeds; every dongle
-  /// call for this lane (setDongleProperties, startECUFlashing,
-  /// flashingData, readDtc, readPid, writePid) must go through THIS
-  /// field so multiple lanes can be connected and flashing at the
-  /// same time.
+ 
   DLLFunctions? dllFunctions;
   final RxBool dongleConnecting = false.obs;
-
-  /// True whenever ANYTHING is actively using this lane's dongle
-  /// connection — Live Parameter read, DTC read, IQA write, or
-  /// flashing. All of those share the exact same socket
-  /// (lane.dllFunctions), so two of them running at once desyncs the
-  /// response stream (a flash command's response can get consumed by
-  /// a still-running PID read loop, or vice versa) — this flag is the
-  /// guard that stops that from happening.
   bool isDongleBusy = false;
   final RxString dongleError = "".obs;
   Timer? dongleRetryTimer;
@@ -147,19 +111,12 @@ class PsfLane {
     false,
   ].obs;
 
-  /// Real scannable IQA codes — one TextEditingController per injector,
-  /// dynamic count resolved from the matched ECU's noOfInjectors, same
-  /// pattern as the Test Station's IQA fields.
   List<TextEditingController> iqaControllers =
       List.generate(4, (_) => TextEditingController());
   List<FocusNode> iqaFocusNodes = List.generate(4, (_) => FocusNode());
   List<Timer?> iqaIdleTimers = List.generate(4, (_) => null);
   final RxBool iqaAllFilled = false.obs;
 
-  /// Proper reactive counter — TextEditingController.text changes are
-  /// NOT observable on their own, so refreshIqaAllFilled() below
-  /// updates this alongside iqaAllFilled, giving the UI something
-  /// genuinely reactive to display without needing a nested Obx.
   final RxInt filledIqaCount = 0.obs;
   List<String>? firingOrder;
 
@@ -274,9 +231,7 @@ class PsfLane {
   final RxBool pidPlaying = false.obs;
   bool stopPidLoop = false;
 
-  /// Result message from writing the IQA values to the ECU right
-  /// after a successful flash (mirrors the Test Station's
-  /// _autoWriteIqaValues status string).
+  
   final RxString iqaWriteStatus = "".obs;
 
   // ===============================

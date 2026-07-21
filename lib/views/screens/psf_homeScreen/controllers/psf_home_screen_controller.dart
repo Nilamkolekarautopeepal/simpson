@@ -2605,6 +2605,15 @@ class PsfHomeScreenController extends GetxController {
     // the dongle is free again, so reconnect the main isolate's
     // connection (same as connectDongleForLane) before doing anything
     // that needs lane.dllFunctions.
+    // The ECU has just been reset by the flash and is rebooting into
+    // its newly-flashed application firmware. Reading DTCs or writing
+    // IQA too soon — while it's still mid-boot or stuck in a
+    // programming/bootloader session — produces exactly
+    // ECUERROR_SERVICENOTSUPPORTED, since those services only exist
+    // once it's back in normal application mode. Rather than guessing
+    // a fixed delay (which will be wrong for some ECUs/some boot
+    // times), actively poll with a lightweight status check until it
+    // actually responds, up to a reasonable timeout.
     await Future.delayed(const Duration(milliseconds: 1000));
     lane.isDongleBusy = false; // connectDongleForLane refuses while busy
     await connectDongleForLane(index);
@@ -2616,6 +2625,25 @@ class PsfHomeScreenController extends GetxController {
       lane.isDongleBusy = false;
       return;
     }
+
+    print('   ⏳ [Lane ${lane.laneNumber}] waiting for ECU to finish booting post-flash...');
+    const maxBootWait = Duration(seconds: 15);
+    final bootDeadline = DateTime.now().add(maxBootWait);
+    bool ecuReady = false;
+    while (DateTime.now().isBefore(bootDeadline)) {
+      try {
+        final status = await lane.dllFunctions!.checkEcuStatus();
+        if (status == 'NOERROR') {
+          ecuReady = true;
+          break;
+        }
+        print('   ⏳ ECU not ready yet (status: "$status") — retrying...');
+      } catch (_) {}
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    print(ecuReady
+        ? '   ✅ [Lane ${lane.laneNumber}] ECU responding — proceeding with DTC/PID/IQA'
+        : '   ⚠️ [Lane ${lane.laneNumber}] ECU still not confirmed ready after ${maxBootWait.inSeconds}s — proceeding anyway');
 
     await readLiveDtcForLane(index);
 
@@ -2840,6 +2868,91 @@ class PsfHomeScreenController extends GetxController {
     } finally {
       lane.isReadingDtc.value = false;
     }
+  }
+
+  /// Clears DTCs on the live ECU via DLLFunctions.clearDtc(), then
+  /// re-reads so the dialog immediately reflects whether it actually
+  /// worked — a "NOERROR" clear response doesn't guarantee the codes
+  /// are gone if the underlying fault condition is still active, so
+  /// re-reading is the only way to show the real resulting state
+  /// rather than just trusting the clear command's own response.
+  Future<void> clearDtcForLane(int laneIndex) async {
+    final lane = lanes[laneIndex];
+
+    print('══════════════════════════════════════════');
+    print('🔹 [Lane ${lane.laneNumber}] CLEAR DTC');
+
+    if (lane.dllFunctions == null || lane.matchedEcu == null) {
+      print('   ❌ dongle not connected for this lane — cannot clear DTCs');
+      print('══════════════════════════════════════════');
+      lane.dtcError.value = 'Connect the dongle for this lane first.';
+      return;
+    }
+
+    final ecu = lane.matchedEcu!.ecu;
+    if (ecu?.clearDtcFnIndex?.value == null) {
+      print('   ❌ no clear_dtc_fn_index configured for this ECU');
+      print('══════════════════════════════════════════');
+      lane.dtcError.value = 'No Clear DTC function configured for this ECU.';
+      return;
+    }
+
+    lane.isReadingDtc.value = true;
+    lane.dtcError.value = '';
+
+    try {
+      await lane.dllFunctions!.setDongleProperties(
+        ecu?.protocol?.name ?? '',
+        ecu?.protocol?.autopeepal ?? '',
+        ecu?.txHeader ?? '',
+        ecu?.rxHeader ?? '',
+      );
+
+      print('   Clearing DTCs on ${ecu?.name}...');
+      final status = await lane.dllFunctions!.clearDtc(ecu!.clearDtcFnIndex!.value!);
+
+      print('   Clear DTC status: $status');
+
+      if (status == null) {
+        print('   ❌ Clear DTC: no response from ECU');
+        print('══════════════════════════════════════════');
+        lane.dtcError.value = 'Clear DTC failed: no response from ECU.';
+        lane.isReadingDtc.value = false;
+        return;
+      }
+
+      final statusText = status.toLowerCase();
+      if (statusText.contains('no resp') || statusText.contains('socket_closed')) {
+        print('   ⚠️ Clear DTC failure looks like a dead connection');
+        lane.dongleConnected.value = false;
+        lane.dllFunctions = null;
+        lane.isReadingDtc.value = false;
+        _startDongleRetryTimer(laneIndex);
+        lane.dtcError.value = 'Dongle disconnected during Clear DTC.';
+        print('══════════════════════════════════════════');
+        return;
+      }
+
+      if (status != 'NOERROR') {
+        print('   ❌ Clear DTC failed: $status');
+        print('══════════════════════════════════════════');
+        lane.dtcError.value = 'Clear DTC failed: $status';
+        lane.isReadingDtc.value = false;
+        return;
+      }
+
+      print('   ✅ Clear DTC succeeded — re-reading to confirm...');
+      print('══════════════════════════════════════════');
+    } catch (e) {
+      print('   ❌ Clear DTC exception: $e');
+      print('══════════════════════════════════════════');
+      lane.dtcError.value = e.toString().replaceFirst('Exception: ', '');
+      lane.isReadingDtc.value = false;
+      return;
+    }
+
+    // Re-read to show the real resulting state, same as after a flash.
+    await readLiveDtcForLane(laneIndex);
   }
 
   Future<String> autoWriteIqaValuesForLane(int laneIndex) async {
@@ -3176,6 +3289,24 @@ class PsfHomeScreenController extends GetxController {
   }
 
   void logout() {
+    final flashingLanes = lanes.where((l) => l.isFlashing.value).toList();
+    if (flashingLanes.isNotEmpty) {
+      final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');
+      final label = flashingLanes.length == 1 ? 'Lane' : 'Lanes';
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flashing in Progress',
+          message:
+              '$label $laneNumbers ${flashingLanes.length == 1 ? 'is' : 'are'} still flashing. '
+              'Please wait for it to finish before logging out — logging out now '
+              'could interrupt the flash and leave the ECU in a bad state.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
+      return;
+    }
     Get.offAllNamed(
       "/login",
     );
@@ -3193,5 +3324,3 @@ class _IdentifiedEcu {
     required this.subModelId,
   });
 }
-
-
