@@ -241,6 +241,45 @@ class HomePageController extends GetxController {
     _startDongleHeartbeat();
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+// Additions to HomePageController (home_page_controller.dart)
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 1) New state — tracks the manual read separately from flashing so
+//    the button can show its own spinner without touching flash flags.
+
+  final RxBool isReadingDtcManually = false.obs;
+
+// ── 2) New method — calls the SAME _loadDtcResults() that already runs
+//    after a successful flash (identical clear+read+description-match
+//    logic, populates the SAME dtcList the post-flash DTC section
+//    reads from). No flashing happens here at all — this is completely
+//    independent of startFlashing().
+
+  Future<void> readDtcsManually() async {
+    if (!dongleConnected.value || App.dllFunctions == null) {
+      _showErrorPopup('Waiting for the dongle to connect first',
+          title: 'Not Connected');
+      return;
+    }
+
+    if (_currentDtcDatasetId == null) {
+      _showErrorPopup(
+          'Select a flash file first so the correct DTC '
+          'dataset is known.',
+          title: 'No Flash File Selected');
+      return;
+    }
+
+    isReadingDtcManually.value = true;
+    try {
+      _log('Manual DTC read requested (no flashing)');
+      await _loadDtcResults(); // <- exact same call the post-flash path uses
+    } finally {
+      isReadingDtcManually.value = false;
+    }
+  }
+
   Future<void> _loadAccessToken() async {
     _accessToken = await SecureStorageService.getAccessToken();
   }
@@ -1906,7 +1945,8 @@ class HomePageController extends GetxController {
         flashStatus.value = 'Flashing ECU...';
 
         percentTimer = Timer.periodic(
-          const Duration(milliseconds: 500),
+          const Duration(
+              milliseconds: 50), // 2 updates/sec — plenty for a UI progress bar
           (_) async {
             try {
               flashProgress.value = await App.dllFunctions!.flashingData();
@@ -1928,34 +1968,6 @@ class HomePageController extends GetxController {
         result = e.toString();
       }
 
-      // _flashStopwatch?.cancel();
-      // percentTimer?.cancel();
-      // flashInProgress.value = false;
-
-      // if (result == null || result.isEmpty || result != 'NOERROR') {
-      //   flashComplete.value = false;
-      //   _log('❌ Flashing failed: $result');
-
-      //   final r = (result ?? '').toLowerCase();
-      //   final looksDisconnected = r.contains('no resp') ||
-      //       r.contains('socket_closed') ||
-      //       r.contains('noresponsefromecu');
-
-      //   if (looksDisconnected) {
-      //     dongleConnected.value = false;
-      //     _startDongleRetryTimer();
-      //     _showReconnectPopup();
-      //   }
-
-      //   flashErrorMessage.value = result ?? 'Unknown error';
-      //   return;
-      // }
-
-      // flashComplete.value = true;
-      // _log('Flashing completed successfully (${formattedElapsed})');
-      // await Future.delayed(const Duration(milliseconds: 500));
-      // final iqaWriteStatus = await _autoWriteIqaValues();
-      // _showFlashCompletePopup(iqaWriteStatus);
       _flashStopwatch?.cancel();
       percentTimer?.cancel();
 
@@ -1984,16 +1996,16 @@ class HomePageController extends GetxController {
       _log('Flashing completed successfully (${formattedElapsed})');
 
       flashStatus.value = 'Writing IQA Values...';
-      await Future.delayed(const Duration(milliseconds: 500));
+      // await Future.delayed(const Duration(milliseconds: 500));
       final iqaWriteStatus = await _autoWriteIqaValues();
       _showFlashCompletePopup(iqaWriteStatus);
 
       flashStatus.value = 'Loading DTCs...';
-      await Future.delayed(const Duration(milliseconds: 300));
+      //await Future.delayed(const Duration(milliseconds: 300));
       await _loadDtcResults();
 
       flashStatus.value = 'Loading PIDs...';
-      await Future.delayed(const Duration(milliseconds: 300));
+      //await Future.delayed(const Duration(milliseconds: 300));
       await _loadPidResults();
 
       flashStatus.value = 'Completed';
@@ -2065,10 +2077,15 @@ class HomePageController extends GetxController {
   }
 
   void _resetLoader() => _setBusy(false, "");
-
   Future<void> _loadDtcResults() {
     return _withDongleBusy(() async {
-      await _clearDTCInternal();
+      // NOTE: intentionally does NOT call _clearDTCInternal() here.
+      // Reading DTCs must never clear them from the ECU — clearing is a
+      // separate, explicit user action (see clearDTC()). Clearing here
+      // was wiping the ECU's DTC memory before every read, which caused
+      // codes to vanish on refresh and made it impossible to ever see a
+      // code transition to Inactive (there was nothing left in the ECU
+      // to report as Inactive).
       final datasetId = _currentDtcDatasetId;
       if (datasetId == null) {
         _log('No DTC dataset id available — skipping');
@@ -2132,13 +2149,120 @@ class HomePageController extends GetxController {
 
         for (final row in rows) {
           if (row.length < 2) continue;
-          final code = row[0];
-          final status = row[1];
+          final code = row[0].toString().toUpperCase();
+          final status = row[1].toString();
 
-          final match = serverCodes.firstWhereOrNull((c) => c.code == code);
+          // No filtering, no persistence — show exactly what the ECU
+          // currently reports for every code (Active / Inactive / Pending).
+          final match = serverCodes.firstWhereOrNull(
+            (c) => (c.code ?? '').toUpperCase() == code,
+          );
           final desc = match?.description ?? 'Description not found';
 
           dummy[code] = '$code - $desc ($status)';
+        }
+
+        dtcList.assignAll(dummy.values.toList());
+        _log('DTC (${dtcList.length}) data loaded');
+      } catch (e) {
+        final message = e.toString().replaceFirst('Exception: ', '');
+        _log('Failed to load DTC dataset: $e');
+        dtcList.clear();
+        _showErrorPopup(message, title: 'Failed to Load DTC');
+      }
+    });
+  }
+
+  Future<void> _loadDtcResults1() {
+    return _withDongleBusy(() async {
+      await _clearDTCInternal();
+      final datasetId = _currentDtcDatasetId;
+      if (datasetId == null) {
+        _log('No DTC dataset id available — skipping');
+        return;
+      }
+
+      final ecu =
+          StaticData.ecuInfo.firstWhereOrNull((e) => e.readDtcIndex != null);
+      if (ecu == null) {
+        _log('DTC read: no ECU with read_dtc_index configured — skipping');
+        return;
+      }
+
+      _accessToken ??= await SecureStorageService.getAccessToken();
+
+      try {
+        final dtc_ds.DtcDataset dtc = await _authService.getDtcDataset(
+          id: datasetId,
+          accessToken: _accessToken,
+        );
+
+        final serverCodes = <dtc_ds.DtcCode>[];
+        for (final result in dtc.results ?? <dtc_ds.Result>[]) {
+          serverCodes.addAll(result.dtcCode ?? <dtc_ds.DtcCode>[]);
+        }
+
+        await App.dllFunctions!.setDongleProperties(
+          ecu.protocol?.name ?? '',
+          ecu.protocol?.autopeepal ?? '',
+          ecu.txHeader ?? '',
+          ecu.rxHeader ?? '',
+        );
+
+        _log('Reading DTCs from ${ecu.ecuName}...');
+        final readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+
+        if (readResult == null) {
+          _log('DTC read: ECU_COMMUNICATION_ERROR');
+          dtcList.clear();
+          dongleConnected.value = false;
+          _startDongleRetryTimer();
+          _showReconnectPopup();
+          return;
+        }
+
+        if (readResult.status != 'NO_ERROR') {
+          _log('DTC read failed: ${readResult.status}');
+          dtcList.clear();
+          if (readResult.status == 'No Resp From Dongle' ||
+              readResult.status == 'SOCKET_CLOSED' ||
+              readResult.status.toString().toLowerCase().contains('no resp')) {
+            dongleConnected.value = false;
+            _startDongleRetryTimer();
+            _showReconnectPopup();
+          }
+          return;
+        }
+
+        // final rows = readResult.dtcs ?? [];
+        // final dummy = <String, String>{};
+
+        // for (final row in rows) {
+        //   if (row.length < 2) continue;
+        //   final code = row[0];
+        //   final status = row[1];
+
+        //   final match = serverCodes.firstWhereOrNull((c) => c.code == code);
+        //   final desc = match?.description ?? 'Description not found';
+
+        //   dummy[code] = '$code - $desc ($status)';
+        // }
+        final rows = readResult.dtcs ?? [];
+        final dummy = <String, String>{};
+
+        for (final row in rows) {
+          if (row.length < 2) continue;
+          final code = row[0];
+          final status = row[1];
+
+          final match = serverCodes.firstWhereOrNull(
+            (c) => (c.code ?? '').toUpperCase() == code.toUpperCase(),
+          );
+          final desc = match?.description ?? 'Description not found';
+
+          // Display the code uppercase too, matching conventional DTC formatting
+          // (P212D, not P212d).
+          dummy[code.toUpperCase()] = '${code.toUpperCase()} - $desc ($status)';
         }
 
         dtcList.assignAll(dummy.values.toList());
@@ -2173,7 +2297,8 @@ class HomePageController extends GetxController {
 
     if (response == 'NOERROR' || response == 'NO_ERROR') {
       _log('✅ DTC cleared successfully');
-      await Future.delayed(const Duration(milliseconds: 500));
+      dtcList.clear();
+      dtcList.refresh();
     } else {
       _log('❌ Clear DTC failed: $response');
     }

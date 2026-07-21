@@ -322,7 +322,7 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
     });
 
     print('🚀 [Lane ${args.laneNumber} isolate] calling flashInterpreter2...');
-    final result = await uds.flashInterpreter2(
+    final result = await uds.flashInterpreter(
       flashConfig,
       jsonData.noOfSectors ?? 0,
       jsonData.sectorData ?? [],

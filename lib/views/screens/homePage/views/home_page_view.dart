@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -222,9 +223,6 @@ class HomePageView extends GetView<HomePageController> {
     final isActive = index == controller.currentStepIndex.value;
 
     int? maxLen;
-    // if (step.key == 'esn') {
-    //   maxLen = 15;
-    // } else
     if (step.key == 'list') {
       maxLen = 4;
     }
@@ -426,9 +424,16 @@ class HomePageView extends GetView<HomePageController> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildFlashSection(),
+                      const SizedBox(height: 16),
+                      // ── DTC section is now ALWAYS shown once scan steps
+                      // are complete — no longer gated behind
+                      // flashComplete. It's populated either by a
+                      // completed flash OR by the standalone "Read DTCs"
+                      // button in its header (no flashing required for
+                      // the latter). The section itself shows "No data
+                      // yet" until either path populates dtcList.
+                      _buildDtcSection(),
                       if (controller.flashComplete.value) ...[
-                        const SizedBox(height: 16),
-                        _buildDtcSection(),
                         const SizedBox(height: 12),
                         _buildPidSection(),
                       ],
@@ -550,7 +555,6 @@ class HomePageView extends GetView<HomePageController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── header row ──
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
@@ -598,7 +602,6 @@ class HomePageView extends GetView<HomePageController> {
             ),
           ),
           const SizedBox(height: 4),
-          // ── data rows ──
           ...controller.harnessReceipes.map((sensor) {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
@@ -655,9 +658,6 @@ class HomePageView extends GetView<HomePageController> {
                   Expanded(
                     flex: 2,
                     child: Obx(() {
-                      // Static API value by default. Only replaced once
-                      // the operator explicitly writes this sensor via
-                      // the WRITE action — no automatic PLC read here.
                       final live = sensor.id != null
                           ? controller.livePlcValues[sensor.id]
                           : null;
@@ -705,11 +705,6 @@ class HomePageView extends GetView<HomePageController> {
     return Obx(() {
       final expanded = controller.flashExpanded.value;
 
-      String? statusText;
-      if (controller.flashInProgress.value) {
-        statusText = '${(controller.flashProgress.value * 100).round()}%';
-      }
-
       return Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -729,48 +724,62 @@ class HomePageView extends GetView<HomePageController> {
                     const Text('Flash File',
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const Spacer(),
-                    if (controller.flashComplete.value) ...[
-                      Column(
-                        children: [
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: const BoxDecoration(
-                              color: AppColors.themeColor,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.check,
-                                color: Colors.white, size: 14),
+                    Obx(() {
+                      if (controller.flashComplete.value) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.themeColor,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.check,
+                                    color: Colors.white, size: 14),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                'Flashing Successful',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.themeColor,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            'Flashing Successful',
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.themeColor,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                    ] else if (statusText != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.themeColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.themeColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
+                        );
+                      }
+
+                      if (controller.flashInProgress.value) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Obx(() {
+                            final pct =
+                                (controller.flashProgress.value * 100).round();
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.themeColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                '$pct%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.themeColor,
+                                ),
+                              ),
+                            );
+                          }),
+                        );
+                      }
+
+                      return const SizedBox.shrink();
+                    }),
                     Icon(expanded ? Icons.expand_less : Icons.expand_more),
                   ],
                 ),
@@ -912,8 +921,6 @@ class HomePageView extends GetView<HomePageController> {
 
       // ── In-progress state ──
       if (controller.flashInProgress.value) {
-        final pct = (controller.flashProgress.value * 100).round();
-
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -937,14 +944,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
             const SizedBox(height: 18),
-            // const Text(
-            //   'Flashing in progress',
-            //   textAlign: TextAlign.center,
-            //   style: TextStyle(
-            //       fontSize: 15,
-            //       fontWeight: FontWeight.w700,
-            //       color: Colors.black87),
-            // ),
             Obx(
               () => Text(
                 controller.flashStatus.value,
@@ -957,15 +956,6 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ),
             const SizedBox(height: 4),
-            // Text(
-            //   'Please keep the dongle connected',
-            //   textAlign: TextAlign.center,
-            //   style: TextStyle(
-            //       fontSize: 12,
-            //       color: Colors.grey.shade600,
-            //       fontWeight: FontWeight.bold),
-            // ),
-
             Obx(() {
               String message = 'Please keep the dongle connected';
 
@@ -973,15 +963,12 @@ class HomePageView extends GetView<HomePageController> {
                 case 'Writing IQA Values...':
                   message = 'Writing injector calibration values...';
                   break;
-
                 case 'Loading DTCs...':
                   message = 'Reading Diagnostic Trouble Codes...';
                   break;
-
                 case 'Loading PIDs...':
                   message = 'Reading Live Parameters...';
                   break;
-
                 case 'Completed':
                   message = 'Almost done...';
                   break;
@@ -1013,35 +1000,43 @@ class HomePageView extends GetView<HomePageController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Elapsed  ${controller.formattedElapsed}',
-                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                Obx(
+                  () => Text(
+                    'Elapsed  ${controller.formattedElapsed}',
+                    style:
+                        TextStyle(fontSize: 12.5, color: Colors.grey.shade700),
+                  ),
                 ),
-                Text(
-                  '$pct%',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.themeColor,
+                Obx(
+                  () => Text(
+                    '${(controller.flashProgress.value * 100).round()}%',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.themeColor,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: controller.flashProgress.value,
-                minHeight: 12,
-                backgroundColor: Colors.grey.shade200,
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.themeColor),
+            Obx(
+              () => ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: controller.flashProgress.value,
+                  minHeight: 12,
+                  backgroundColor: Colors.grey.shade200,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.themeColor),
+                ),
               ),
             ),
           ],
         );
       }
 
-      // ── File selection state (unchanged from before) ──
+      // ── File selection state ──
       if (controller.flashFilesLoading.value) {
         return const Padding(
           padding: EdgeInsets.symmetric(vertical: 20),
@@ -1205,6 +1200,57 @@ class HomePageView extends GetView<HomePageController> {
         itemBuilder: _buildDtcCard,
         onRefresh: controller.refreshDtcResults,
         onClear: controller.clearDTC,
+        // ── Standalone "Read DTCs" action — calls the SAME logic that
+        // populates dtcList after a successful flash (_loadDtcResults),
+        // but no flashing happens here at all. Requires the dongle to
+        // be connected and a flash file selected (so the correct DTC
+        // dataset is known) — see readDtcsManually() in the controller.
+        extraAction: Obx(() {
+          final busy = controller.isReadingDtcManually.value;
+          final canRead = controller.dongleConnected.value && !busy;
+          return InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: canRead ? controller.readDtcsManually : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: canRead ? AppColors.themeColor : Colors.grey.shade300,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (busy)
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.6),
+                    )
+                  else
+                    Icon(
+                      Icons.search,
+                      size: 14,
+                      color:
+                          canRead ? AppColors.themeColor : Colors.grey.shade400,
+                    ),
+                  const SizedBox(width: 5),
+                  Text(
+                    busy ? 'Reading…' : 'Read DTCs',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          canRead ? AppColors.themeColor : Colors.grey.shade400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -1237,7 +1283,11 @@ class HomePageView extends GetView<HomePageController> {
     } else if (statusLower == 'pending') {
       badgeColor = Colors.orange.shade700;
       badgeLabel = 'Pending';
-    } else {
+    } else if (statusLower == 'inactive') {
+      badgeColor = Colors.green.shade600;
+      badgeLabel = 'InActive';
+    } 
+    else {
       badgeColor = Colors.green.shade600;
       badgeLabel = status.isNotEmpty ? 'History' : '-';
     }
@@ -1277,7 +1327,6 @@ class HomePageView extends GetView<HomePageController> {
             ),
           ),
           const SizedBox(width: 10),
-          // ✅ Status badge — colored by Active/Pending/History.
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
@@ -1355,20 +1404,6 @@ class HomePageView extends GetView<HomePageController> {
                 ),
               ),
             ),
-            // if (expanded)
-            //   Padding(
-            //     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-            //     child: Obx(() {
-            //       if (controller.livePidCodes.isEmpty) {
-            //         return Padding(
-            //           padding: const EdgeInsets.symmetric(vertical: 8),
-            //           child: Text('No data yet',
-            //               style: TextStyle(
-            //                   color: Colors.grey.shade500, fontSize: 13)),
-            //         );
-            //       }
-
-            //       final codes = controller.livePidCodes;
             if (expanded)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -1453,8 +1488,6 @@ class HomePageView extends GetView<HomePageController> {
                     }),
                   );
 
-                  // ── Overlay a centered loader on top of the list while reading ──
-                  // ── Overlay a loader near the top of the list while reading ──
                   return Stack(
                     alignment: Alignment.topCenter,
                     children: [
@@ -1522,6 +1555,7 @@ class HomePageView extends GetView<HomePageController> {
     Widget Function(String item)? itemBuilder,
     VoidCallback? onRefresh,
     VoidCallback? onClear,
+    Widget? extraAction,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1540,7 +1574,6 @@ class HomePageView extends GetView<HomePageController> {
                 children: [
                   Text(title,
                       style: const TextStyle(fontWeight: FontWeight.w600)),
-
                   if (trailingLabel != null) ...[
                     const SizedBox(width: 15),
                     Container(
@@ -1558,6 +1591,7 @@ class HomePageView extends GetView<HomePageController> {
                     ),
                   ],
                   const Spacer(),
+                  if (extraAction != null) extraAction,
                   if (onRefresh != null) ...[
                     InkWell(
                       borderRadius: BorderRadius.circular(20),
@@ -1573,7 +1607,6 @@ class HomePageView extends GetView<HomePageController> {
                     ),
                     const SizedBox(width: 6),
                   ],
-                  // ✅ Clear button — only shown if a handler is provided.
                   if (onClear != null) ...[
                     InkWell(
                       borderRadius: BorderRadius.circular(6),
@@ -1582,7 +1615,6 @@ class HomePageView extends GetView<HomePageController> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          //color: AppColors.themeColor,
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: AppColors.themeColor),
                         ),
@@ -1656,7 +1688,6 @@ class HomePageView extends GetView<HomePageController> {
   Color _activityLogColor(String entry) {
     final lower = entry.toLowerCase();
 
-    // Explicit markers used throughout HomePageController's _log() calls.
     if (entry.contains('❌') ||
         lower.contains('failed') ||
         lower.contains('error') ||
@@ -1674,8 +1705,100 @@ class HomePageView extends GetView<HomePageController> {
       return Colors.green.shade700;
     }
 
-    return Colors.grey.shade700; // neutral/info lines unchanged
+    return Colors.grey.shade700;
   }
+
+//   Widget _buildActivitySection() {
+//     return Container(
+//       constraints: const BoxConstraints(maxHeight: 180),
+//       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+//       padding: const EdgeInsets.all(16),
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(10),
+//         border: Border.all(color: Colors.grey.shade300),
+//         boxShadow: [
+//           BoxShadow(
+//             color: Colors.black.withOpacity(0.04),
+//             blurRadius: 8,
+//             offset: const Offset(0, -2),
+//           ),
+//         ],
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: [
+//               const Text('Activity',
+//                   style: TextStyle(fontWeight: FontWeight.w600)),
+//               const Spacer(),
+//               Obx(() => IconButton(
+//                     icon: const Icon(Icons.save_alt, size: 18),
+//                     tooltip: "Save Activity Log",
+//                     color: AppColors.themeColor,
+//                     onPressed: controller.activityLog.isEmpty
+//                         ? null
+//                         : () async {
+//                             await controller.saveActivityLog();
+//                           },
+//                   )),
+//               Obx(
+//                 () => IconButton(
+//                   icon: const Icon(Icons.copy, size: 18),
+//                   color: AppColors.themeColor,
+//                   tooltip: 'Copy all activity log',
+//                   visualDensity: VisualDensity.compact,
+//                   onPressed: controller.activityLog.isEmpty
+//                       ? null
+//                       : () => _copyActivityLog(),
+//                 ),
+//               ),
+//             ],
+//           ),
+//           const Divider(height: 16),
+//           Expanded(
+//             child: Obx(
+//               () => ListView(
+//                 padding: EdgeInsets.zero,
+//                 children: controller.activityLog
+//                     .map((entry) => Padding(
+//                           padding: const EdgeInsets.symmetric(vertical: 3),
+//                           child: Text(
+//                             entry,
+//                             style: TextStyle(
+//                                 fontSize: 12.5, color: Colors.grey.shade700),
+//                           ),
+//                         ))
+//                     .toList(),
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// ══════════════════════════════════════════════════════════════════════
+// Additions to HomePageView (home_page_view.dart)
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 1) Add a "fullscreen" IconButton to _buildActivitySection()'s header
+//    row, right before the existing Save/Copy buttons.
+//
+// BEFORE:
+//
+//   Row(
+//     children: [
+//       const Text('Activity',
+//           style: TextStyle(fontWeight: FontWeight.w600)),
+//       const Spacer(),
+//       Obx(() => IconButton(
+//             icon: const Icon(Icons.save_alt, size: 18),
+//             ...
+//
+// AFTER — add the fullscreen button right after the Spacer, before Save:
 
   Widget _buildActivitySection() {
     return Container(
@@ -1702,6 +1825,14 @@ class HomePageView extends GetView<HomePageController> {
               const Text('Activity',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
+              // ── NEW: open the full activity log in a full-screen dialog ──
+              IconButton(
+                icon: const Icon(Icons.fullscreen, size: 20),
+                color: AppColors.themeColor,
+                tooltip: 'Open full screen',
+                visualDensity: VisualDensity.compact,
+                onPressed: _showActivityFullScreen,
+              ),
               Obx(() => IconButton(
                     icon: const Icon(Icons.save_alt, size: 18),
                     tooltip: "Save Activity Log",
@@ -1715,7 +1846,7 @@ class HomePageView extends GetView<HomePageController> {
               Obx(
                 () => IconButton(
                   icon: const Icon(Icons.copy, size: 18),
-                  color: AppColors.themeColor,
+                 color: AppColors.themeColor,
                   tooltip: 'Copy all activity log',
                   visualDensity: VisualDensity.compact,
                   onPressed: controller.activityLog.isEmpty
@@ -1747,20 +1878,89 @@ class HomePageView extends GetView<HomePageController> {
       ),
     );
   }
+
+
+  void _showActivityFullScreen() {
+    Get.dialog(
+      Dialog.fullscreen(
+        child: Scaffold(
+          appBar: AppBar(
+             iconTheme: const IconThemeData(
+    color: Colors.white, // Back arrow color
+  ),
+            backgroundColor: AppColors.themeColor,
+            foregroundColor: Colors.white,
+            title: const Text('Activity Log'),
+            actions: [
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.save_alt,color:Colors.white),
+                    tooltip: 'Save Activity Log',
+                    onPressed: controller.activityLog.isEmpty
+                        ? null
+                        : () async {
+                            await controller.saveActivityLog();
+                          },
+                  )),
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.copy,color:Colors.white),
+                    tooltip: 'Copy all activity log',
+                    onPressed: controller.activityLog.isEmpty
+                        ? null
+                        : () => _copyActivityLog(),
+                   )),
+              // IconButton(
+              //   icon: const Icon(Icons.close,color:Colors.white),
+              //   tooltip: 'Close',
+              //   onPressed: () => Get.back(),
+              // ),
+            ],
+          ),
+          backgroundColor: const Color(0xFFF4F5F7),
+          body: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Obx(() {
+              if (controller.activityLog.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No activity yet',
+                    style: TextStyle(color: Colors.grey.shade500),
+                  ),
+                );
+              }
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white),
+                ),
+                child: ListView.builder(
+                  itemCount: controller.activityLog.length,
+                  itemBuilder: (context, index) {
+                    final entry = controller.activityLog[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: SelectableText(
+                        entry,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: _activityLogColor(entry),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
 }
 
-/// Inline "write a value" control for one Recipe row: a small number
-/// field + send button. Writes to the PLC, then reads the register
-/// back for real confirmation (see writeSensorValue in the
-/// controller) — the VALUE cell updates with whatever the PLC
-/// actually confirms, not just an echo of what was typed. Kept as its
-/// own StatefulWidget so its TextEditingController survives the
-/// Recipe dialog's Obx rebuilds.
-///
-/// sensor is typed as list_ds.Receipe (from listNumber.model.dart) —
-/// harness recipe data now comes from the matched variant's
-/// prodbud_variant_harness, not a separate harness API, so this must
-/// match harnessReceipes' actual type in the controller.
 class _SensorWriteAction extends StatefulWidget {
   const _SensorWriteAction({required this.sensor, required this.controller});
 

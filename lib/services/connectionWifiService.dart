@@ -1,6 +1,5 @@
 import 'package:ap_diagnostic/usd_diagnostic.dart';
 import 'package:ap_dongle_comm/utils/commController.dart';
-import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/dongleComm.dart';
 import 'package:ecu_seedkey/ecu_seedkey.dart';
 import 'package:flutter/foundation.dart';
@@ -26,7 +25,7 @@ class ConnectionWifi {
           "DongleComm initialized with channelId: $channelId and comm assigned");
       print("Connecting to $ip:$port via WiFi...");
       await comm!
-          .connectWifi(host: ip, port: port, selectedType: Connectivity.wiFi);
+          .connectWifi(host: ip, port: port,);
       print("WiFi connected.");
       dSDiagnostic ??= UDSDiagnostic(dongleCommWin!, ECUCalculateSeedkey());
       print("UDSDiagnostic initialized.");
@@ -100,7 +99,7 @@ class ConnectionWifi {
 
       print("[Lane $ip] Connecting via WiFi...");
       await laneComm.connectWifi(
-          host: ip, port: port, selectedType: Connectivity.wiFi);
+          host: ip, port: port,);
       print("[Lane $ip] WiFi connected.");
 
       final laneDiagnostic =

@@ -5,6 +5,6 @@ abstract class ICommController {
   Connectivity get connectivity;
   Uint8List hexToBytes(String hexStr);
   Future<Uint8List?> readData();
-  Future<Uint8List?> sendCommand(Uint8List finalPacket, {Duration timeout});
-  Future<void> disconnectVCI();
+  Future<Uint8List?> sendCommand(Uint8List finalPacket);
+  Future<void> disconnect();
 }
