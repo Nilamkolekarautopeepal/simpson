@@ -54,6 +54,7 @@ dependencies:
   device_info_plus: ^13.2.0
   flutter_secure_storage: ^10.3.0
   flutter_libserialport: 0.6.0
+  window_manager: ^0.5.1
 
   ap_dongle_comm:
     path: apDongleComm-main

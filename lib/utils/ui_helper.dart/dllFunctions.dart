@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:core';
 import 'dart:typed_data';
 import 'package:ap_diagnostic/enum/readDTCIndex.dart' show ReadDtcIndex, ClearDtcIndex;
@@ -36,7 +36,7 @@ class DLLFunctions {
   Future<String> setDongleProperties1() async {
     try {
       if (StaticData.ecuInfo.isEmpty) {
-        print("❌ setDongleProperties1: StaticData.ecuInfo is empty");
+        print("ÔØî setDongleProperties1: StaticData.ecuInfo is empty");
         return "";
       }
 
@@ -46,7 +46,8 @@ class DLLFunctions {
           firstEcu.protocol?.autopeepal == null ||
           firstEcu.txHeader == null ||
           firstEcu.rxHeader == null) {
-        print("❌ setDongleProperties1: ECU missing protocol/txHeader/rxHeader "
+        print(
+            "ÔØî setDongleProperties1: ECU missing protocol/txHeader/rxHeader "
             "(protocol=${firstEcu.protocol?.name}, "
             "autopeepal=${firstEcu.protocol?.autopeepal}, "
             "tx=${firstEcu.txHeader}, rx=${firstEcu.rxHeader})");
@@ -62,8 +63,8 @@ class DLLFunctions {
         }
       }
       if (matchedProtocol == null) {
-        print("❌ setDongleProperties1: No Protocol enum matches API value "
-            "\"$value\" — check Protocol enum definitions against API protocol names");
+        print("ÔØî setDongleProperties1: No Protocol enum matches API value "
+            "\"$value\" ÔÇö check Protocol enum definitions against API protocol names");
         return "";
       }
       mDongleComm.protocol = matchedProtocol;
@@ -72,7 +73,7 @@ class DLLFunctions {
       txHeaderTemp = firstEcu.txHeader!;
       rxHeaderTemp = firstEcu.rxHeader!;
 
-      print("🔹 setDongleProperties1: protocol=$matchedProtocol "
+      print("­ƒö╣ setDongleProperties1: protocol=$matchedProtocol "
           "(0x${protocolValue.toRadixString(16)}), "
           "tx=$txHeaderTemp, rx=$rxHeaderTemp");
 
@@ -84,16 +85,16 @@ class DLLFunctions {
       final dynamic firmwareResult = await mDongleComm.getFirmwareVersion();
 
       if (firmwareResult == null) {
-        print("❌ setDongleProperties1: getFirmwareVersion() returned null");
+        print("ÔØî setDongleProperties1: getFirmwareVersion() returned null");
         return "";
       }
       if (firmwareResult is! Uint8List) {
-        print("❌ setDongleProperties1: unexpected firmware response type "
+        print("ÔØî setDongleProperties1: unexpected firmware response type "
             "(${firmwareResult.runtimeType})");
         return "";
       }
       if (firmwareResult.length < 6) {
-        print("❌ setDongleProperties1: firmware response too short "
+        print("ÔØî setDongleProperties1: firmware response too short "
             "(${firmwareResult.length} bytes)");
         return "";
       }
@@ -102,85 +103,134 @@ class DLLFunctions {
           "${firmwareResult[4].toString().padLeft(2, '0')}."
           "${firmwareResult[5].toString().padLeft(2, '0')}";
 
-      print("✅ setDongleProperties1: firmware version = $version");
+      print("Ô£à setDongleProperties1: firmware version = $version");
       return version;
     } catch (e, stack) {
-      print("❌ setDongleProperties1 exception: $e");
+      print("ÔØî setDongleProperties1 exception: $e");
       print(stack);
       return "";
     }
   }
 
-  /// Single-dongle path only — no connectivity/RP1210 branching.
+  Future<String?> clearDtc(String dtcIndex) async {
+    print("🔹 [clearDtc] Start - Received index string: $dtcIndex");
+
+    try {
+      // Matches C#'s alias handling:
+      //   if (dtc_index == "UDS-4BYTES") dtc_index = "UDS_4BYTES";
+      // plus normalizing any other dashes to underscores so the enum
+      // lookup below succeeds regardless of which separator the API sent.
+      String normalized = dtcIndex == 'UDS-4BYTES'
+          ? 'UDS_4BYTES'
+          : dtcIndex.replaceAll('-', '_');
+
+      if (normalized != dtcIndex) {
+        print("🔧 [clearDtc] Normalized '$dtcIndex' -> '$normalized'");
+      }
+
+      final ClearDtcIndex index = ClearDtcIndex.values.firstWhere(
+        (e) => e.toString().split('.').last == normalized,
+        orElse: () {
+          print("❌ No matching ClearDtcIndex enum found for: $normalized");
+          throw Exception("Invalid Clear DTC index: $normalized");
+        },
+      );
+      print("✅ [clearDtc] Mapped string '$normalized' to enum: $index");
+
+      final result = await mUdsDiagnostic.clearDTC(index);
+
+      if (result == null) {
+        print("⚠️ [clearDtc] clearDTC returned null");
+        return null;
+      }
+
+      // result is the raw ResponseArrayStatus-style object from
+      // UDSDiagnostic.clearDTC() — pull the status field directly via
+      // dynamic dispatch, same field the C# version extracts through
+      // JsonConvert as Response.ECUResponseStatus.
+      final status = (result as dynamic).ecuResponseStatus as String?;
+
+      print("📡 [clearDtc] Status received: $status");
+
+      return status;
+    } catch (e, st) {
+      print("❌ [clearDtc] EXCEPTION: $e");
+      print("❌ StackTrace: $st");
+      return null;
+    }
+  }
+
+  /// Single-dongle path only ÔÇö no connectivity/RP1210 branching.
   // Future<void> setDongleProperties(
   //     String protocolName, String txHeaderTemp, String rxHeaderTemp) async {
   //   try {
   //     print(
-  //         "📡 [DEBUG] setDongleProperties Start | Protocol: $protocolName, TX: $txHeaderTemp, RX: $rxHeaderTemp");
+  //         "­ƒôí [DEBUG] setDongleProperties Start | Protocol: $protocolName, TX: $txHeaderTemp, RX: $rxHeaderTemp");
 
   //     final protocolInt = int.parse(protocolName, radix: 16);
 
   //     await mDongleComm.dongleSetProtocol(protocolInt);
-  //     print("🔸 Protocol set to 0x${protocolInt.toRadixString(16)}");
+  //     print("­ƒö© Protocol set to 0x${protocolInt.toRadixString(16)}");
 
   //     await mDongleComm.canSetTxHeader(txHeaderTemp);
-  //     print("🔸 TX Header set: $txHeaderTemp");
+  //     print("­ƒö© TX Header set: $txHeaderTemp");
 
   //     await mDongleComm.canSetRxHeaderMask(rxHeaderTemp);
-  //     print("🔸 RX Mask set: $rxHeaderTemp");
+  //     print("­ƒö© RX Mask set: $rxHeaderTemp");
 
-  //     print("✅ [DEBUG] setDongleProperties completed successfully.");
+  //     print("Ô£à [DEBUG] setDongleProperties completed successfully.");
   //   } catch (ex, stack) {
-  //     print("❌ [ERROR] setDongleProperties failed: $ex");
+  //     print("ÔØî [ERROR] setDongleProperties failed: $ex");
   //     print(stack);
   //   }
   // }
-  /// Single-dongle path only — no connectivity/RP1210 branching.
-  Future<void> setDongleProperties(String protocolNameRaw, String protocolHex,
-      String txHeaderTemp, String rxHeaderTemp) async {
-    try {
-      print(
-          "📡 [DEBUG] setDongleProperties Start | ProtocolName: $protocolNameRaw, Hex: $protocolHex, TX: $txHeaderTemp, RX: $rxHeaderTemp");
+  /// Single-dongle path only ÔÇö no connectivity/RP1210 branching.
+ Future<void> setDongleProperties(String protocolNameRaw, String protocolHex,
+    String txHeaderTemp, String rxHeaderTemp) async {
+  try {
+    print(
+        "📍 [DEBUG] setDongleProperties Start | ProtocolName: $protocolNameRaw, Hex: $protocolHex, TX: $txHeaderTemp, RX: $rxHeaderTemp");
 
-      // Resolve + assign the Protocol enum FIRST. dongleSetProtocol() only
-      // sends the raw hex value to the dongle — it does NOT set
-      // mDongleComm.protocol, which canSetTxHeader/canSetRxHeaderMask
-      // depend on internally. Confirmed via debug logging: protocol was
-      // still null even after a successful dongleSetProtocol() call.
-      final String value = protocolNameRaw.replaceAll("-", "_");
-      Protocol? matchedProtocol;
-      for (final p in Protocol.values) {
-        if (p.name == value) {
-          matchedProtocol = p;
-          break;
-        }
+    final String value = protocolNameRaw.replaceAll("-", "_");
+    Protocol? matchedProtocol;
+    for (final p in Protocol.values) {
+      if (p.name == value) {
+        matchedProtocol = p;
+        break;
       }
-      if (matchedProtocol == null) {
-        print("❌ setDongleProperties: no Protocol enum matches \"$value\"");
-        throw Exception("Unsupported protocol: $protocolNameRaw");
-      }
-      mDongleComm.protocol = matchedProtocol;
-      print("🔍 [DEBUG] mDongleComm.protocol assigned: $matchedProtocol");
-
-      final protocolInt = int.parse(protocolHex, radix: 16);
-      await mDongleComm.dongleSetProtocol(protocolInt);
-      print(
-          "🔸 Protocol set to 0x${protocolInt.toRadixString(16)} ($matchedProtocol)");
-
-      await mDongleComm.canSetTxHeader(txHeaderTemp);
-      print("🔸 TX Header set: $txHeaderTemp");
-
-      await mDongleComm.canSetRxHeaderMask(rxHeaderTemp);
-      print("🔸 RX Mask set: $rxHeaderTemp");
-
-      print("✅ [DEBUG] setDongleProperties completed successfully.");
-    } catch (ex, stack) {
-      print("❌ [ERROR] setDongleProperties failed: $ex");
-      print(stack);
-      rethrow;
     }
-  }
+    if (matchedProtocol == null) {
+      print("❌ setDongleProperties: no Protocol enum matches \"$value\"");
+      throw Exception("Unsupported protocol: $protocolNameRaw");
+    }
+    mDongleComm.protocol = matchedProtocol;
+    print("🔍 [DEBUG] mDongleComm.protocol assigned: $matchedProtocol");
 
+    final protocolInt = int.parse(protocolHex, radix: 16);
+    await mDongleComm.dongleSetProtocol(protocolInt);
+    print("🔧 Protocol set to 0x${protocolInt.toRadixString(16)} ($matchedProtocol)");
+
+    await mDongleComm.canSetTxHeader(txHeaderTemp);
+    print("🔧 TX Header set: $txHeaderTemp");
+
+    await mDongleComm.canSetRxHeaderMask(rxHeaderTemp);
+    print("🔧 RX Mask set: $rxHeaderTemp");
+
+    // ✅ Must re-arm padding any time TX/RX headers are (re)configured —
+    // matches setDongleProperties1(), which does this on connect/reconnect.
+    // Without this, the very next send on this header config can go into
+    // a channel with no flow-control padding and simply time out with
+    // "No Resp From Dongle" (this was the flash-start failure).
+    await mDongleComm.canStartPadding("00");
+    print("🔧 CAN padding (re)started");
+
+    print("✅ [DEBUG] setDongleProperties completed successfully.");
+  } catch (ex, stack) {
+    print("❌ [ERROR] setDongleProperties failed: $ex");
+    print(stack);
+    rethrow;
+  }
+}
   Uint8List hexToBytes(String hex) {
     hex = hex.replaceAll(" ", "");
 
@@ -197,28 +247,28 @@ class DLLFunctions {
       final comm = mDongleComm.comm;
 
       if (comm == null) {
-        print("⚠️ comm is null, skipping VCI disconnect");
+        print("ÔÜá´©Å comm is null, skipping VCI disconnect");
         return;
       }
 
-      print("🔄 Sending Dongle Reset...");
-      await comm.disconnectVCI();
+      print("­ƒöä Sending Dongle Reset...");
+      await comm.disconnect();
 
-      print("✅ VCI disconnected successfully");
+      print("Ô£à VCI disconnected successfully");
     } catch (e, stack) {
-      print("❌ Error disconnecting VCI: $e");
+      print("ÔØî Error disconnecting VCI: $e");
       print(stack);
     }
   }
 
-  Future<String> checkEcuStatus() async {
-    try {
-      final resp = await mDongleComm.can2xTxRx(2, '1003');
-      return resp.ecuResponseStatus ?? '';
-    } catch (_) {
-      return '';
-    }
-  }
+  // Future<String> checkEcuStatus() async {
+  //   try {
+  //     final resp = await mDongleComm.can2xTxRx(2,he( '1003'));
+  //     return resp.ecuResponseStatus ?? '';
+  //   } catch (_) {
+  //     return '';
+  //   }
+  // }
 
   List<SessionLogsModel> getLogs() {
     print("DLLFunctions.getLogs: Start");
@@ -296,17 +346,17 @@ class DLLFunctions {
   }
 
   // Future<ReadDtcResponseModel?> readDtc(String dtcIndex) async {
-  //   print("🔹 [readDtc] Start - Received index string: $dtcIndex");
+  //   print("­ƒö╣ [readDtc] Start - Received index string: $dtcIndex");
 
   //   try {
   //     ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
   //       (e) => e.toString().split('.').last == dtcIndex,
   //       orElse: () {
-  //         print("❌ No matching ReadDtcIndex enum found for: $dtcIndex");
+  //         print("ÔØî No matching ReadDtcIndex enum found for: $dtcIndex");
   //         throw Exception("Invalid DTC index: $dtcIndex");
   //       },
   //     );
-  //     print("✅ [readDtc] Mapped string '$dtcIndex' to enum: $index");
+  //     print("Ô£à [readDtc] Mapped string '$dtcIndex' to enum: $index");
 
   //     ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
 
@@ -314,7 +364,7 @@ class DLLFunctions {
 
   //     do {
   //       attempt++;
-  //       print("⏳ [readDtc] Attempt #$attempt to read DTC...");
+  //       print("ÔÅ│ [readDtc] Attempt #$attempt to read DTC...");
 
   //       final rawResponse = await mUdsDiagnostic.readDTC(index);
 
@@ -322,14 +372,14 @@ class DLLFunctions {
   //       readDtcResponseModel.status = rawResponse.status;
   //       readDtcResponseModel.noofdtc = rawResponse.noofdtc;
 
-  //       print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
+  //       print("­ƒôí [readDtc] Status received: ${readDtcResponseModel.status}");
   //       print(
-  //           "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
+  //           "­ƒôí [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
 
   //       if (readDtcResponseModel.status ==
   //               "GENERALERROR_INVALIDRESPFROMDONGLE" ||
   //           readDtcResponseModel.status?.contains("BUSY") == true) {
-  //         print("⏳ [readDtc] ECU busy or invalid response, retrying...");
+  //         print("ÔÅ│ [readDtc] ECU busy or invalid response, retrying...");
   //         await Future.delayed(const Duration(milliseconds: 100));
   //       } else {
   //         break;
@@ -338,21 +388,21 @@ class DLLFunctions {
 
   //     if (readDtcResponseModel.dtcs != null) {
   //       print(
-  //           "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
+  //           "Ô£à [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
   //     } else {
-  //       print("⚠️ [readDtc] Warning - dtcs array is null");
+  //       print("ÔÜá´©Å [readDtc] Warning - dtcs array is null");
   //     }
 
   //     return readDtcResponseModel;
   //   } catch (e, st) {
-  //     print("❌ [readDtc] EXCEPTION: $e");
-  //     print("❌ StackTrace: $st");
+  //     print("ÔØî [readDtc] EXCEPTION: $e");
+  //     print("ÔØî StackTrace: $st");
   //     return null;
   //   }
   // }
 
   Future<ReadDtcResponseModel?> readDtc(String dtcIndex) async {
-    print("🔹 [readDtc] Start - Received index string: $dtcIndex");
+    print("­ƒö╣ [readDtc] Start - Received index string: $dtcIndex");
 
     try {
       // Normalize to match C# ReadDtc(string dtc_index):
@@ -363,17 +413,17 @@ class DLLFunctions {
           : dtcIndex.replaceAll('-', '_');
 
       if (normalized != dtcIndex) {
-        print("🔧 [readDtc] Normalized '$dtcIndex' -> '$normalized'");
+        print("­ƒöº [readDtc] Normalized '$dtcIndex' -> '$normalized'");
       }
 
       ReadDtcIndex index = ReadDtcIndex.values.firstWhere(
         (e) => e.toString().split('.').last == normalized,
         orElse: () {
-          print("❌ No matching ReadDtcIndex enum found for: $normalized");
+          print("ÔØî No matching ReadDtcIndex enum found for: $normalized");
           throw Exception("Invalid DTC index: $normalized");
         },
       );
-      print("✅ [readDtc] Mapped string '$normalized' to enum: $index");
+      print("Ô£à [readDtc] Mapped string '$normalized' to enum: $index");
 
       ReadDtcResponseModel readDtcResponseModel = ReadDtcResponseModel();
 
@@ -381,7 +431,7 @@ class DLLFunctions {
 
       do {
         attempt++;
-        print("⏳ [readDtc] Attempt #$attempt to read DTC...");
+        print("ÔÅ│ [readDtc] Attempt #$attempt to read DTC...");
 
         final rawResponse = await mUdsDiagnostic.readDTC(index);
 
@@ -389,14 +439,14 @@ class DLLFunctions {
         readDtcResponseModel.status = rawResponse.status;
         readDtcResponseModel.noofdtc = rawResponse.noofdtc;
 
-        print("📡 [readDtc] Status received: ${readDtcResponseModel.status}");
+        print("­ƒôí [readDtc] Status received: ${readDtcResponseModel.status}");
         print(
-            "📡 [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
+            "­ƒôí [readDtc] Number of DTCs: ${readDtcResponseModel.dtcs?.length ?? 0}");
 
         if (readDtcResponseModel.status ==
                 "GENERALERROR_INVALIDRESPFROMDONGLE" ||
             readDtcResponseModel.status?.contains("BUSY") == true) {
-          print("⏳ [readDtc] ECU busy or invalid response, retrying...");
+          print("ÔÅ│ [readDtc] ECU busy or invalid response, retrying...");
           await Future.delayed(const Duration(milliseconds: 100));
         } else {
           break;
@@ -405,78 +455,30 @@ class DLLFunctions {
 
       if (readDtcResponseModel.dtcs != null) {
         print(
-            "✅ [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
+            "Ô£à [readDtc] Success - DTCs parsed: ${readDtcResponseModel.dtcs!.length}");
       } else {
-        print("⚠️ [readDtc] Warning - dtcs array is null");
+        print("ÔÜá´©Å [readDtc] Warning - dtcs array is null");
       }
 
       return readDtcResponseModel;
     } catch (e, st) {
-      print("❌ [readDtc] EXCEPTION: $e");
-      print("❌ StackTrace: $st");
+      print("ÔØî [readDtc] EXCEPTION: $e");
+      print("ÔØî StackTrace: $st");
       return null;
     }
   }
-
-  Future<String?> clearDtc(String dtcIndex) async {
-  print("🔹 [clearDtc] Start - Received index string: $dtcIndex");
-
-  try {
-    // Matches C#'s alias handling:
-    //   if (dtc_index == "UDS-4BYTES") dtc_index = "UDS_4BYTES";
-    // plus normalizing any other dashes to underscores so the enum
-    // lookup below succeeds regardless of which separator the API sent.
-    String normalized = dtcIndex == 'UDS-4BYTES'
-        ? 'UDS_4BYTES'
-        : dtcIndex.replaceAll('-', '_');
-
-    if (normalized != dtcIndex) {
-      print("🔧 [clearDtc] Normalized '$dtcIndex' -> '$normalized'");
-    }
-
-    final ClearDtcIndex index = ClearDtcIndex.values.firstWhere(
-      (e) => e.toString().split('.').last == normalized,
-      orElse: () {
-        print("❌ No matching ClearDtcIndex enum found for: $normalized");
-        throw Exception("Invalid Clear DTC index: $normalized");
-      },
-    );
-    print("✅ [clearDtc] Mapped string '$normalized' to enum: $index");
-
-    final result = await mUdsDiagnostic.clearDTC(index);
-
-    if (result == null) {
-      print("⚠️ [clearDtc] clearDTC returned null");
-      return null;
-    }
-
-    // result is the raw ResponseArrayStatus-style object from
-    // UDSDiagnostic.clearDTC() — pull the status field directly via
-    // dynamic dispatch, same field the C# version extracts through
-    // JsonConvert as Response.ECUResponseStatus.
-    final status = (result as dynamic).ecuResponseStatus as String?;
-
-    print("📡 [clearDtc] Status received: $status");
-
-    return status;
-  } catch (e, st) {
-    print("❌ [clearDtc] EXCEPTION: $e");
-    print("❌ StackTrace: $st");
-    return null;
-  }
-}
 
   Future<List<ReadParameterResponse>?> readPid(
       List<pid_ds.Code> pidList) async {
     try {
-      print("🚀 readPid() called");
-      print("📌 Total PID requested: ${pidList.length}");
+      print("­ƒÜÇ readPid() called");
+      print("­ƒôî Total PID requested: ${pidList.length}");
 
       // Build ReadParameterPID list
       List<ReadParameterPID> list = [];
 
       for (var item in pidList) {
-        print("➡️ Building PID: ${item.id}, Code: ${item.code}");
+        print("Ô×í´©Å Building PID: ${item.id}, Code: ${item.code}");
 
         List<PidVariable> variables = [];
 
@@ -486,7 +488,7 @@ class DLLFunctions {
           int noOfBits = endBit - startBit + 1;
 
           print(
-              "   🔹 Variable ID: ${vari.id}, StartBit: $startBit, EndBit: $endBit");
+              "   ­ƒö╣ Variable ID: ${vari.id}, StartBit: $startBit, EndBit: $endBit");
 
           final messages = (vari.messages ?? <pid_ds.Message>[])
               .map((m) => SelectedParameterMessage(
@@ -524,18 +526,18 @@ class DLLFunctions {
         );
       }
 
-      print("📤 Reading ${list.length} PID(s) directly via dongle comm...");
+      print("­ƒôñ Reading ${list.length} PID(s) directly via dongle comm...");
 
       final result = await mUdsDiagnostic.readParameters(list.length, list);
 
-      print("📥 Result count: ${result.length}");
+      print("­ƒôÑ Result count: ${result.length}");
       for (var item in result) {
-        print("➡️ PID: ${item.pidId}, Status: ${item.status}");
+        print("Ô×í´©Å PID: ${item.pidId}, Status: ${item.status}");
       }
 
       return result;
     } catch (ex) {
-      print("🔥 Error reading PIDs: $ex");
+      print("­ƒöÑ Error reading PIDs: $ex");
       return null;
     }
   }
@@ -548,13 +550,13 @@ class DLLFunctions {
   }
 
   Future<double> resetPercentage() async {
-  try {
-    await mUdsDiagnostic.resetPercentage();
-    return 0;
-  } catch (e) {
-    return 0;
+    try {
+      await mUdsDiagnostic.resetPercentage();
+      return 0;
+    } catch (e) {
+      return 0;
+    }
   }
-}
 
   Future<String?> startECUFlashing(
     String flashJson,
@@ -563,66 +565,66 @@ class DLLFunctions {
     String sklFN,
   ) async {
     try {
-      print("🚀 [FLASH] ===== START ECU FLASHING =====");
+      print("­ƒÜÇ [FLASH] ===== START ECU FLASHING =====");
 
-      print("📥 [INPUT] sklFN (raw): $sklFN");
-      print("📥 [INPUT] interpreter: $interpreter");
-      print("📥 [INPUT] flashJson length: ${flashJson.length}");
+      print("­ƒôÑ [INPUT] sklFN (raw): $sklFN");
+      print("­ƒôÑ [INPUT] interpreter: $interpreter");
+      print("­ƒôÑ [INPUT] flashJson length: ${flashJson.length}");
 
       sklFN = sklFN.replaceAll('-', '_');
-      print("🔄 [PROCESS] sklFN normalized: $sklFN");
+      print("­ƒöä [PROCESS] sklFN normalized: $sklFN");
 
       final jsonMap = jsonDecode(flashJson);
-      print("📦 [JSON] Parsed successfully");
+      print("­ƒôª [JSON] Parsed successfully");
 
       final jsonData = FlashingMatrixData.fromJson(jsonMap);
-      print("📦 [JSON] noOfSectors: ${jsonData.noOfSectors}");
-      print("📦 [JSON] sectorData count: ${jsonData.sectorData?.length}");
+      print("­ƒôª [JSON] noOfSectors: ${jsonData.noOfSectors}");
+      print("­ƒôª [JSON] sectorData count: ${jsonData.sectorData?.length}");
 
       final seedkeyindx = SEEDKEYINDEXTYPE.values.firstWhere(
         (e) {
           final enumName = e.toString().split('.').last;
-          print("🔍 [ENUM CHECK] comparing $enumName with $sklFN");
+          print("­ƒöì [ENUM CHECK] comparing $enumName with $sklFN");
           return enumName.toUpperCase() == sklFN.toUpperCase();
         },
         orElse: () {
-          print("⚠️ [ENUM] No match found, using default");
+          print("ÔÜá´©Å [ENUM] No match found, using default");
           return SEEDKEYINDEXTYPE.values.first;
         },
       );
 
-      print("✅ [ENUM] Selected: $seedkeyindx");
+      print("Ô£à [ENUM] Selected: $seedkeyindx");
 
       final flashConfig = FlashConfig(
         seedKeyIndex: seedkeyindx,
       );
 
-      print("⚙️ [CONFIG] FlashConfig created");
+      print("ÔÜÖ´©Å [CONFIG] FlashConfig created");
 
-      // print("📡 [UDS] Starting tester present...");
+      //print("­ƒôí [UDS] Starting tester present...");
       // await startTesterPresent();
-      // print("✅ [UDS] Tester present started");
+      //print("Ô£à [UDS] Tester present started");
 
-      print("🚀 [FLASH] Calling flashInterpreter...");
-      final response = await mUdsDiagnostic.flashInterpreter2(
+      print("­ƒÜÇ [FLASH] Calling flashInterpreter...");
+      final response = await mUdsDiagnostic.flashInterpreter(
         flashConfig,
         jsonData.noOfSectors ?? 0,
         jsonData.sectorData!,
         interpreter,
       );
 
-      print("📥 [FLASH RESPONSE]: $response");
+      print("­ƒôÑ [FLASH RESPONSE]: $response");
 
-      // print("🛑 [UDS] Stopping tester present...");
-      //  await stopTesterPresent();
-      // print("✅ [UDS] Tester present stopped");
+      // print("­ƒøæ [UDS] Stopping tester present...");
+      // // await stopTesterPresent();
+      // print("Ô£à [UDS] Tester present stopped");
 
-      print("🎉 [FLASH] ===== COMPLETED SUCCESS =====");
+      print("­ƒÄë [FLASH] ===== COMPLETED SUCCESS =====");
 
       return response;
     } catch (e, stackTrace) {
-      print("❌ [ERROR] Flashing failed: $e");
-      print("📍 [STACKTRACE]: $stackTrace");
+      print("ÔØî [ERROR] Flashing failed: $e");
+      print("­ƒôì [STACKTRACE]: $stackTrace");
 
       return null;
     }
@@ -708,7 +710,7 @@ class DLLFunctions {
         index = WriteParameterIndex.values
             .firstWhere((e) => e.toString().split('.').last == writePidIndex);
       } catch (e) {
-        print("❌ Failed to parse WriteParameterIndex from "
+        print("ÔØî Failed to parse WriteParameterIndex from "
             "writePidIndex=\"$writePidIndex\": $e");
         rethrow;
       }
@@ -735,7 +737,7 @@ class DLLFunctions {
           seedIndex = SEEDKEYINDEXTYPE.values.firstWhere(
               (e) => e.toString().split('.').last == item.seedKeyIndex);
         } catch (e) {
-          print("❌ Failed to parse SEEDKEYINDEXTYPE from "
+          print("ÔØî Failed to parse SEEDKEYINDEXTYPE from "
               "seedKeyIndex=\"${item.seedKeyIndex}\" (pid=${item.pid}): $e");
           rethrow;
         }
@@ -748,7 +750,7 @@ class DLLFunctions {
           writeIndex = WriteParameterIndex.values.firstWhere(
               (e) => e.toString().split('.').last == item.writePamIndex);
         } catch (e) {
-          print("❌ Failed to parse WriteParameterIndex from "
+          print("ÔØî Failed to parse WriteParameterIndex from "
               "writePamIndex=\"${item.writePamIndex}\" (pid=${item.pid}): $e");
           rethrow;
         }
@@ -825,7 +827,7 @@ class DLLFunctions {
       print("Raw Result from writeParameters(): $result");
 
       if (result == null) {
-        print("⚠ writeParameters returned NULL");
+        print("ÔÜá writeParameters returned NULL");
         return null;
       }
 
@@ -842,14 +844,14 @@ class DLLFunctions {
       print("Parsed WriteParameterStatus List Length: ${resList.length}");
 
       for (int i = 0; i < resList.length; i++) {
-        print("  • Result[$i].status: ${resList[i].status}");
+        print("  ÔÇó Result[$i].status: ${resList[i].status}");
       }
 
       print("========== WRITE PID END ==========");
 
       return resList;
     } catch (e, stack) {
-      print("❌ Error in writePid: $e");
+      print("ÔØî Error in writePid: $e");
       print("StackTrace: $stack");
 
       return null;
@@ -961,7 +963,7 @@ class DLLFunctions {
       print("Raw Result from writeParameters(): $result");
 
       if (result == null) {
-        print("⚠ writeParameters returned NULL");
+        print("ÔÜá writeParameters returned NULL");
         return null;
       }
 
@@ -981,7 +983,7 @@ class DLLFunctions {
 
       return resList;
     } catch (e, stack) {
-      print("❌ Error in writePid: $e");
+      print("ÔØî Error in writePid: $e");
       print("StackTrace: $stack");
 
       return null;
