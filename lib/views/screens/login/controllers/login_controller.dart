@@ -136,10 +136,6 @@ class LoginController extends GetxController {
       await SecureStorageService.savePlcIp(plcIp);
       await SecureStorageService.savePlcPort(plcPort?.toString());
 
-      // await SecureStorageService.saveDongleIp(dongleIp);
-      // await SecureStorageService.savePlcIp(plcIp);
-      // await SecureStorageService.savePlcPort(plcPort?.toString());
-
       if (stationType == 'Testing') {
         Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
       } else {

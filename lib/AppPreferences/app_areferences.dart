@@ -1,11 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Wraps flutter_secure_storage for anything sensitive: username, password,
-/// access token, refresh token. Unlike SharedPreferences (used in
-/// AppPreferences for non-sensitive cached data), this is encrypted at rest.
-///
-/// Add to pubspec.yaml:
-///   flutter_secure_storage: ^9.0.0
 class SecureStorageService {
   SecureStorageService._();
 

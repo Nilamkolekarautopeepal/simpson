@@ -85,34 +85,6 @@ class AndroidOperationsService {
     return "1234567890"; // fallback for other platforms
   }
 
-  /// Runs `getmac /fo csv /nh` and returns the first real (non-virtual,
-  /// non-all-zero) physical MAC address formatted as "AA:BB:CC:DD:EE:FF".
-  static Future<String?> _getWindowsMacAddress() async {
-    try {
-      final result = await Process.run('getmac', ['/fo', 'csv', '/nh']);
-      if (result.exitCode != 0) return null;
-
-      final output = result.stdout.toString();
-      final lines = output.split('\n').where((line) => line.trim().isNotEmpty);
-
-      final macPattern = RegExp(r'"([0-9A-Fa-f]{2}(-[0-9A-Fa-f]{2}){5})"');
-
-      for (final line in lines) {
-        final match = macPattern.firstMatch(line);
-        if (match == null) continue;
-
-        final formatted = match.group(1)!.replaceAll('-', ':').toUpperCase();
-
-        // Skip disabled/virtual adapters reporting all zeros
-        if (formatted == "00:00:00:00:00:00") continue;
-
-        return formatted;
-      }
-    } catch (e) {
-      // fall through to null below
-    }
-    return null;
-  }
 
   static Future<String?> getData(String fileName) async {
     try {

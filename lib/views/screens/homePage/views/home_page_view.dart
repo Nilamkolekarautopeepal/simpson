@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -701,6 +700,100 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
+  // Widget _buildFlashSection() {
+  //   return Obx(() {
+  //     final expanded = controller.flashExpanded.value;
+
+  //     return Container(
+  //       decoration: BoxDecoration(
+  //         color: Colors.white,
+  //         borderRadius: BorderRadius.circular(10),
+  //         border: Border.all(color: Colors.grey.shade200),
+  //       ),
+  //       child: Column(
+  //         children: [
+  //           InkWell(
+  //             borderRadius: BorderRadius.circular(10),
+  //             onTap: controller.toggleFlash,
+  //             child: Padding(
+  //               padding:
+  //                   const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //               child: Row(
+  //                 children: [
+  //                   const Text('Flash File',
+  //                       style: TextStyle(fontWeight: FontWeight.w600)),
+  //                   const Spacer(),
+  //                   Obx(() {
+  //                     if (controller.flashComplete.value) {
+  //                       return Padding(
+  //                         padding: const EdgeInsets.only(right: 10),
+  //                         child: Column(
+  //                           children: [
+  //                             Container(
+  //                               width: 22,
+  //                               height: 22,
+  //                               decoration: const BoxDecoration(
+  //                                 color: AppColors.themeColor,
+  //                                 shape: BoxShape.circle,
+  //                               ),
+  //                               child: const Icon(Icons.check,
+  //                                   color: Colors.white, size: 14),
+  //                             ),
+  //                             const SizedBox(height: 5),
+  //                             Text(
+  //                               'Flashing Successful',
+  //                               style: TextStyle(
+  //                                   fontSize: 12,
+  //                                   color: AppColors.themeColor,
+  //                                   fontWeight: FontWeight.bold),
+  //                             ),
+  //                           ],
+  //                         ),
+  //                       );
+  //                     }
+
+  //                     if (controller.flashInProgress.value) {
+  //                       return Padding(
+  //                         padding: const EdgeInsets.only(right: 10),
+  //                         child: Obx(() {
+  //                           final pct =
+  //                               (controller.flashProgress.value * 100).round();
+  //                           return Container(
+  //                             padding: const EdgeInsets.symmetric(
+  //                                 horizontal: 8, vertical: 2),
+  //                             decoration: BoxDecoration(
+  //                               color: AppColors.themeColor.withOpacity(0.1),
+  //                               borderRadius: BorderRadius.circular(12),
+  //                             ),
+  //                             child: Text(
+  //                               '$pct%',
+  //                               style: TextStyle(
+  //                                 fontSize: 12,
+  //                                 color: AppColors.themeColor,
+  //                               ),
+  //                             ),
+  //                           );
+  //                         }),
+  //                       );
+  //                     }
+
+  //                     return const SizedBox.shrink();
+  //                   }),
+  //                   Icon(expanded ? Icons.expand_less : Icons.expand_more),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //           if (expanded)
+  //             Padding(
+  //               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+  //               child: _buildFlashBody(),
+  //             ),
+  //         ],
+  //       ),
+  //     );
+  //   });
+  // }
   Widget _buildFlashSection() {
     return Obx(() {
       final expanded = controller.flashExpanded.value;
@@ -757,8 +850,7 @@ class HomePageView extends GetView<HomePageController> {
                         return Padding(
                           padding: const EdgeInsets.only(right: 10),
                           child: Obx(() {
-                            final pct =
-                                (controller.flashProgress.value * 100).round();
+                            final pct = controller.flashProgress.value * 100;
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 2),
@@ -767,7 +859,7 @@ class HomePageView extends GetView<HomePageController> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '$pct%',
+                                '${pct.toStringAsFixed(1)}%',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: AppColors.themeColor,
@@ -1009,7 +1101,7 @@ class HomePageView extends GetView<HomePageController> {
                 ),
                 Obx(
                   () => Text(
-                    '${(controller.flashProgress.value * 100).round()}%',
+                    '${(controller.flashProgress.value * 100).toStringAsFixed(1)}%',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -1286,8 +1378,7 @@ class HomePageView extends GetView<HomePageController> {
     } else if (statusLower == 'inactive') {
       badgeColor = Colors.green.shade600;
       badgeLabel = 'InActive';
-    } 
-    else {
+    } else {
       badgeColor = Colors.green.shade600;
       badgeLabel = status.isNotEmpty ? 'History' : '-';
     }
@@ -1846,7 +1937,7 @@ class HomePageView extends GetView<HomePageController> {
               Obx(
                 () => IconButton(
                   icon: const Icon(Icons.copy, size: 18),
-                 color: AppColors.themeColor,
+                  color: AppColors.themeColor,
                   tooltip: 'Copy all activity log',
                   visualDensity: VisualDensity.compact,
                   onPressed: controller.activityLog.isEmpty
@@ -1879,21 +1970,20 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
-
   void _showActivityFullScreen() {
     Get.dialog(
       Dialog.fullscreen(
         child: Scaffold(
           appBar: AppBar(
-             iconTheme: const IconThemeData(
-    color: Colors.white, // Back arrow color
-  ),
+            iconTheme: const IconThemeData(
+              color: Colors.white, // Back arrow color
+            ),
             backgroundColor: AppColors.themeColor,
             foregroundColor: Colors.white,
             title: const Text('Activity Log'),
             actions: [
               Obx(() => IconButton(
-                    icon: const Icon(Icons.save_alt,color:Colors.white),
+                    icon: const Icon(Icons.save_alt, color: Colors.white),
                     tooltip: 'Save Activity Log',
                     onPressed: controller.activityLog.isEmpty
                         ? null
@@ -1902,12 +1992,12 @@ class HomePageView extends GetView<HomePageController> {
                           },
                   )),
               Obx(() => IconButton(
-                    icon: const Icon(Icons.copy,color:Colors.white),
+                    icon: const Icon(Icons.copy, color: Colors.white),
                     tooltip: 'Copy all activity log',
                     onPressed: controller.activityLog.isEmpty
                         ? null
                         : () => _copyActivityLog(),
-                   )),
+                  )),
               // IconButton(
               //   icon: const Icon(Icons.close,color:Colors.white),
               //   tooltip: 'Close',

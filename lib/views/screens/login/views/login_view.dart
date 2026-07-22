@@ -82,33 +82,6 @@ class LoginScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 32),
 
-                      // Station
-                      // const Text(
-                      //   'Station',
-                      //   style: TextStyle(fontWeight: FontWeight.bold),
-                      // ),
-                      // const SizedBox(height: 6),
-                      // Obx(
-                      //   () => DropdownButtonFormField<String>(
-                      //     value: controller.selectedStation.value,
-                      //     items: controller.stationOptions
-                      //         .map(
-                      //           (station) => DropdownMenuItem(
-                      //             value: station,
-                      //             child: Text(station),
-                      //           ),
-                      //         )
-                      //         .toList(),
-                      //     onChanged: (value) {
-                      //       if (value != null) {
-                      //         controller.selectedStation.value = value;
-                      //       }
-                      //     },
-                      //     decoration: _fieldDecoration('Select Station'),
-                      //   ),
-                      // ),
-                      // const SizedBox(height: 20),
-
                       // Email
                       const Text(
                         'Email',

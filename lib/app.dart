@@ -75,7 +75,7 @@ class App {
 
             WindowOptions windowOptions = const WindowOptions(
               center: true,
-              backgroundColor: Colors.transparent,
+              //backgroundColor: Colors.transparent,
               skipTaskbar: false,
               titleBarStyle: TitleBarStyle.normal,
               // This sets the window to full screen at startup

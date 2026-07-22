@@ -132,6 +132,7 @@ class HomePageController extends GetxController {
     _autoConnectPlc();
   }
 
+  // ignore: unused_element
   void _startPlcHeartbeat() {
     _plcHeartbeatTimer?.cancel();
     _plcHeartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
@@ -249,12 +250,6 @@ class HomePageController extends GetxController {
 //    the button can show its own spinner without touching flash flags.
 
   final RxBool isReadingDtcManually = false.obs;
-
-// ── 2) New method — calls the SAME _loadDtcResults() that already runs
-//    after a successful flash (identical clear+read+description-match
-//    logic, populates the SAME dtcList the post-flash DTC section
-//    reads from). No flashing happens here at all — this is completely
-//    independent of startFlashing().
 
   Future<void> readDtcsManually() async {
     if (!dongleConnected.value || App.dllFunctions == null) {
@@ -1915,7 +1910,7 @@ class HomePageController extends GetxController {
           throw Exception("ECU MAP FILE missing — cannot generate flash JSON.");
         }
 
-        flashStatus.value = 'Downloading firmware...';
+        flashStatus.value = 'Downloading Dataset...';
 
         final hexUrl = variantEcu.dataFile ?? _fileToHexUrl[fileName];
 
@@ -2077,15 +2072,97 @@ class HomePageController extends GetxController {
   }
 
   void _resetLoader() => _setBusy(false, "");
+  // Future<void> _loadDtcResults() {
+  //   return _withDongleBusy(() async {
+  //     final datasetId = _currentDtcDatasetId;
+  //     if (datasetId == null) {
+  //       _log('No DTC dataset id available — skipping');
+  //       return;
+  //     }
+
+  //     final ecu =
+  //         StaticData.ecuInfo.firstWhereOrNull((e) => e.readDtcIndex != null);
+  //     if (ecu == null) {
+  //       _log('DTC read: no ECU with read_dtc_index configured — skipping');
+  //       return;
+  //     }
+
+  //     _accessToken ??= await SecureStorageService.getAccessToken();
+
+  //     try {
+  //       final dtc_ds.DtcDataset dtc = await _authService.getDtcDataset(
+  //         id: datasetId,
+  //         accessToken: _accessToken,
+  //       );
+
+  //       final serverCodes = <dtc_ds.DtcCode>[];
+  //       for (final result in dtc.results ?? <dtc_ds.Result>[]) {
+  //         serverCodes.addAll(result.dtcCode ?? <dtc_ds.DtcCode>[]);
+  //       }
+
+  //       await App.dllFunctions!.setDongleProperties(
+  //         ecu.protocol?.name ?? '',
+  //         ecu.protocol?.autopeepal ?? '',
+  //         ecu.txHeader ?? '',
+  //         ecu.rxHeader ?? '',
+  //       );
+
+  //       _log('Reading DTCs from ${ecu.ecuName}...');
+  //       final readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+
+  //       if (readResult == null) {
+  //         _log('DTC read: ECU_COMMUNICATION_ERROR');
+  //         dtcList.clear();
+  //         dongleConnected.value = false;
+  //         _startDongleRetryTimer();
+  //         _showReconnectPopup();
+  //         return;
+  //       }
+
+  //       if (readResult.status != 'NO_ERROR') {
+  //         _log('DTC read failed: ${readResult.status}');
+  //         dtcList.clear();
+  //         if (readResult.status == 'No Resp From Dongle' ||
+  //             readResult.status == 'SOCKET_CLOSED' ||
+  //             readResult.status.toString().toLowerCase().contains('no resp')) {
+  //           dongleConnected.value = false;
+  //           _startDongleRetryTimer();
+  //           _showReconnectPopup();
+  //         }
+  //         return;
+  //       }
+
+  //       final rows = readResult.dtcs ?? [];
+  //       final dummy = <String, String>{};
+
+  //       for (final row in rows) {
+  //         if (row.length < 2) continue;
+  //         final code = row[0].toString().toUpperCase();
+  //         final status = row[1].toString();
+
+  //         // No filtering, no persistence — show exactly what the ECU
+  //         // currently reports for every code (Active / Inactive / Pending).
+  //         final match = serverCodes.firstWhereOrNull(
+  //           (c) => (c.code ?? '').toUpperCase() == code,
+  //         );
+  //         final desc = match?.description ?? 'Description not found';
+
+  //         dummy[code] = '$code - $desc ($status)';
+  //       }
+
+  //       dtcList.assignAll(dummy.values.toList());
+  //       _log('DTC (${dtcList.length}) data loaded');
+  //     } catch (e) {
+  //       final message = e.toString().replaceFirst('Exception: ', '');
+  //       _log('Failed to load DTC dataset: $e');
+  //       dtcList.clear();
+  //       _showErrorPopup(message, title: 'Failed to Load DTC');
+  //     }
+  //   });
+  // }
+
   Future<void> _loadDtcResults() {
     return _withDongleBusy(() async {
-      // NOTE: intentionally does NOT call _clearDTCInternal() here.
-      // Reading DTCs must never clear them from the ECU — clearing is a
-      // separate, explicit user action (see clearDTC()). Clearing here
-      // was wiping the ECU's DTC memory before every read, which caused
-      // codes to vanish on refresh and made it impossible to ever see a
-      // code transition to Inactive (there was nothing left in the ECU
-      // to report as Inactive).
       final datasetId = _currentDtcDatasetId;
       if (datasetId == null) {
         _log('No DTC dataset id available — skipping');
@@ -2119,11 +2196,39 @@ class HomePageController extends GetxController {
           ecu.rxHeader ?? '',
         );
 
-        _log('Reading DTCs from ${ecu.ecuName}...');
-        final readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+        // ── Read with one retry before treating it as a real disconnect ──
+        // A single dropped packet or a slow ECU response (common right
+        // after flashing, or over WiFi) shouldn't be treated the same as
+        // a genuinely dead connection.
+        dynamic readResult;
+        const maxAttempts = 2;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+          _log(
+              'Reading DTCs from ${ecu.ecuName}... (attempt $attempt/$maxAttempts)');
+          readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+
+          final status = readResult?.status?.toString();
+          final looksBad = readResult == null ||
+              (status != 'NO_ERROR' &&
+                  (status == null ||
+                      status == 'No Resp From Dongle' ||
+                      status == 'SOCKET_CLOSED' ||
+                      status.toLowerCase().contains('no resp')));
+
+          if (!looksBad) break; // good read — stop retrying
+
+          if (attempt < maxAttempts) {
+            _log(
+                'DTC read attempt $attempt failed (${readResult?.status ?? "no response"}) '
+                '— retrying once before giving up...');
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+        }
 
         if (readResult == null) {
-          _log('DTC read: ECU_COMMUNICATION_ERROR');
+          _log(
+              'DTC read: ECU_COMMUNICATION_ERROR (after $maxAttempts attempts)');
           dtcList.clear();
           dongleConnected.value = false;
           _startDongleRetryTimer();
@@ -2132,11 +2237,13 @@ class HomePageController extends GetxController {
         }
 
         if (readResult.status != 'NO_ERROR') {
-          _log('DTC read failed: ${readResult.status}');
+          _log(
+              'DTC read failed: ${readResult.status} (after $maxAttempts attempts)');
           dtcList.clear();
+          final statusLower = readResult.status.toString().toLowerCase();
           if (readResult.status == 'No Resp From Dongle' ||
               readResult.status == 'SOCKET_CLOSED' ||
-              readResult.status.toString().toLowerCase().contains('no resp')) {
+              statusLower.contains('no resp')) {
             dongleConnected.value = false;
             _startDongleRetryTimer();
             _showReconnectPopup();
@@ -2173,6 +2280,7 @@ class HomePageController extends GetxController {
     });
   }
 
+  // ignore: unused_element
   Future<void> _loadDtcResults1() {
     return _withDongleBusy(() async {
       await _clearDTCInternal();
@@ -2583,48 +2691,6 @@ class HomePageController extends GetxController {
     }
   }
 
-  // Future<bool> _readSelectedPidsOnce(List<pid_ds.Code> codes) async {
-  //   return await _withDongleBusy(() async {
-  //     try {
-  //       final responses = await App.dllFunctions!.readPid(codes);
-
-  //       if (responses == null) {
-  //         _log('❌ Live PID read: no response from ECU');
-  //         return false;
-  //       }
-
-  //       for (final resp in responses) {
-  //         final code = codes.firstWhereOrNull((c) => c.id == resp.pidId);
-  //         if (code == null) continue;
-
-  //         if (resp.status == 'NOERROR') {
-  //           for (final variable
-  //               in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
-  //             final item = resp.variables
-  //                 .firstWhereOrNull((v) => v.pidNumber == variable.id);
-  //             if (variable.id != null) {
-  //               livePidValues[variable.id!] =
-  //                   item?.responseValue ?? 'Not Found';
-  //             }
-  //           }
-  //         } else {
-  //           for (final variable
-  //               in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
-  //             if (variable.id != null) {
-  //               livePidValues[variable.id!] = resp.status ?? 'ERROR';
-  //             }
-  //           }
-  //         }
-  //       }
-
-  //       return true;
-  //     } catch (e) {
-  //       _log('❌ Live PID read error: $e');
-  //       return false;
-  //     }
-  //   });
-  // }
-
   Future<bool> _readSelectedPidsOnce(List<pid_ds.Code> codes) async {
     return await _withDongleBusy(() async {
       try {
@@ -2724,7 +2790,7 @@ class HomePageController extends GetxController {
   void _startDongleHeartbeat() {
     _dongleHeartbeatTimer?.cancel();
     _dongleHeartbeatTimer =
-        Timer.periodic(const Duration(seconds: 1), (_) async {
+        Timer.periodic(const Duration(seconds: 5), (_) async {
       await checkDongleStatus();
     });
   }

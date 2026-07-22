@@ -153,163 +153,6 @@ class UDSDiagnostic {
     return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
-  // Future<ReadDtcResponseModel> readDTC(ReadDtcIndex dtcIndex) async {
-  //   String status = '';
-  //   String returnStatus = '';
-  //   List<List<String>>? dtcArray;
-
-  //   try {
-  //     if (dtcIndex == ReadDtcIndex.KWP_2BYTE_DTC ||
-  //         dtcIndex == ReadDtcIndex.UDS_2BYTE12_DTC ||
-  //         dtcIndex == ReadDtcIndex.UDS_2BYTE13_DTC ||
-  //         dtcIndex == ReadDtcIndex.UDS_3BYTE_DTC) {
-  //       int frameLength = 3;
-  //       final responseBytes = await _dongleComm.can2xTxRx(
-  //         frameLength,
-  //         '1902FF',
-  //       );
-  //       status = responseBytes.ecuResponseStatus ?? '';
-  //       final actualData = responseBytes.actualDataBytes;
-  //       returnStatus = '';
-
-  //       if (status == 'NOERROR') {
-  //         returnStatus = 'NO_ERROR';
-  //         final rxSize = actualData!.length;
-  //         final rxArray = actualData;
-  //         int dtcStartByteIndex = 3;
-  //         // 59 02 FF DTCHB DTCMB1 DTCLB1 DTCSTS1 DTCHB2 DTCMB2 DTCLB2 DTCSTS2 ..... DTCHBn DTCMBn DTCLBn DTCSTSn
-  //         final noOfDtc = (rxSize - 3) ~/ 4;
-  //         dtcArray = List.generate(noOfDtc, (_) => List.filled(2, ''));
-
-  //         int i = 0;
-  //         while (i < noOfDtc) {
-  //           final dtcTypeBits = (rxArray[dtcStartByteIndex] & 0xC0) >> 6;
-  //           String dtcType = '';
-  //           if (dtcTypeBits == 0x00) {
-  //             dtcType = 'P';
-  //           } else if (dtcTypeBits == 0x01) {
-  //             dtcType = 'C';
-  //           } else if (dtcTypeBits == 0x02) {
-  //             dtcType = 'B';
-  //           } else if (dtcTypeBits == 0x03) {
-  //             dtcType = 'U';
-  //           }
-
-  //           final value = rxArray[dtcStartByteIndex + 3] & 0x01;
-  //           switch (value) {
-  //             case 0x00:
-  //               dtcArray[i][1] = 'Inactive';
-  //               break;
-  //             case 0x01:
-  //               dtcArray[i][1] = 'Active';
-  //               break;
-  //           }
-
-  //           switch (dtcIndex) {
-  //             case ReadDtcIndex.UDS_3BYTE_DTC:
-  //               dtcArray[i][0] =
-  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}-${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
-  //               break;
-  //             case ReadDtcIndex.UDS_2BYTE12_DTC:
-  //               dtcArray[i][0] =
-  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
-  //               break;
-  //             case ReadDtcIndex.UDS_2BYTE13_DTC:
-  //               dtcArray[i][0] =
-  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 2].toRadixString(16).padLeft(2, '0')}';
-  //               break;
-  //             case ReadDtcIndex.KWP_2BYTE_DTC:
-  //               dtcArray[i][0] =
-  //                   '$dtcType${(rxArray[dtcStartByteIndex] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray[dtcStartByteIndex + 1].toRadixString(16).padLeft(2, '0')}';
-  //               break;
-  //             default:
-  //               dtcArray[i][0] = '';
-  //           }
-
-  //           dtcStartByteIndex += 4;
-  //           i++;
-  //         }
-  //       } else {
-  //         returnStatus = status;
-  //       }
-  //     } else if (dtcIndex == ReadDtcIndex.GENERIC_OBD) {
-  //       int frameLength = 1;
-  //       final responseBytes03 = await _dongleComm.can2xTxRx(frameLength, '03');
-  //       status = responseBytes03.ecuResponseStatus ?? '';
-  //       final actualData03 = responseBytes03.actualDataBytes;
-
-  //       if (status == 'NOERROR') {
-  //         final rxArray03 = actualData03!;
-  //         frameLength = 1;
-  //         final responseBytes07 = await _dongleComm.can2xTxRx(
-  //           frameLength,
-  //           '07',
-  //         );
-  //         status = responseBytes07.ecuResponseStatus ?? '';
-  //         final actualData07 = responseBytes07.actualDataBytes;
-  //         returnStatus = '';
-
-  //         if (status == 'NOERROR') {
-  //           returnStatus = 'NO_ERROR';
-  //           final rxArray07 = actualData07!;
-  //           // All DTCs    - 43 LEN DTCHB DTCLB1 DTCHB2 DTCLB2  ..... DTCHBn DTCLBn
-  //           // Pending DTCs - 47 LEN DTCHB DTCLB1 DTCHB2 DTCLB2  ..... DTCHBn DTCLBn
-  //           final noOfDtc03 = rxArray03[1];
-  //           final noOfDtc07 = rxArray07[1];
-
-  //           dtcArray = List.generate(
-  //             noOfDtc03 + noOfDtc07,
-  //             (_) => List.filled(2, ''),
-  //           );
-
-  //           int i = 0;
-  //           for (i = 0; i < noOfDtc03; i++) {
-  //             final dtcTypeBits = (rxArray03[i * 2 + 2] & 0xC0) >> 6;
-  //             String dtcType = '';
-  //             if (dtcTypeBits == 0x00) {
-  //               dtcType = 'P';
-  //             } else if (dtcTypeBits == 0x01) {
-  //               dtcType = 'C';
-  //             } else if (dtcTypeBits == 0x02) {
-  //               dtcType = 'B';
-  //             } else if (dtcTypeBits == 0x03) {
-  //               dtcType = 'U';
-  //             }
-  //             dtcArray[i][0] =
-  //                 '$dtcType${(rxArray03[i * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray03[i * 2 + 3].toRadixString(16).padLeft(2, '0')}';
-  //             dtcArray[i][1] = 'Current';
-  //           }
-
-  //           for (int j = 0; j < noOfDtc07; j++) {
-  //             final dtcTypeBits = (rxArray07[j * 2 + 2] & 0xC0) >> 6;
-  //             String dtcType = '';
-  //             if (dtcTypeBits == 0x00) {
-  //               dtcType = 'P';
-  //             } else if (dtcTypeBits == 0x01) {
-  //               dtcType = 'C';
-  //             } else if (dtcTypeBits == 0x02) {
-  //               dtcType = 'B';
-  //             } else if (dtcTypeBits == 0x03) {
-  //               dtcType = 'U';
-  //             }
-  //             dtcArray[i + j][0] =
-  //                 '$dtcType${(rxArray07[j * 2 + 2] & 0x3F).toRadixString(16).padLeft(2, '0')}${rxArray07[j * 2 + 3].toRadixString(16).padLeft(2, '0')}';
-  //             dtcArray[i + j][1] = 'Pending';
-  //           }
-  //         } else {
-  //           returnStatus = status;
-  //         }
-  //       } else {
-  //         returnStatus = status;
-  //       }
-  //     }
-
-  //     return ReadDtcResponseModel(dtcs: dtcArray, status: returnStatus);
-  //   } catch (e) {
-  //     return ReadDtcResponseModel(dtcs: null, status: e.toString());
-  //   }
-  // }
-
   Future<ReadDtcResponseModel> readDTC(ReadDtcIndex dtcIndex) async {
     String status = '';
     String returnStatus = '';
@@ -3502,7 +3345,7 @@ class UDSDiagnostic {
             "📤 send[$command]: ${byteArrayToHexString(txFrame)} (${txFrame.length} bytes)",
           );
 
-          var sendResp = await _dongleComm!.can2xTxRx(
+          var sendResp = await _dongleComm.can2xTxRx(
             txFrame.length,
             byteArrayToHexString(txFrame),
           );
@@ -3515,8 +3358,8 @@ class UDSDiagnostic {
           while (reprogrammingResponse.ecuResponseStatus ==
               "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
             print("⏳ RequiredTimeDelay — retrying in 300ms...");
-          //  await Future.delayed(const Duration(milliseconds: 300));
-            reprogrammingResponse = await _dongleComm!.can2xTxRx(
+            //  await Future.delayed(const Duration(milliseconds: 300));
+            reprogrammingResponse = await _dongleComm.can2xTxRx(
               txFrame.length,
               byteArrayToHexString(txFrame),
             );
@@ -3537,8 +3380,8 @@ class UDSDiagnostic {
             print("🔁 sendroutine polling: $routineReqCommand");
             bool isRoutineLoop = true;
             while (isRoutineLoop) {
-             // await Future.delayed(const Duration(milliseconds: 500));
-              var routineResp = await _dongleComm!.can2xTxRx(
+              // await Future.delayed(const Duration(milliseconds: 500));
+              var routineResp = await _dongleComm.can2xTxRx(
                 routineReqCommand.length ~/ 2,
                 routineReqCommand,
               );
@@ -3575,14 +3418,12 @@ class UDSDiagnostic {
             }
           }
         }
-
         // ── sleep ──────────────────────────────────────────────────────
         else if (command == "sleep") {
           int ms = int.parse(info);
           print("💤 sleep ${ms}ms");
           await Future.delayed(Duration(milliseconds: ms));
         }
-
         // ── function (seed/key calc) ──────────────────────────────────
         else if (command == "function") {
           if (info.contains("CalculateKeyFromSeed")) {
@@ -3664,7 +3505,6 @@ class UDSDiagnostic {
             }
           }
         }
-
         // ── repeatstart / repeatend ────────────────────────────────────
         else if (command == "repeatstart") {
           isLoopPresent = true;
@@ -3697,7 +3537,6 @@ class UDSDiagnostic {
             print("↩️ Loop back to line $i");
           }
         }
-
         // ── sendbulkdata (SINGLE block — no dead duplicate) ─────────────
         else if (command == "sendbulkdata") {
           List<String> sInfo = info.split(',');
@@ -3734,14 +3573,14 @@ class UDSDiagnostic {
           final RegExp hexRe = RegExp(r'^[0-9a-fA-F]+$');
 
           bool needsDynamicAddr = tSplitData.any(
-            (t) => t.trim().contains("json_strt_addr") ||
+            (t) =>
+                t.trim().contains("json_strt_addr") ||
                 t.trim().contains("sectordatasent"),
           );
 
           Stopwatch sw = Stopwatch()..start();
 
           if (!needsDynamicAddr) {
-     
             final List<int> layout = [];
             int bscPos = -1;
             int dataPos = -1;
@@ -3789,20 +3628,20 @@ class UDSDiagnostic {
                   frameLen,
                 );
 
-                var bulkResp = await _dongleComm!.can2xTxRx(
+                var bulkResp = await _dongleComm.can2xTxRx(
                   nTxFrame.length,
                   byteArrayToHexString(nTxFrame),
                 );
 
                 if (bulkResp.ecuResponseStatus != "NOERROR") {
-                  print("❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}");
+                  print(
+                    "❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}",
+                  );
                   return bulkResp.ecuResponseStatus;
                 }
 
                 blkSeqCnt = (blkSeqCnt + 1) & 0xFF;
-                // Update EVERY frame, not batched — this is just an int
-                // add, it costs nothing, and it's what keeps the progress
-                // bar from freezing then jumping between UI polls.
+
                 realTimeBytesFlashed += currentTransferLen;
               } catch (e) {
                 print("❌ bulk exception: $e");
@@ -3810,8 +3649,6 @@ class UDSDiagnostic {
               }
             }
           } else {
-            // ---- GENERAL PATH: template needs a per-frame-varying
-            // value (address or sent-length) — rebuild each frame. ----
             int startAddr = int.parse(
               sectordata[index].jsonStartAddress!,
               radix: 16,
@@ -3843,10 +3680,10 @@ class UDSDiagnostic {
                       radix: 16,
                     );
 
-                    Uint8List addrBig = (ByteData(4)
-                          ..setUint32(0, startAddr, Endian.big))
-                        .buffer
-                        .asUint8List();
+                    Uint8List addrBig =
+                        (ByteData(4)..setUint32(0, startAddr, Endian.big))
+                            .buffer
+                            .asUint8List();
 
                     Uint8List trimmedAddr = addrBig.length > copyLength
                         ? addrBig.sublist(addrBig.length - copyLength)
@@ -3862,10 +3699,11 @@ class UDSDiagnostic {
                       radix: 16,
                     );
 
-                    Uint8List lenBig = (ByteData(4)
-                          ..setUint32(0, currentTransferLen, Endian.big))
-                        .buffer
-                        .asUint8List();
+                    Uint8List lenBig =
+                        (ByteData(4)
+                              ..setUint32(0, currentTransferLen, Endian.big))
+                            .buffer
+                            .asUint8List();
 
                     Uint8List trimmedLen = lenBig.length > copyLength
                         ? lenBig.sublist(lenBig.length - copyLength)
@@ -3881,13 +3719,15 @@ class UDSDiagnostic {
                 j += currentTransferLen;
                 Uint8List nTxFrame = Uint8List.fromList(nTxFrameList);
 
-                var bulkResp = await _dongleComm!.can2xTxRx(
+                var bulkResp = await _dongleComm.can2xTxRx(
                   nTxFrame.length,
                   byteArrayToHexString(nTxFrame),
                 );
 
                 if (bulkResp.ecuResponseStatus != "NOERROR") {
-                  print("❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}");
+                  print(
+                    "❌ bulk ERROR at byte $j: ${bulkResp.ecuResponseStatus}",
+                  );
                   return bulkResp.ecuResponseStatus;
                 }
 
@@ -3905,32 +3745,31 @@ class UDSDiagnostic {
             "✅ sendbulkdata complete in ${sw.elapsed.inSeconds}s — totalFlashed so far: $realTimeBytesFlashed",
           );
         }
-
         // ── dongle config commands ────────────────────────────────────
         else if (command == "txid") {
           print("🔧 txid: $info");
-          await _dongleComm!.canSetTxHeader(info);
+          await _dongleComm.canSetTxHeader(info);
         } else if (command == "rxid") {
           print("🔧 rxid: $info");
-          await _dongleComm!.canSetRxHeaderMask(info);
+          await _dongleComm.canSetRxHeaderMask(info);
         } else if (command == "startpadding") {
           print("🔧 startpadding: $info");
-          await _dongleComm!.canStartPadding(info);
+          await _dongleComm.canStartPadding(info);
         } else if (command == "stoppadding") {
           print("🔧 stoppadding");
-          await _dongleComm!.canStopPadding();
+          await _dongleComm.canStopPadding();
         } else if (command == "setstmin") {
           print("🔧 setstmin: $info");
-          await _dongleComm!.canSetP1Min(info.trim());
+          await _dongleComm.canSetP1Min(info.trim());
         } else if (command == "setP2Max") {
           print("🔧 setP2Max: $info");
-          await _dongleComm!.canSetP2Max(info.trim());
+          await _dongleComm.canSetP2Max(info.trim());
         } else if (command == "stopTP") {
           print("🔧 stopTP");
-          await _dongleComm!.canStopTP();
+          await _dongleComm.canStopTP();
         } else if (command == "startTP") {
           print("🔧 startTP");
-          await _dongleComm!.canStartTP();
+          await _dongleComm.canStartTP();
         } else {
           print("⚠️ Unknown command '$command' — skipping");
         }

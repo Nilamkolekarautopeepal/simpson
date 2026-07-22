@@ -29,7 +29,6 @@ class RoundedBottomContainer extends StatelessWidget {
   }
 }
 
-@override
 Path getClip(Size size) {
   final path = Path();
   path.lineTo(0, size.height - 30); // Start at the top-left
@@ -41,7 +40,6 @@ Path getClip(Size size) {
   return path;
 }
 
-@override
 bool shouldReclip(CustomClipper<Path> oldClipper) {
   return false;
 }
