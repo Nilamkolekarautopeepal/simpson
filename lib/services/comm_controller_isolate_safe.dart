@@ -380,12 +380,6 @@ class CommControllerIsolateSafe implements ICommController {
         timeout: const Duration(minutes: 1),
       );
 
-      // CRITICAL FIX: without this, Windows' default TCP behavior
-      // (Nagle's algorithm combined with delayed ACK) adds 200-500ms
-      // of pure network-stack latency to EVERY small send/response
-      // round-trip — and the flash protocol does thousands of these.
-      // Same fix already applied to the main-isolate CommController;
-      // this isolate-safe twin was missing it.
       try {
         _socket!.setOption(SocketOption.tcpNoDelay, true);
         print('⚡ TCP_NODELAY enabled — small packets sent immediately, no Nagle delay');
@@ -505,11 +499,8 @@ class CommControllerIsolateSafe implements ICommController {
     }
   }
 
-  /// Same behavior as the concrete CommController's disconnectVCI()
-  /// for the WiFi path (this class never uses USB/RP1210) — flush and
-  /// close the socket, mark disconnected. DLLFunctions calls this
-  /// directly on the comm field, so it has to exist on this class too
-  /// now that comm is typed as the shared ICommController interface.
+  
+
   @override
   Future<void> disconnectVCI() async {
     try {

@@ -4614,23 +4614,23 @@ class UDSDiagnostic {
   //   return reprogrammingResponse.ecuResponseStatus;
   // }
 
-  /// Converts an int value to a [byteLength]-long big-endian Uint8List
-  Uint8List intToBytes(int value, int byteLength) {
-    Uint8List bytes = Uint8List(byteLength);
-    for (int i = 0; i < byteLength; i++) {
-      bytes[byteLength - 1 - i] = (value >> (8 * i)) & 0xFF;
-    }
-    return bytes;
-  }
+  // /// Converts an int value to a [byteLength]-long big-endian Uint8List
+  // Uint8List intToBytes(int value, int byteLength) {
+  //   Uint8List bytes = Uint8List(byteLength);
+  //   for (int i = 0; i < byteLength; i++) {
+  //     bytes[byteLength - 1 - i] = (value >> (8 * i)) & 0xFF;
+  //   }
+  //   return bytes;
+  // }
 
-  List<int> intToBytesBigEndian(int value, int length) {
-    Uint8List result = Uint8List(length);
-    for (int i = length - 1; i >= 0; i--) {
-      result[i] = value & 0xFF;
-      value >>= 8;
-    }
-    return result.toList();
-  }
+  // List<int> intToBytesBigEndian(int value, int length) {
+  //   Uint8List result = Uint8List(length);
+  //   for (int i = length - 1; i >= 0; i--) {
+  //     result[i] = value & 0xFF;
+  //     value >>= 8;
+  //   }
+  //   return result.toList();
+  // }
 
   Uint8List hexStringToBytes(String hex) {
     hex = hex.replaceAll(' ', '').replaceAll('0x', '');

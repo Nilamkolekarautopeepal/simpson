@@ -263,7 +263,7 @@ class PsfLaneCard extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: isResolved
                     ? [_LaneColors.greenBg, _LaneColors.greenBg.withOpacity(0.7)]
-                    : [_LaneColors.slateBg, Colors.white],
+                    : [_LaneColors.slateBg, const Color.fromARGB(255, 245, 246, 247)],
               ),
               border: Border.all(color: isResolved ? _LaneColors.green : _LaneColors.slateBorder),
               boxShadow: [

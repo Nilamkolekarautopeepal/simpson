@@ -1,19 +1,3 @@
-// // // ════════════════════════════════════════════════════════════
-// // // PFS-ONLY isolate-based flash entry point.
-// // //
-// // // Does not touch Test Station or any of its files. This gives each
-// // // lane's flash its own real OS-scheduled Dart isolate — genuine
-// // // parallelism, unlike async/await on the main isolate (which is
-// // // cooperative and single-threaded no matter how it's structured).
-// // //
-// // // CRITICAL RULE (this is what broke the earlier isolate attempt):
-// // // the dongle connection is created FRESH, from scratch, entirely
-// // // INSIDE this isolate. A live Socket/connection can never be handed
-// // // off between isolates — Dart isolates share no memory, and native
-// // // resources like sockets aren't transferable. Every single thing
-// // // this function touches (CommControllerIsolateSafe, DongleComm,
-// // // UDSDiagnostic) is created here, used here, and discarded here.
-// // // ════════════════════════════════════════════════════════════
 // import 'dart:async';
 // import 'dart:convert';
 // import 'dart:isolate';
@@ -167,22 +151,7 @@
 //     reportError(e.toString());
 //   }
 // }
-// ════════════════════════════════════════════════════════════
-// PFS-ONLY isolate-based flash entry point.
 
-// Does not touch Test Station or any of its files. This gives each
-// lane's flash its own real OS-scheduled Dart isolate — genuine
-// parallelism, unlike async/await on the main isolate (which is
-// cooperative and single-threaded no matter how it's structured).
-
-// CRITICAL RULE (this is what broke the earlier isolate attempt):
-// the dongle connection is created FRESH, from scratch, entirely
-// INSIDE this isolate. A live Socket/connection can never be handed
-// off between isolates — Dart isolates share no memory, and native
-// resources like sockets aren't transferable. Every single thing
-// this function touches (CommControllerIsolateSafe, DongleComm,
-// UDSDiagnostic) is created here, used here, and discarded here.
-// ════════════════════════════════════════════════════════════
 import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
@@ -196,11 +165,6 @@ import 'package:ap_dongle_comm/utils/enums/connectivity.dart';
 import 'package:ap_dongle_comm/utils/enums/protocol.dart';
 import 'package:ecu_seedkey/ecu_seedkey.dart';
 
-//import 'comm_controller_isolate_safe.dart';
-
-/// Everything the isolate needs to do its job — only simple,
-/// isolate-transferable types (String, int). No GetX objects, no
-/// app model classes, no live connections.
 class PfsFlashArgs {
   final String host;
   final int port;
@@ -227,15 +191,19 @@ class PfsFlashArgs {
   });
 }
 
-/// Messages sent back from the isolate to the main isolate.
-/// type is one of: 'progress', 'done', 'error'
 class PfsFlashMessage {
   final String type;
   final double? percent;
   final String? result;
-  PfsFlashMessage.progress(this.percent) : type = 'progress', result = null;
-  PfsFlashMessage.done(this.result) : type = 'done', percent = null;
-  PfsFlashMessage.error(this.result) : type = 'error', percent = null;
+  PfsFlashMessage.progress(this.percent)
+      : type = 'progress',
+        result = null;
+  PfsFlashMessage.done(this.result)
+      : type = 'done',
+        percent = null;
+  PfsFlashMessage.error(this.result)
+      : type = 'error',
+        percent = null;
 }
 
 /// Call this from the main isolate with Isolate.spawn. It expects
@@ -253,7 +221,8 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
   }
 
   try {
-    print('🚀 [Lane ${args.laneNumber} isolate] starting — own fresh connection to ${args.host}:${args.port}');
+    print(
+        '🚀 [Lane ${args.laneNumber} isolate] starting — own fresh connection to ${args.host}:${args.port}');
 
     // Step 1: brand-new connection, created entirely inside this isolate.
     final comm = CommControllerIsolateSafe();
@@ -268,14 +237,10 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
       return;
     }
 
-    // CommControllerIsolateSafe isn't the same static type as the regular
-    // CommController used by DongleComm. Cast to dynamic to satisfy the
-    // parameter at runtime — the implementation is compatible.
-    final dongleComm = DongleComm(comm: comm as dynamic, isChannel: true, channelId: '00');
 
-    // Step 2: setDongleProperties — same logic as DLLFunctions.setDongleProperties,
-    // replicated here since DLLFunctions itself isn't isolate-safe (it holds a
-    // concrete CommController field), but the actual work it does is simple.
+    final dongleComm =
+        DongleComm(comm: comm as dynamic, isChannel: true, channelId: '00');
+
     final protoValue = args.protocolName.replaceAll('-', '_');
     Protocol? matchedProtocol;
     for (final p in Protocol.values) {
@@ -294,7 +259,8 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
     await dongleComm.dongleSetProtocol(protocolInt);
     await dongleComm.canSetTxHeader(args.txHeader);
     await dongleComm.canSetRxHeaderMask(args.rxHeader);
-    print('✅ [Lane ${args.laneNumber} isolate] dongle configured — protocol=$matchedProtocol tx=${args.txHeader} rx=${args.rxHeader}');
+    print(
+        '✅ [Lane ${args.laneNumber} isolate] dongle configured — protocol=$matchedProtocol tx=${args.txHeader} rx=${args.rxHeader}');
 
     // Step 3: the actual flash, using the real flashInterpreter2 logic.
     uds = UDSDiagnostic(dongleComm, ECUCalculateSeedkey());
@@ -310,16 +276,14 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
 
     final flashConfig = FlashConfig(seedKeyIndex: seedkeyindx);
 
-    // Report progress every 500ms by reading the SAME local counters
-    // flashInterpreter2 updates internally (getRuntimeFlashPercent() —
-    // confirmed pure local math, no network I/O, safe to poll from a
-    // timer running alongside the flash on this isolate's own event loop).
-    progressTimer = Timer.periodic(const Duration(milliseconds: 500), (_) async {
-      try {
+    progressTimer = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) async {
         final pct = await uds!.getRuntimeFlashPercent();
         mainSendPort.send(PfsFlashMessage.progress(pct));
-      } catch (_) {}
-    });
+      },
+    );
+    ;
 
     print('🚀 [Lane ${args.laneNumber} isolate] calling flashInterpreter2...');
     final result = await uds.flashInterpreter(
