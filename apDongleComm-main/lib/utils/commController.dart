@@ -91,7 +91,7 @@ class CommController extends GetxController implements ICommController {
       isConnected.value = false;
       connectivityRx.value = Connectivity.none;
       _connectionStream.add(false);
-
+      await stopForegroundService();
       print("✅ Full disconnect completed");
     } catch (e) {
       print("🔥 Disconnect error: $e");
