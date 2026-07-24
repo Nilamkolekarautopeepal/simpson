@@ -24,8 +24,10 @@ class ConnectionWifi {
       print(
           "DongleComm initialized with channelId: $channelId and comm assigned");
       print("Connecting to $ip:$port via WiFi...");
-      await comm!
-          .connectWifi(host: ip, port: port,);
+      await comm!.connectWifi(
+        host: ip,
+        port: port,
+      );
       print("WiFi connected.");
       dSDiagnostic ??= UDSDiagnostic(dongleCommWin!, ECUCalculateSeedkey());
       print("UDSDiagnostic initialized.");
@@ -84,7 +86,8 @@ class ConnectionWifi {
     }
   }
 
-  Future<({String macId, DLLFunctions dll})?> connectDongleForLane(
+  Future<({String macId, DLLFunctions dll, CommController comm})?>
+      connectDongleForLane(
     String ip, {
     String channelId = "00",
     int port = 6888,
@@ -99,7 +102,9 @@ class ConnectionWifi {
 
       print("[Lane $ip] Connecting via WiFi...");
       await laneComm.connectWifi(
-          host: ip, port: port,);
+        host: ip,
+        port: port,
+      );
       print("[Lane $ip] WiFi connected.");
 
       final laneDiagnostic =
@@ -118,12 +123,14 @@ class ConnectionWifi {
             "at $ip isn't answering commands (likely failed Security Access "
             "just before this too). Treating as a failed connection rather "
             "than reporting false success.");
+        await laneComm.disconnect();
         return null;
       }
 
       if (macResp == null || macResp.length < 9) {
         print(
             "[Lane $ip] Error: Invalid MAC response (length=${macResp?.length})");
+        await laneComm.disconnect();
         return null;
       }
 
@@ -140,7 +147,7 @@ class ConnectionWifi {
       final dll = DLLFunctions(laneDongleComm, laneDiagnostic);
       print("[Lane $ip] DLLFunctions created (independent instance).");
 
-      return (macId: macId, dll: dll);
+      return (macId: macId, dll: dll, comm: laneComm);
     } catch (e) {
       print("[Lane $ip] Error @connectDongleForLane: $e");
       return null;
