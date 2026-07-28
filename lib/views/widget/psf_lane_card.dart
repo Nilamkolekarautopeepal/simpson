@@ -770,9 +770,6 @@ class PsfLaneCard extends StatelessWidget {
     );
   }
 
-  /// DTC / Live Parameter — glass-outline pill buttons with a subtle
-  /// gradient fill instead of flat white, so they read as part of
-  /// the same glossy family rather than plain Material outlines.
   Widget _dtcAndLiveParameter(BuildContext context) {
     Widget pillButton(
         {required String label, required VoidCallback onPressed}) {

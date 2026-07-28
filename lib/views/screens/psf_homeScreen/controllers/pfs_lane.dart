@@ -1,3 +1,4 @@
+//Prathmesh Girme
 import 'dart:async';
 import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 
@@ -46,14 +47,12 @@ class PsfLane {
   Timer? esnIdleTimer;
   Timer? listNumberIdleTimer;
 
-
   final TextEditingController listNumberController = TextEditingController();
   final FocusNode listNumberFocusNode = FocusNode();
   final RxBool isLookingUpListNumber = false.obs;
   final RxString listNumberError = "".obs;
   final RxString listNumber = "".obs;
 
- 
   final Rx<String?> resolvedFlashFileUrl = Rx<String?>(null);
   final Rx<String?> resolvedFlashFileName = Rx<String?>(null);
 
@@ -67,10 +66,8 @@ class PsfLane {
 
   final Rxn<int> pidDatasetId = Rxn<int>();
 
-
   SubmodelModelecu? matchedEcu;
 
- 
   int? matchedVehicleModelId;
   int? matchedSubModelId;
 
@@ -90,10 +87,7 @@ class PsfLane {
   // DONGLE
   // ===============================
 
-  
   final RxBool dongleConnected = false.obs;
-
- 
   DLLFunctions? dllFunctions;
   final RxBool dongleConnecting = false.obs;
   bool isDongleBusy = false;
@@ -231,7 +225,6 @@ class PsfLane {
   final RxBool pidPlaying = false.obs;
   bool stopPidLoop = false;
 
-  
   final RxString iqaWriteStatus = "".obs;
 
   // ===============================

@@ -7,7 +7,7 @@ import 'package:ap_diagnostic/enum/writeParameter.dart';
 import 'package:ap_diagnostic/models/flashingMtrixModel.dart';
 import 'package:ap_diagnostic/models/readDtcResponseModel.dart';
 import 'package:ap_diagnostic/models/readParameterPIDModel.dart'
-    show ReadParameterPID, SelectedParameterMessage, PidVariable;
+show ReadParameterPID, SelectedParameterMessage, PidVariable;
 import 'package:ap_diagnostic/models/readParameterResponseModel.dart';
 import 'package:ap_diagnostic/models/writeParameterPIDModel.dart';
 import 'package:ap_diagnostic/structure/flash_structures.dart';
@@ -20,7 +20,6 @@ import 'package:simpson/modals/all.models.dart' hide Protocol;
 import 'package:simpson/modals/liveParameter_model.dart';
 import 'package:simpson/modals/pidDataset.model.dart' as pid_ds;
 import 'package:simpson/modals/staticData.dart';
-
 import '../../modals/writeParameter_model.dart';
 
 class DLLFunctions {
@@ -601,9 +600,6 @@ class DLLFunctions {
 
       print("ÔÜÖ´©Å [CONFIG] FlashConfig created");
 
-      //print("­ƒôí [UDS] Starting tester present...");
-      // await startTesterPresent();
-      //print("Ô£à [UDS] Tester present started");
 
       print("­ƒÜÇ [FLASH] Calling flashInterpreter...");
       final response = await mUdsDiagnostic.flashInterpreter(
@@ -615,9 +611,7 @@ class DLLFunctions {
 
       print("­ƒôÑ [FLASH RESPONSE]: $response");
 
-      // print("­ƒøæ [UDS] Stopping tester present...");
-      // // await stopTesterPresent();
-      // print("Ô£à [UDS] Tester present stopped");
+   ;
 
       print("­ƒÄë [FLASH] ===== COMPLETED SUCCESS =====");
 
@@ -667,15 +661,6 @@ class DLLFunctions {
       return 0;
     }
   }
-
-  // Future<double> resetPercentage() async {
-  //   try {
-  //     await mUdsDiagnostic.resetPercentage();
-  //     return 0;
-  //   } catch (e) {
-  //     return 0;
-  //   }
-  // }
 
   Future<bool> writeSSID(String routerSSID) async {
     try {

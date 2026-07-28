@@ -1,3 +1,4 @@
+//Prathmesh Girme
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -742,10 +743,15 @@ class PsfHomeScreenController extends GetxController {
         print(
             '   🛑 physically power-cycle Lane ${lane.laneNumber}\'s dongle, then tap the reconnect button.');
         try {
-          Get.snackbar(
-            'Lane ${lane.laneNumber} dongle unresponsive',
-            'Power-cycle the dongle, then tap reconnect. Auto-retry stopped after $attempts failed attempts.',
-            duration: const Duration(seconds: 8),
+          if (Get.isDialogOpen == true) Get.back();
+          Get.dialog(
+            CustomPopup(
+              title: 'Lane ${lane.laneNumber} dongle unresponsive',
+              message:
+                  'Power-cycle the dongle, then tap reconnect. Auto-retry stopped after $attempts failed attempts.',
+              confirmText: 'OK',
+            ),
+            barrierDismissible: true,
           );
         } catch (_) {}
         return; // stop scheduling further retries
@@ -845,15 +851,30 @@ class PsfHomeScreenController extends GetxController {
     if (lane.resolvedFlashFileUrl.value == null) {
       print('   ❌ no flash file resolved — scan List Number first');
       print('══════════════════════════════════════════');
-      Get.snackbar(
-          'Flash', 'Scan a List Number first to resolve the flash file.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message: 'Scan a List Number first to resolve the flash file.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print('   ❌ this lane\'s dongle isn\'t connected — cannot flash');
       print('══════════════════════════════════════════');
-      Get.snackbar('Flash', 'Connect the dongle for this lane first.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message: 'Connect the dongle for this lane first.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
@@ -861,8 +882,16 @@ class PsfHomeScreenController extends GetxController {
       print(
           '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
       print('══════════════════════════════════════════');
-      Get.snackbar('Flash',
-          'This lane\'s dongle is busy — wait for the current operation to finish.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message:
+              'This lane\'s dongle is busy — wait for the current operation to finish.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
     lane.isDongleBusy = true;
@@ -1500,18 +1529,42 @@ class PsfHomeScreenController extends GetxController {
     }
 
     if (lane.dllFunctions == null) {
-      Get.snackbar('Live Parameter', 'Connect the dongle for this lane first.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message: 'Connect the dongle for this lane first.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (lane.liveParameterCodes.isEmpty) {
-      Get.snackbar('Live Parameter', 'No parameters available to run.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message: 'No parameters available to run.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (lane.isDongleBusy) {
-      Get.snackbar('Live Parameter',
-          'This lane\'s dongle is busy with another operation — try again shortly.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message:
+              'This lane\'s dongle is busy with another operation — try again shortly.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
@@ -1610,7 +1663,6 @@ class PsfHomeScreenController extends GetxController {
       lane.iqaStatus.refresh();
     }
   }
-
 
   void onRefreshLane(
     int index,
