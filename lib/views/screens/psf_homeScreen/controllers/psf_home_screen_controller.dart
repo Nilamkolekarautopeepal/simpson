@@ -998,16 +998,57 @@ class PsfHomeScreenController extends GetxController {
       lane.isDongleBusy = false;
       return;
     }
+    //----------------------------
+    // print(
+    //     '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — reconnecting to read DTC/PID, write IQA…');
+    // print('══════════════════════════════════════════');
+    // lane.flashProgress.value = 1;
+    // lane.flashStatus.value = "Flash Completed";
+    // lane.isDongleBusy = false;
+    // await connectDongleForLane(index);
+    // lane.isDongleBusy = true;
 
+    //------------------------------------------------------
     print(
-        '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — reconnecting to read DTC/PID, write IQA…');
+        '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — letting dongle settle before reconnecting…');
     print('══════════════════════════════════════════');
     lane.flashProgress.value = 1;
     lane.flashStatus.value = "Flash Completed";
+    
+    //----------------------------------
+    
+    // await Future.delayed(const Duration(seconds: 3));
+    // lane.isDongleBusy = false;
+    // await connectDongleForLane(index);
+    // if (!lane.dongleConnected.value || lane.dllFunctions == null) {
+    //   print(
+    //       '   ⚠️ [Lane ${lane.laneNumber}] first reconnect attempt failed — waiting longer and trying once more...');
+    //   await Future.delayed(const Duration(seconds: 3));
+    //   await connectDongleForLane(index);
+    // }
+
+    // lane.isDongleBusy = true;
+
+    //------------------------------------------------
+    await Future.delayed(const Duration(seconds: 5));
     lane.isDongleBusy = false;
-    await connectDongleForLane(index);
+
+    int attempt = 0;
+    final reconnectDeadline = DateTime.now().add(const Duration(minutes: 3));
+    while (DateTime.now().isBefore(reconnectDeadline)) {
+      attempt++;
+      await connectDongleForLane(index);
+      if (lane.dongleConnected.value && lane.dllFunctions != null) {
+        print('   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+        break;
+      }
+      print('   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+      await Future.delayed(const Duration(seconds: 5));
+    }
+
     lane.isDongleBusy = true;
 
+    //---------------------------------------------
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print(
           '   ⚠️ [Lane ${lane.laneNumber}] could not reconnect after flash — skipping DTC/PID/IQA steps');
@@ -1221,10 +1262,14 @@ class PsfHomeScreenController extends GetxController {
 
       for (final row in rows) {
         if (row.length < 2) continue;
-        final code = row[0];
-        final status = row[1];
+        //final code = row[0];
+        final code = row[0].toString().toUpperCase();
+        final status = row[1].toString();
 
-        final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
+        //final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
+        final match =  lane.dtcCodes.firstWhereOrNull(
+            (c) => (c.code ?? '').toUpperCase() == code,
+          );
         final desc = match?.description ?? 'Description not found';
 
         merged[code] = '$code - $desc ($status)';
