@@ -59,7 +59,8 @@ class PlcService extends GetxService {
       isConnecting.value = true;
       status.value = 'Connecting…';
 
-      _socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 4));
+      _socket =
+          await Socket.connect(ip, port, timeout: const Duration(seconds: 4));
       _socket!.setOption(SocketOption.tcpNoDelay, true);
 
       isConnected.value = true;
@@ -104,7 +105,8 @@ class PlcService extends GetxService {
 
   // ── Read / write ──
 
-  Future<int> readRegister(int registerAddress, {Duration timeout = const Duration(seconds: 3)}) async {
+  Future<int> readRegister(int registerAddress,
+      {Duration timeout = const Duration(seconds: 3)}) async {
     final frame = await _sendAndWait(
       functionCode: 0x03,
       registerAddress: registerAddress,
@@ -116,7 +118,8 @@ class PlcService extends GetxService {
     return (hi << 8) | lo;
   }
 
-  Future<bool> writeRegister(int registerAddress, int value, {Duration timeout = const Duration(seconds: 3)}) async {
+  Future<bool> writeRegister(int registerAddress, int value,
+      {Duration timeout = const Duration(seconds: 3)}) async {
     final hiVal = (value >> 8) & 0xFF;
     final loVal = value & 0xFF;
 
@@ -148,14 +151,19 @@ class PlcService extends GetxService {
 
     final pdu = [0x01, functionCode, hiAddr, loAddr, ...extra];
     final packet = [
-      (txId >> 8) & 0xFF, txId & 0xFF,
-      0x00, 0x00,
-      (pdu.length >> 8) & 0xFF, pdu.length & 0xFF,
+      (txId >> 8) & 0xFF,
+      txId & 0xFF,
+      0x00,
+      0x00,
+      (pdu.length >> 8) & 0xFF,
+      pdu.length & 0xFF,
       ...pdu,
     ];
 
     final completer = Completer<List<int>>();
     _pending[txId] = completer;
+    print('[MODBUS TX] fn=0x${functionCode.toRadixString(16)} '
+        'reg=$registerAddress bytes=$packet');
     _socket!.add(packet);
 
     try {
