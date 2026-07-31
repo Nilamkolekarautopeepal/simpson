@@ -700,100 +700,6 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
-  // Widget _buildFlashSection() {
-  //   return Obx(() {
-  //     final expanded = controller.flashExpanded.value;
-
-  //     return Container(
-  //       decoration: BoxDecoration(
-  //         color: Colors.white,
-  //         borderRadius: BorderRadius.circular(10),
-  //         border: Border.all(color: Colors.grey.shade200),
-  //       ),
-  //       child: Column(
-  //         children: [
-  //           InkWell(
-  //             borderRadius: BorderRadius.circular(10),
-  //             onTap: controller.toggleFlash,
-  //             child: Padding(
-  //               padding:
-  //                   const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-  //               child: Row(
-  //                 children: [
-  //                   const Text('Flash File',
-  //                       style: TextStyle(fontWeight: FontWeight.w600)),
-  //                   const Spacer(),
-  //                   Obx(() {
-  //                     if (controller.flashComplete.value) {
-  //                       return Padding(
-  //                         padding: const EdgeInsets.only(right: 10),
-  //                         child: Column(
-  //                           children: [
-  //                             Container(
-  //                               width: 22,
-  //                               height: 22,
-  //                               decoration: const BoxDecoration(
-  //                                 color: AppColors.themeColor,
-  //                                 shape: BoxShape.circle,
-  //                               ),
-  //                               child: const Icon(Icons.check,
-  //                                   color: Colors.white, size: 14),
-  //                             ),
-  //                             const SizedBox(height: 5),
-  //                             Text(
-  //                               'Flashing Successful',
-  //                               style: TextStyle(
-  //                                   fontSize: 12,
-  //                                   color: AppColors.themeColor,
-  //                                   fontWeight: FontWeight.bold),
-  //                             ),
-  //                           ],
-  //                         ),
-  //                       );
-  //                     }
-
-  //                     if (controller.flashInProgress.value) {
-  //                       return Padding(
-  //                         padding: const EdgeInsets.only(right: 10),
-  //                         child: Obx(() {
-  //                           final pct =
-  //                               (controller.flashProgress.value * 100).round();
-  //                           return Container(
-  //                             padding: const EdgeInsets.symmetric(
-  //                                 horizontal: 8, vertical: 2),
-  //                             decoration: BoxDecoration(
-  //                               color: AppColors.themeColor.withOpacity(0.1),
-  //                               borderRadius: BorderRadius.circular(12),
-  //                             ),
-  //                             child: Text(
-  //                               '$pct%',
-  //                               style: TextStyle(
-  //                                 fontSize: 12,
-  //                                 color: AppColors.themeColor,
-  //                               ),
-  //                             ),
-  //                           );
-  //                         }),
-  //                       );
-  //                     }
-
-  //                     return const SizedBox.shrink();
-  //                   }),
-  //                   Icon(expanded ? Icons.expand_less : Icons.expand_more),
-  //                 ],
-  //               ),
-  //             ),
-  //           ),
-  //           if (expanded)
-  //             Padding(
-  //               padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-  //               child: _buildFlashBody(),
-  //             ),
-  //         ],
-  //       ),
-  //     );
-  //   });
-  // }
   Widget _buildFlashSection() {
     return Obx(() {
       final expanded = controller.flashExpanded.value;
@@ -1006,6 +912,41 @@ class HomePageView extends GetView<HomePageController> {
                 'Completed in ${controller.formattedElapsed}',
                 style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
               ),
+              // ── NEW: allow re-flashing the ECU right from the success
+              // state, without needing to collapse/expand or re-select
+              // the file. Reuses the same file already selected.
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: controller.dongleConnected.value
+                    ? controller.startFlashing
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.themeColor,
+                  disabledBackgroundColor: Colors.grey.shade300,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Start Flashing',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              if (!controller.dongleConnected.value) ...[
+                const SizedBox(height: 10),
+                Text(
+                  'Waiting for the dongle to reconnect…',
+                  textAlign: TextAlign.center,
+                  style:
+                      TextStyle(fontSize: 11.5, color: Colors.orange.shade800),
+                ),
+              ],
             ],
           ),
         );
@@ -1799,98 +1740,6 @@ class HomePageView extends GetView<HomePageController> {
     return Colors.grey.shade700;
   }
 
-//   Widget _buildActivitySection() {
-//     return Container(
-//       constraints: const BoxConstraints(maxHeight: 180),
-//       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-//       padding: const EdgeInsets.all(16),
-//       decoration: BoxDecoration(
-//         color: Colors.white,
-//         borderRadius: BorderRadius.circular(10),
-//         border: Border.all(color: Colors.grey.shade300),
-//         boxShadow: [
-//           BoxShadow(
-//             color: Colors.black.withOpacity(0.04),
-//             blurRadius: 8,
-//             offset: const Offset(0, -2),
-//           ),
-//         ],
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Row(
-//             children: [
-//               const Text('Activity',
-//                   style: TextStyle(fontWeight: FontWeight.w600)),
-//               const Spacer(),
-//               Obx(() => IconButton(
-//                     icon: const Icon(Icons.save_alt, size: 18),
-//                     tooltip: "Save Activity Log",
-//                     color: AppColors.themeColor,
-//                     onPressed: controller.activityLog.isEmpty
-//                         ? null
-//                         : () async {
-//                             await controller.saveActivityLog();
-//                           },
-//                   )),
-//               Obx(
-//                 () => IconButton(
-//                   icon: const Icon(Icons.copy, size: 18),
-//                   color: AppColors.themeColor,
-//                   tooltip: 'Copy all activity log',
-//                   visualDensity: VisualDensity.compact,
-//                   onPressed: controller.activityLog.isEmpty
-//                       ? null
-//                       : () => _copyActivityLog(),
-//                 ),
-//               ),
-//             ],
-//           ),
-//           const Divider(height: 16),
-//           Expanded(
-//             child: Obx(
-//               () => ListView(
-//                 padding: EdgeInsets.zero,
-//                 children: controller.activityLog
-//                     .map((entry) => Padding(
-//                           padding: const EdgeInsets.symmetric(vertical: 3),
-//                           child: Text(
-//                             entry,
-//                             style: TextStyle(
-//                                 fontSize: 12.5, color: Colors.grey.shade700),
-//                           ),
-//                         ))
-//                     .toList(),
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-// ══════════════════════════════════════════════════════════════════════
-// Additions to HomePageView (home_page_view.dart)
-// ══════════════════════════════════════════════════════════════════════
-
-// ── 1) Add a "fullscreen" IconButton to _buildActivitySection()'s header
-//    row, right before the existing Save/Copy buttons.
-//
-// BEFORE:
-//
-//   Row(
-//     children: [
-//       const Text('Activity',
-//           style: TextStyle(fontWeight: FontWeight.w600)),
-//       const Spacer(),
-//       Obx(() => IconButton(
-//             icon: const Icon(Icons.save_alt, size: 18),
-//             ...
-//
-// AFTER — add the fullscreen button right after the Spacer, before Save:
-
   Widget _buildActivitySection() {
     return Container(
       constraints: const BoxConstraints(maxHeight: 180),
@@ -1916,7 +1765,7 @@ class HomePageView extends GetView<HomePageController> {
               const Text('Activity',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
-              // ── NEW: open the full activity log in a full-screen dialog ──
+              // ── Open the full activity log in a full-screen dialog ──
               IconButton(
                 icon: const Icon(Icons.fullscreen, size: 20),
                 color: AppColors.themeColor,
@@ -2061,6 +1910,63 @@ class _SensorWriteAction extends StatefulWidget {
   State<_SensorWriteAction> createState() => _SensorWriteActionState();
 }
 
+// class _SensorWriteActionState extends State<_SensorWriteAction> {
+//   final TextEditingController _valueController = TextEditingController();
+
+//   @override
+//   void dispose() {
+//     _valueController.dispose();
+//     super.dispose();
+//   }
+
+//   void _submit() async {
+//     final text = _valueController.text.trim();
+//     final value = int.tryParse(text);
+//     if (value == null) return;
+
+//     await widget.controller.writeSensorValue(widget.sensor, value);
+//     _valueController.clear();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Obx(() {
+//       final id = widget.sensor.id;
+//       final isBusy =
+//           id != null && widget.controller.writeInFlightSensorIds.contains(id);
+
+//       return Row(
+//         children: [
+//           SizedBox(
+//             width: 70,
+//             height: 32,
+//             child: TextField(
+//               controller: _valueController,
+//               enabled: !isBusy,
+//               keyboardType: TextInputType.number,
+//               style: const TextStyle(fontSize: 12),
+//               decoration: InputDecoration(
+//                 isDense: true,
+//                 contentPadding:
+//                     const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+//                 filled: true,
+//                 fillColor: const Color(0xFFF5F7FA),
+//                 border: OutlineInputBorder(
+//                   borderRadius: BorderRadius.circular(6),
+//                   borderSide: BorderSide.none,
+//                 ),
+//                 hintText: 'value',
+//                 hintStyle: const TextStyle(fontSize: 11),
+//               ),
+//               onSubmitted: (_) => _submit(),
+//             ),
+//           ),
+//         ],
+//       );
+//     });
+//   }
+// }
+
 class _SensorWriteActionState extends State<_SensorWriteAction> {
   final TextEditingController _valueController = TextEditingController();
 
@@ -2076,7 +1982,8 @@ class _SensorWriteActionState extends State<_SensorWriteAction> {
     if (value == null) return;
 
     await widget.controller.writeSensorValue(widget.sensor, value);
-    _valueController.clear();
+    // Value box (livePlcValues) is updated inside writeSensorValue itself
+    // after the read-back, so no extra work needed here.
   }
 
   @override
@@ -2112,8 +2019,39 @@ class _SensorWriteActionState extends State<_SensorWriteAction> {
               onSubmitted: (_) => _submit(),
             ),
           ),
+          const SizedBox(width: 6),
+          SizedBox(
+            height: 32,
+            child: ElevatedButton(
+              onPressed: isBusy ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.themeColor,
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                minimumSize: const Size(0, 32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+              child: isBusy
+                  ? const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text(
+                      'Write',
+                      style: TextStyle(fontSize: 11, color: Colors.white),
+                    ),
+            ),
+          ),
         ],
       );
     });
   }
 }
+
+

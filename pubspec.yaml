@@ -55,6 +55,7 @@ dependencies:
   flutter_secure_storage: ^10.3.0
   flutter_libserialport: 0.6.0
   window_manager: ^0.5.1
+  wakelock_plus: ^1.2.8
 
   ap_dongle_comm:
     path: apDongleComm-main

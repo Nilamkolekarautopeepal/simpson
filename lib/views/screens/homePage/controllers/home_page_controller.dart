@@ -21,6 +21,7 @@ import 'package:simpson/services/apiServices.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 enum StepType { single, iqaGroup }
 
@@ -1773,8 +1774,254 @@ class HomePageController extends GetxController {
 
   final RxString flashStatus = 'Preparing...'.obs;
   final RxDouble postFlashProgress = 0.0.obs;
-
   Future<void> startFlashing() async {
+    if (flashInProgress.value) {
+      return;
+    }
+
+    final fileName = selectedFlashFile.value;
+    if (fileName == null) {
+      _showErrorPopup('Select a flash file from the list first',
+          title: 'No File Selected');
+      return;
+    }
+
+    if (!dongleConnected.value || App.dllFunctions == null) {
+      _log('❌ Cannot flash — dongle not connected');
+      _showErrorPopup('Waiting for the dongle to connect before flashing',
+          title: 'Not Connected');
+      return;
+    }
+
+    flashErrorMessage.value = '';
+    flashComplete.value = false;
+    flashProgress.value = 0;
+    flashElapsedSeconds.value = 0;
+    flashStatus.value = 'Preparing Flash...';
+    postFlashProgress.value = 0;
+
+    // ✅ Keep device awake for the entire flashing operation
+    await WakelockPlus.enable();
+
+    try {
+      await _withDongleBusy(() async {
+        flashInProgress.value = true;
+        flashStatus.value = 'Preparing Flash...';
+
+        _log('Flashing started');
+
+        _flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
+          flashElapsedSeconds.value++;
+        });
+
+        Timer? percentTimer;
+
+        String? result;
+
+        try {
+          flashStatus.value = 'Validating vehicle...';
+
+          final scannedList = stepControllers[1].text.trim().toUpperCase();
+          final variants = await _ensureVariantList();
+
+          final variant = (variants.results ?? []).firstWhereOrNull(
+            (v) => (v.variantCode ?? '').trim().toUpperCase() == scannedList,
+          );
+
+          if (variant == null) {
+            throw Exception("Variant not found");
+          }
+
+          final targetEcuId = _fileToEcuId[fileName];
+          if (targetEcuId == null) {
+            throw Exception(
+                "Could not resolve ECU for selected file \"$fileName\"");
+          }
+
+          final variantEcu = (variant.tDatasetEcu ?? []).firstWhereOrNull(
+            (t) => t.ecu == targetEcuId && t.isActive == true,
+          );
+
+          if (variantEcu == null) {
+            throw Exception(
+                "Active D-dataset ECU entry not found for selected file");
+          }
+
+          final models = await _ensureModels();
+
+          all_ds.SubmodelModelecu? selectedEcu;
+
+          for (final model in models.results ?? []) {
+            if (model.id != variant.vehicleModel) continue;
+
+            for (final sub in model.subModels ?? []) {
+              if (sub.id != variant.subModel) continue;
+
+              for (final ecu in sub.submodelModelecu ?? []) {
+                if (ecu.ecu?.id == targetEcuId) {
+                  selectedEcu = ecu;
+                  break;
+                }
+              }
+
+              if (selectedEcu != null) break;
+            }
+
+            if (selectedEcu != null) break;
+          }
+
+          if (selectedEcu == null) {
+            throw Exception("ECU configuration not found");
+          }
+
+          if (selectedEcu.flashFile == null) {
+            final fallback = vehicleEcuEntries.firstWhereOrNull(
+              (e) => e.ecu?.id == targetEcuId,
+            );
+
+            if (fallback?.flashFile != null) {
+              selectedEcu = fallback;
+            }
+          }
+
+          if (selectedEcu!.flashFile == null) {
+            throw Exception("Flash file missing");
+          }
+
+          final flashConfig = selectedEcu.flashFile!;
+
+          flashStatus.value = 'Configuring ECU...';
+
+          await App.dllFunctions!.setDongleProperties(
+            selectedEcu.ecu?.protocol?.name ?? '',
+            selectedEcu.ecu?.protocol?.autopeepal ?? '',
+            selectedEcu.ecu?.txHeader ?? '',
+            selectedEcu.ecu?.rxHeader ?? '',
+          );
+
+          flashStatus.value = 'Downloading sequence file...';
+
+          final sequenceContent =
+              await _downloadAsRawString(flashConfig.sequenceFile!);
+
+          var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
+
+          if (ecuMapFiles.isEmpty) {
+            ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
+          }
+
+          if (ecuMapFiles.isEmpty) {
+            throw Exception(
+                "ECU MAP FILE missing — cannot generate flash JSON.");
+          }
+
+          flashStatus.value = 'Downloading Dataset...';
+
+          final hexUrl = variantEcu.dataFile ?? _fileToHexUrl[fileName];
+
+          if (hexUrl == null || hexUrl.isEmpty) {
+            throw Exception(
+                "Hex file URL missing for selected D-dataset entry");
+          }
+
+          final hexContent = await _downloadAsRawString(hexUrl);
+
+          flashStatus.value = 'Preparing flash data...';
+
+          final flashJson = await readJson(
+            ecuMapFiles,
+            flashConfig.flashCheckSumType?.toString() ?? '',
+            Uint8List.fromList(hexContent.codeUnits),
+          );
+
+          if (flashJson.isEmpty) {
+            throw Exception("Flash JSON generation failed");
+          }
+
+          _currentDtcDatasetId = _fileToDtcDatasetId[fileName];
+          _currentPidDatasetId = _fileToPidDatasetId[fileName];
+
+          flashProgress.value = 0;
+
+          flashStatus.value = 'Flashing ECU...';
+
+          percentTimer = Timer.periodic(
+            const Duration(
+                milliseconds:
+                    50), // 2 updates/sec — plenty for a UI progress bar
+            (_) async {
+              try {
+                flashProgress.value = await App.dllFunctions!.flashingData();
+              } catch (_) {}
+            },
+          );
+
+          result = await App.dllFunctions!.startECUFlashing(
+            flashJson,
+            sequenceContent,
+            selectedEcu.ecu!,
+            selectedEcu.ecu?.seedkeyalgoFnIndex?.value ?? '',
+          );
+
+          print("Flash Result : $result");
+        } catch (e, s) {
+          print("❌ FATAL ERROR : $e");
+          print(s);
+          result = e.toString();
+        }
+
+        _flashStopwatch?.cancel();
+        percentTimer?.cancel();
+
+        if (result == null || result.isEmpty || result != 'NOERROR') {
+          flashInProgress.value = false;
+
+          flashComplete.value = false;
+          _log('❌ Flashing failed: $result');
+
+          final r = (result ?? '').toLowerCase();
+          final looksDisconnected = r.contains('no resp') ||
+              r.contains('socket_closed') ||
+              r.contains('noresponsefromecu');
+
+          if (looksDisconnected) {
+            dongleConnected.value = false;
+            _startDongleRetryTimer();
+            _showReconnectPopup();
+          }
+
+          flashErrorMessage.value = result ?? 'Unknown error';
+          return;
+        }
+
+        flashComplete.value = true;
+        _log('Flashing completed successfully (${formattedElapsed})');
+
+        flashStatus.value = 'Writing IQA Values...';
+        // await Future.delayed(const Duration(milliseconds: 500));
+        final iqaWriteStatus = await _autoWriteIqaValues();
+        _showFlashCompletePopup(iqaWriteStatus);
+
+        flashStatus.value = 'Loading DTCs...';
+        //await Future.delayed(const Duration(milliseconds: 300));
+        await _loadDtcResults();
+
+        flashStatus.value = 'Loading PIDs...';
+        //await Future.delayed(const Duration(milliseconds: 300));
+        await _loadPidResults();
+
+        flashStatus.value = 'Completed';
+
+        flashInProgress.value = false;
+      });
+    } finally {
+      // ✅ Always release the wakelock, whether flashing succeeded,
+      // failed, or threw — device can go back to sleep normally after this.
+      await WakelockPlus.disable();
+    }
+  }
+
+  Future<void> startFlashing1() async {
     if (flashInProgress.value) {
       return;
     }
