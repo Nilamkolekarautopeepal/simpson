@@ -1380,20 +1380,11 @@ class PsfLaneCard extends StatelessWidget {
     );
   }
 
-  /// Start Flash button — this is the card's signature glossy
-  /// element: a real gradient fill, layered shadow that lifts off
-  /// the card, and the diagonal sheen riding across the top so it
-  /// reads like a lacquered hardware button, not a Material default.
   Widget _startFlashButton() {
     final bool ready = lane.resolvedFlashFileUrl.value != null && lane.dongleConnected.value;
     final bool canFlash = ready && !lane.isFlashing.value;
 
-    // isFlashing must be checked FIRST — during an active flash, the
-    // main isolate's dongleConnected is intentionally false (the
-    // dongle is in active use by the flash isolate's own connection,
-    // freed up right before it spawns). Checking dongleConnected
-    // first would show "CONNECTING DONGLE…" for the entire flash
-    // instead of "FLASHING…" with the progress panel.
+    
     final String label = lane.isFlashing.value
         ? 'FLASHING…'
         : (!lane.dongleConnected.value
@@ -1475,10 +1466,6 @@ class PsfLaneCard extends StatelessWidget {
     );
   }
 
-  /// Big flash status panel — same tri-state coloring (failed /
-  /// completed / in-progress) but now a soft gradient card with a
-  /// gloss sheen, so it feels like part of the same lacquered-glass
-  /// family as the header and the Start Flash button.
   Widget _bigFlashStatus() {
     if (!lane.isFlashing.value && lane.flashProgress.value == 0 && lane.flashStatus.value.isEmpty) {
       return const SizedBox.shrink();
@@ -1626,13 +1613,7 @@ class PsfLaneCard extends StatelessWidget {
                 () => controller.readLiveDtcForLane(laneIndex),
                 () => controller.clearDtcForLane(laneIndex),
               );
-              // Auto-read live DTCs the moment the dialog opens —
-              // same command the refresh button runs, just automatic,
-              // so the operator sees real ECU state immediately
-              // instead of stale/empty data until they tap refresh.
-              // Only when the dongle is actually connected; if it
-              // isn't, readLiveDtcForLane already shows its own
-              // "connect the dongle first" message.
+          
               if (lane.dongleConnected.value) {
                 controller.readLiveDtcForLane(laneIndex);
               }
