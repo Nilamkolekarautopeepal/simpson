@@ -11,10 +11,6 @@ class SplashScreenDartView extends GetView<SplashScreenDartController> {
     return Scaffold(
       body: Stack(
         children: [
-          // Solid color background instead of an image — avoids any
-          // asset-loading/path issues entirely. Adjust the color to
-          // match your brand (this matches the dark navy blue used
-          // elsewhere in the splash/login screens).
           Positioned.fill(
             child: Container(
               color: const Color(0xFF0A1F44),
