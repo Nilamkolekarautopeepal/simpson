@@ -240,16 +240,6 @@ class LoginScreen extends StatelessWidget {
                         ),
                       ),
 
-                      // Center(
-                      //   child: TextButton(
-                      //     onPressed: () {},
-                      //     child: const Text(
-                      //       'Register',
-                      //       style: TextStyle(color: Colors.blue),
-                      //     ),
-                      //   ),
-                      // ),
-
                       const SizedBox(height: 24),
                       Column(
                         children: [

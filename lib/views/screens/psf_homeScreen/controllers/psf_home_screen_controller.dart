@@ -221,7 +221,7 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  void _startPlcRetryTimer() {
+   void _startPlcRetryTimer() {
     _plcRetryTimer?.cancel();
     _schedulePlcRetry(const Duration(seconds: 10));
   }
