@@ -35,6 +35,25 @@ class PsfHomeScreenController extends GetxController {
     ..connectionTimeout = const Duration(seconds: 15);
   static const int _dongleFlashPort = 6888;
 
+
+  final RxnInt expandedLaneIndex = RxnInt();
+
+  void expandLane(int index) {
+    expandedLaneIndex.value = index;
+  }
+
+  void collapseLane() {
+    expandedLaneIndex.value = null;
+  }
+
+  void logActivity(String entry, dynamic activityLog) {
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    activityLog.add('[$timestamp] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
+  }
+
   String? station;
   final RxList<PsfLane> lanes = <PsfLane>[].obs;
   final AuthService _authService = AuthService();
@@ -310,6 +329,10 @@ class PsfHomeScreenController extends GetxController {
       _showScanFailedPopup('ESN Not Recognized', message);
     } finally {
       lane.isLookingUpEsn.value = false;
+    }
+
+    if (esn.isNotEmpty) {
+      logActivity('ESN scanned: $esn', lane.activityLog);
     }
   }
 

@@ -1047,9 +1047,36 @@ class PsfLaneCard extends StatelessWidget {
               tooltip: 'Reset lane for next engine',
             ),
             const SizedBox(width: 6),
+            const SizedBox(width: 6),
+            Obx(() => _glowDongleDot(lane.dongleConnected.value)),
+            const SizedBox(width: 6),
             _ledDot(lane.isLedOn.value),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Independent per-lane dongle connection indicator — separate from
+  /// the existing LED dot (which reflects the PLC harness LED output,
+  /// not the dongle link). Green when THIS lane's dongle is connected,
+  /// red otherwise — reads straight from lane.dongleConnected, which
+  /// is already tracked independently per lane.
+  Widget _glowDongleDot(bool connected) {
+    final Color core = connected ? const Color(0xFF4ADE80) : const Color(0xFFEF5350);
+    return Container(
+      width: 13,
+      height: 13,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          center: const Alignment(-0.3, -0.3),
+          colors: [Colors.white.withOpacity(0.9), core, core],
+          stops: const [0.0, 0.35, 1.0],
+        ),
+        boxShadow: [
+          BoxShadow(color: core.withOpacity(0.75), blurRadius: 8, spreadRadius: 0.5),
+        ],
       ),
     );
   }
@@ -1196,27 +1223,27 @@ class PsfLaneCard extends StatelessWidget {
     );
   }
 
-  Widget _boxedLabel(String text) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(vertical: 9),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [_LaneColors.slateBg, Colors.white],
-        ),
-        border: Border.all(color: _LaneColors.slateBorder),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _LaneColors.slate),
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
-  }
+  // Widget _boxedLabel(String text) {
+  //   return Container(
+  //     margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+  //     alignment: Alignment.center,
+  //     padding: const EdgeInsets.symmetric(vertical: 9),
+  //     decoration: BoxDecoration(
+  //       gradient: const LinearGradient(
+  //         begin: Alignment.topCenter,
+  //         end: Alignment.bottomCenter,
+  //         colors: [_LaneColors.slateBg, Colors.white],
+  //       ),
+  //       border: Border.all(color: _LaneColors.slateBorder),
+  //       borderRadius: BorderRadius.circular(6),
+  //     ),
+  //     child: Text(
+  //       text,
+  //       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _LaneColors.slate),
+  //       overflow: TextOverflow.ellipsis,
+  //     ),
+  //   );
+  // }
 
   Widget _iqaScanGrid() {
     return Padding(
@@ -1335,9 +1362,9 @@ class PsfLaneCard extends StatelessWidget {
             child: Text(lane.flashFilesError.value, style: const TextStyle(fontSize: 10.5, color: _LaneColors.red)),
           );
         }
-        if (lane.resolvedFlashFileName.value == null) {
-          return _boxedLabel('FLASH FILE NAME');
-        }
+        // if (lane.resolvedFlashFileName.value == null) {
+        //   return _boxedLabel('FLASH FILE NAME');
+        // }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

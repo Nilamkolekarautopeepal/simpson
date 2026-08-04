@@ -42,6 +42,17 @@ class PsfLane {
 
   final RxString esnError = "".obs;
 
+
+  final RxList<String> activityLog = <String>[].obs;
+
+  void logActivity(String entry) {
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    activityLog.add('[$timestamp] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
+  }
+
   /// Auto-scan debounce — no SCAN button anymore; typing pauses for
   /// 2s then submits automatically.
   Timer? esnIdleTimer;
