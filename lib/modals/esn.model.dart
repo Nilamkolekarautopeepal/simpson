@@ -1,3 +1,5 @@
+import 'package:simpson/modals/esn_ds.dart';
+
 class EsnNumber {
   int? count;
   dynamic next;
@@ -34,37 +36,32 @@ class EsnNumber {
 class Result {
   int? id;
   String? engSlno;
-  ModelRef? model;
-  ModelRef? subModel;
+  ProdbudVariant? prodbudVariant;
   bool? isActive;
 
   Result({
     this.id,
     this.engSlno,
-    this.model,
-    this.subModel,
+    this.prodbudVariant,
     this.isActive,
   });
 
   factory Result.fromJson(Map<String, dynamic> json) => Result(
         id: json["id"],
         engSlno: json["eng_slno"],
-        model: json["model"] == null ? null : ModelRef.fromJson(json["model"]),
-        subModel: json["sub_model"] == null
+        prodbudVariant: json["prodbud_variant"] == null
             ? null
-            : ModelRef.fromJson(json["sub_model"]),
+            : ProdbudVariant.fromJson(json["prodbud_variant"]),
         isActive: json["is_active"],
       );
 
   Map<String, dynamic> toJson() => {
         "id": id,
         "eng_slno": engSlno,
-        "model": model?.toJson(),
-        "sub_model": subModel?.toJson(),
+        "prodbud_variant": prodbudVariant?.toJson(),
         "is_active": isActive,
       };
 }
-
 /// Shared shape for both "model" and "sub_model" — both are just
 /// {"id": int, "name": String} in the real response.
 class ModelRef {

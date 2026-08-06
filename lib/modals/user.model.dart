@@ -424,9 +424,29 @@ class ProdbudDongle {
     };
 }
 
+class Ecu {
+    int? id;
+    String? name;
+
+    Ecu({
+        this.id,
+        this.name,
+    });
+
+    factory Ecu.fromJson(Map<String, dynamic> json) => Ecu(
+        id: json["id"],
+        name: json["name"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "id": id,
+        "name": name,
+    };
+}
+
 class EcuStation {
     int? id;
-    int? ecu;
+    Ecu? ecu;
     int? priority;
     bool? injector;
     bool? isActive;
@@ -441,7 +461,7 @@ class EcuStation {
 
     factory EcuStation.fromJson(Map<String, dynamic> json) => EcuStation(
         id: json["id"],
-        ecu: json["ecu"],
+        ecu: json["ecu"] == null ? null : Ecu.fromJson(json["ecu"]),
         priority: json["priority"],
         injector: json["injector"],
         isActive: json["is_active"],
@@ -449,13 +469,12 @@ class EcuStation {
 
     Map<String, dynamic> toJson() => {
         "id": id,
-        "ecu": ecu,
+        "ecu": ecu?.toJson(),
         "priority": priority,
         "injector": injector,
         "is_active": isActive,
     };
 }
-
 class Token {
     String? refresh;
     String? access;

@@ -444,6 +444,95 @@ class AuthService {
     }
   }
 
+  //=================================
+  Future<void> createEolSession({
+    required int? esnId,
+    required int? dongleId,
+    required int? datasetType,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String continutyStatus,
+    required String flashStatus,
+    required String iqaStatus,
+    required String dtcStatus,
+    required List<String> activityLog,
+    String? accessToken,
+  }) async {
+    try {
+      final activityText = activityLog.join('\n');
+      final activityBytes = utf8.encode(activityText);
+
+      final formData = FormData.fromMap({
+        "esn_id": esnId?.toString() ?? '',
+        "dongle_id": dongleId?.toString() ?? '',
+        "dataset_type": datasetType?.toString() ?? '',
+        "start_date": startDate.toIso8601String(),
+        "end_date": endDate.toIso8601String(),
+        "continuty_status": continutyStatus,
+        "flash_status": flashStatus,
+        "iqa_status": iqaStatus,
+        "dtc_status": dtcStatus,
+        "activity_report": MultipartFile.fromBytes(
+          activityBytes,
+          filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
+        ),
+      });
+
+      debugPrint("🔵 [EolSessionService] POST ${ApiUrls.createEolSession}");
+      debugPrint(
+          "🔵 [EolSessionService] esn_id=$esnId dongle_id=$dongleId dataset_type=$datasetType "
+          "flash=$flashStatus iqa=$iqaStatus dtc=$dtcStatus continuty=$continutyStatus");
+
+      final response = await _dio.post(
+        ApiUrls.createEolSession,
+        data: formData,
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+     debugPrint("🔵 [EolSessionService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [EolSessionService] response.data=${response.data}");
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [EolSessionService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [EolSessionService] response.data=${e.response?.data}");
+      rethrow; // let the caller (activity log) know it actually failed
+    }
+  }
+
+  Future<Map<String, dynamic>> getSessionHistory({
+    required String esn,
+    String? accessToken,
+  }) async {
+    try {
+      debugPrint("🔵 [SessionHistoryService] GET ${ApiUrls.sessionByEsn}?esn=$esn");
+
+      final response = await _dio.get(
+        ApiUrls.sessionByEsn,
+        queryParameters: {"esn": esn},
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint("🔵 [SessionHistoryService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [SessionHistoryService] response.data=${response.data}");
+
+      return response.data is Map ? _asMap(response.data) : {};
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [SessionHistoryService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [SessionHistoryService] response.data=${e.response?.data}");
+      return {};
+    }
+  }
+  //================================
+
   String _friendlyMessage(DioException e) {
     final statusCode = e.response?.statusCode;
     if (statusCode != null) {

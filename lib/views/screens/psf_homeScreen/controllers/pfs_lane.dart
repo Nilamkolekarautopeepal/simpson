@@ -1,3 +1,4 @@
+//Prathmesh Girme
 import 'dart:async';
 import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 
@@ -16,7 +17,29 @@ class PsfLane {
     this.dongleIpFromLogin,
     this.expectedEcuId,
     this.macIdFromLogin,
-  });
+  }) {
+    ever(dongleConnected, (bool connected) {
+      logActivity(connected ? 'Dongle connected' : 'Dongle disconnected');
+    });
+    ever(esn, (String v) {
+      if (v.isNotEmpty) logActivity('ESN scanned: $v');
+    });
+    ever(esnError, (String v) {
+      if (v.isNotEmpty) logActivity('ESN error: $v');
+    });
+    ever(isFlashing, (bool flashing) {
+      if (flashing) logActivity('Flashing started');
+    });
+    ever(flashStatus, (String v) {
+      if (v.isNotEmpty) logActivity(v);
+    });
+    ever(dtcError, (String v) {
+      if (v.isNotEmpty) logActivity('DTC error: $v');
+    });
+    ever(iqaWriteStatus, (String v) {
+      if (v.isNotEmpty) logActivity(v);
+    });
+  }
 
   final String? dongleIpFromLogin;
   final int? expectedEcuId;
@@ -41,11 +64,20 @@ class PsfLane {
 
   final RxString esnError = "".obs;
 
+  final RxList<String> activityLog = <String>[].obs;
+
+  void logActivity(String entry) {
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    activityLog.add('[$timestamp] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
+  }
+
   /// Auto-scan debounce — no SCAN button anymore; typing pauses for
   /// 2s then submits automatically.
   Timer? esnIdleTimer;
   Timer? listNumberIdleTimer;
-
 
   final TextEditingController listNumberController = TextEditingController();
   final FocusNode listNumberFocusNode = FocusNode();
@@ -53,7 +85,6 @@ class PsfLane {
   final RxString listNumberError = "".obs;
   final RxString listNumber = "".obs;
 
- 
   final Rx<String?> resolvedFlashFileUrl = Rx<String?>(null);
   final Rx<String?> resolvedFlashFileName = Rx<String?>(null);
 
@@ -67,13 +98,16 @@ class PsfLane {
 
   final Rxn<int> pidDatasetId = Rxn<int>();
 
-
   SubmodelModelecu? matchedEcu;
 
- 
   int? matchedVehicleModelId;
   int? matchedSubModelId;
 
+  // For EOL session reporting
+  int? esnRecordId;
+  int? resolvedDatasetId;
+  int? dongleDbId;
+  DateTime? flashCycleStartTime;
   // ===============================
   // PLC / HARNESS STATUS
   // ===============================
@@ -90,10 +124,7 @@ class PsfLane {
   // DONGLE
   // ===============================
 
-  
   final RxBool dongleConnected = false.obs;
-
- 
   DLLFunctions? dllFunctions;
   final RxBool dongleConnecting = false.obs;
   bool isDongleBusy = false;
@@ -140,23 +171,57 @@ class PsfLane {
   }
 
   void configureIqaFields(int count, {List<String>? firingSequence}) {
-    for (final c in iqaControllers) {
-      c.dispose();
+    firingOrder = firingSequence;
+
+    // If the injector count hasn't actually changed (e.g. re-scanning
+    // the same ESN on an already-configured lane — completely normal
+    // in real use), there's nothing to rebuild. Disposing and
+    // recreating FocusNodes unconditionally on every scan was racing
+    // against currently-mounted TextFields still attached to them,
+    // since GetX's Obx rebuild happens on the next frame, not
+    // synchronously — that race is exactly what crashes here.
+    if (count == iqaControllers.length) {
+      for (final c in iqaControllers) {
+        c.clear();
+      }
+      for (final t in iqaIdleTimers) {
+        t?.cancel();
+      }
+      iqaIdleTimers = List.generate(count, (_) => null);
+      iqaAllFilled.value = false;
+      filledIqaCount.value = 0;
+      injectorStatus.assignAll(List.generate(count, (_) => false));
+      iqaStatus.assignAll(List.generate(count, (_) => false));
+      return;
     }
-    for (final f in iqaFocusNodes) {
-      f.dispose();
-    }
-    for (final t in iqaIdleTimers) {
-      t?.cancel();
-    }
+
+    // Count genuinely changed — swap in new lists first so the next
+    // rebuild has valid nodes to bind to, then dispose the OLD ones a
+    // frame later, once Flutter has actually detached every widget
+    // from them.
+    final oldControllers = iqaControllers;
+    final oldFocusNodes = iqaFocusNodes;
+    final oldTimers = iqaIdleTimers;
+
     iqaControllers = List.generate(count, (_) => TextEditingController());
     iqaFocusNodes = List.generate(count, (_) => FocusNode());
     iqaIdleTimers = List.generate(count, (_) => null);
-    firingOrder = firingSequence;
     iqaAllFilled.value = false;
     filledIqaCount.value = 0;
     injectorStatus.assignAll(List.generate(count, (_) => false));
     iqaStatus.assignAll(List.generate(count, (_) => false));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      for (final t in oldTimers) {
+        t?.cancel();
+      }
+      for (final c in oldControllers) {
+        c.dispose();
+      }
+      for (final f in oldFocusNodes) {
+        f.dispose();
+      }
+    });
   }
 
   String iqaLabelFor(int i) {
@@ -231,7 +296,6 @@ class PsfLane {
   final RxBool pidPlaying = false.obs;
   bool stopPidLoop = false;
 
-  
   final RxString iqaWriteStatus = "".obs;
 
   // ===============================
@@ -314,6 +378,12 @@ class PsfLane {
     matchedEcu = null;
     matchedVehicleModelId = null;
     matchedSubModelId = null;
+    esnRecordId = null;
+    resolvedDatasetId = null;
+    flashCycleStartTime = null;
+    // dongleDbId is intentionally NOT cleared — it's tied to the
+    // physical dongle wired to this lane, not to whichever engine
+    // is currently being flashed.
 
     dtcDatasetId.value = null;
 

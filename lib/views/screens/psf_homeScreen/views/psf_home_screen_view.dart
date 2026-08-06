@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/views/widget/psf_lane_card.dart';
+import 'psf_top_lane_status_bar.dart';
+import 'psf_lane_fullscreen_view.dart';
 import '../controllers/psf_home_screen_controller.dart';
 
 class _LaneColors {
@@ -122,54 +124,72 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Obx(() {
-                final laneCount = controller.lanes.length;
-                if (laneCount == 0) {
-                  return const Center(
-                    child: Text(
-                      'No dongles found for this station from login data.',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  );
-                }
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    const int slotsPerScreen = 5;
-                    const double spacing = 16;
-                    final double cardWidth = (constraints.maxWidth -
-                            spacing * (slotsPerScreen - 1)) /
-                        slotsPerScreen;
-                    final double cardHeight = constraints.maxHeight;
-
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: List.generate(laneCount, (i) {
-                          return Padding(
-                            padding: EdgeInsets.only(
-                                right: i == laneCount - 1 ? 0 : spacing),
-                            child: PsfLaneCard(
-                              laneIndex: i,
-                              lane: controller.lanes[i],
-                              controller: controller,
-                              width: cardWidth,
-                              height: cardHeight,
-                            ),
-                          );
-                        }),
-                      ),
-                    );
-                  },
-                );
-              }),
-            ),
+          PsfTopLaneStatusBar(controller: controller),
+         Expanded(
+            child: Obx(() {
+              if (controller.lanes.isEmpty) {
+                return const Center(child: Text('No dongles found for this station from login data.', style: TextStyle(color: Colors.grey)));
+              }
+              final expanded = (controller.expandedLaneIndex.value ?? 0).clamp(0, controller.lanes.length - 1);
+              return PsfLaneFullScreenView(
+                laneIndex: expanded,
+                lane: controller.lanes[expanded],
+                controller: controller,
+              );
+            }),
           ),
         ],
       ),
+    );
+  }
+
+  /// The original grid view — unchanged from before, just pulled out
+  /// into its own method so it can be swapped in/out by the Obx above
+  /// depending on whether a lane is currently expanded full-screen.
+  Widget _buildLaneGrid() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Obx(() {
+        final laneCount = controller.lanes.length;
+        if (laneCount == 0) {
+          return const Center(
+            child: Text(
+              'No dongles found for this station from login data.',
+              style: TextStyle(color: Colors.grey),
+            ),
+          );
+        }
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const int slotsPerScreen = 5;
+            const double spacing = 16;
+            final double cardWidth =
+                (constraints.maxWidth - spacing * (slotsPerScreen - 1)) /
+                    slotsPerScreen;
+            final double cardHeight = constraints.maxHeight;
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: List.generate(laneCount, (i) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                        right: i == laneCount - 1 ? 0 : spacing),
+                    child: PsfLaneCard(
+                      laneIndex: i,
+                      lane: controller.lanes[i],
+                      controller: controller,
+                      width: cardWidth,
+                      height: cardHeight,
+                    ),
+                  );
+                }),
+              ),
+            );
+          },
+        );
+      }),
     );
   }
 }

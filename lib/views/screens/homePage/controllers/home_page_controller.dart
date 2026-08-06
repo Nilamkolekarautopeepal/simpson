@@ -343,8 +343,15 @@ class HomePageController extends GetxController {
     if (match == null) return false;
     if (match.isActive != true) return false;
 
-    _esnVehicleModelName = match.model?.name;
-    _esnVehicleSubModelName = match.subModel?.name;
+    final variant = match.prodbudVariant;
+    if (variant == null) return false;
+
+    // This function only stored names before — the new API gives IDs
+    // instead, so store those directly. If this function's return
+    // value is used elsewhere expecting a model NAME specifically,
+    // let me know and I'll look up the name from the catalog too.
+    _esnVehicleModelId = variant.vehicleModel;
+    _esnVehicleSubModelId = variant.subModel;
     return true;
   }
 

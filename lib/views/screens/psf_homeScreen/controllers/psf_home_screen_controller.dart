@@ -1,3 +1,4 @@
+//Prathmesh Girme
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -33,6 +34,25 @@ class PsfHomeScreenController extends GetxController {
     ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
     ..connectionTimeout = const Duration(seconds: 15);
   static const int _dongleFlashPort = 6888;
+
+
+  final RxnInt expandedLaneIndex = RxnInt();
+
+  void expandLane(int index) {
+    expandedLaneIndex.value = index;
+  }
+
+  void collapseLane() {
+    expandedLaneIndex.value = null;
+  }
+
+  void logActivity(String entry, dynamic activityLog) {
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    activityLog.add('[$timestamp] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
+  }
 
   String? station;
   final RxList<PsfLane> lanes = <PsfLane>[].obs;
@@ -156,19 +176,26 @@ class PsfHomeScreenController extends GetxController {
       final List<dynamic> decoded = jsonDecode(raw);
       final built = <PsfLane>[];
 
-      for (int i = 0; i < decoded.length; i++) {
+     for (int i = 0; i < decoded.length; i++) {
         final entry = decoded[i] as Map<String, dynamic>;
         final ecuIdRaw = entry['ecuId'];
         final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
 
-        built.add(PsfLane(
+        final lane = PsfLane(
           i + 1,
           dongleIpFromLogin: entry['ip'] as String?,
           expectedEcuId: ecuId,
           macIdFromLogin: entry['macId'] as String?,
-        ));
-      }
+        );
+        lane.dongleDbId = entry['dongleDbId'] as int?;
 
+        final ecuNameFromLogin = entry['ecuName'] as String?;
+        if (ecuNameFromLogin != null && ecuNameFromLogin.isNotEmpty) {
+          lane.ecuModelName.value = ecuNameFromLogin;
+        }
+
+        built.add(lane);
+      }
       lanes.assignAll(built);
       debugPrint(
           "PFS Controller Loaded : ${lanes.length} lane(s) from login dongle list");
@@ -220,7 +247,7 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  void _startPlcRetryTimer() {
+   void _startPlcRetryTimer() {
     _plcRetryTimer?.cancel();
     _schedulePlcRetry(const Duration(seconds: 10));
   }
@@ -293,13 +320,27 @@ class PsfHomeScreenController extends GetxController {
       }
 
       await applyLane(esn, laneIndex, result);
+
+      unawaited(_authService.getSessionHistory(esn: esn, accessToken: _accessToken).then((history) {
+        final eol = (history['eol_sessions'] as List?) ?? [];
+        final testbed = (history['testbed_sessions'] as List?) ?? [];
+        print('   History for ESN $esn → ${eol.length} EOL session(s), ${testbed.length} testbed session(s)');
+        if (eol.isNotEmpty || testbed.isNotEmpty) {
+          lane.logActivity('Previous history: ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+        }
+      }));
       print(
           '   ✅ ESN accepted — model/sub-model/ECU applied to Lane ${lane.laneNumber}');
       print('══════════════════════════════════════════');
 
       // Auto-advance to List Number once ESN resolves successfully.
+     // Auto-advance directly to the first IQA field once ESN
+      // resolves successfully — List Number is no longer a separate
+      // step, everything now comes back from the ESN lookup itself.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        lane.listNumberFocusNode.requestFocus();
+        if (lane.iqaFocusNodes.isNotEmpty) {
+          lane.iqaFocusNodes.first.requestFocus();
+        }
       });
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
@@ -309,6 +350,10 @@ class PsfHomeScreenController extends GetxController {
       _showScanFailedPopup('ESN Not Recognized', message);
     } finally {
       lane.isLookingUpEsn.value = false;
+    }
+
+    if (esn.isNotEmpty) {
+      logActivity('ESN scanned: $esn', lane.activityLog);
     }
   }
 
@@ -337,31 +382,31 @@ class PsfHomeScreenController extends GetxController {
       throw Exception('ESN is not active.');
     }
 
-    final modelName = match.model?.name?.trim();
-    final subModelName = match.subModel?.name?.trim();
-
-    print('   ESN catalog match → model="$modelName" subModel="$subModelName" '
-        '(model.id=${match.model?.id}, subModel.id=${match.subModel?.id})');
-
-    if (modelName == null ||
-        modelName.isEmpty ||
-        subModelName == null ||
-        subModelName.isEmpty) {
-      throw Exception('ESN match is missing model/sub-model information.');
+    final variant = match.prodbudVariant;
+    if (variant == null) {
+      throw Exception('This ESN has no vehicle variant assigned.');
     }
+
+    final vehicleModelId = variant.vehicleModel;
+    final subModelId = variant.subModel;
+
+    print('   ESN catalog match → vehicleModelId=$vehicleModelId '
+        'subModelId=$subModelId variantId=${variant.id}');
+
+    if (vehicleModelId == null || subModelId == null) {
+      throw Exception('ESN variant is missing vehicle model/sub-model.');
+    }
+
     final allModel = await _ensureModels();
 
     all_ds.Result? matchedModel;
     all_ds.SubModel? matchedSubModel;
 
     for (final result in allModel.results ?? <all_ds.Result>[]) {
-      if ((result.name ?? '').trim().toUpperCase() != modelName.toUpperCase()) {
-        continue;
-      }
+      if (result.id != vehicleModelId) continue;
       matchedModel = result;
       for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
-        if ((subModel.name ?? '').trim().toUpperCase() ==
-            subModelName.toUpperCase()) {
+        if (subModel.id == subModelId) {
           matchedSubModel = subModel;
           break;
         }
@@ -371,26 +416,55 @@ class PsfHomeScreenController extends GetxController {
 
     if (matchedModel == null || matchedSubModel == null) {
       throw Exception(
-          'No matching model/sub-model found in catalog for "$modelName — $subModelName".');
+          'No matching model/sub-model found in catalog '
+          '(vehicleModelId=$vehicleModelId, subModelId=$subModelId).');
     }
 
     final ecuEntry = matchedSubModel.submodelModelecu?.firstOrNull;
     if (ecuEntry == null) {
       throw Exception(
-          'No ECU configuration found for "$modelName — $subModelName".');
+          'No ECU configuration found for this model/sub-model.');
     }
 
     print('   Models catalog match → vehicleModel.id=${matchedModel.id} '
         'subModel.id=${matchedSubModel.id} ecu.id=${ecuEntry.ecu?.id} '
         'ecu.name=${ecuEntry.ecu?.name}');
 
+    String? flashFileUrl;
+    int? resolvedDatasetId;
+    final expectedEcuId = ecuEntry.ecu?.id;
+
+    final dMatches = (variant.dDatasetEcu ?? [])
+        .where((e) => e.ecu == expectedEcuId)
+        .toList();
+    if (dMatches.isNotEmpty) {
+      final chosen = dMatches.firstWhereOrNull((e) => e.isLatest == true) ?? dMatches.first;
+      flashFileUrl = chosen.dataFile;
+      resolvedDatasetId = chosen.id;
+    }
+
+    if (flashFileUrl == null || flashFileUrl.isEmpty) {
+      final tMatches = (variant.tDatasetEcu ?? [])
+          .where((e) => e.ecu == expectedEcuId)
+          .toList();
+      if (tMatches.isNotEmpty) {
+        final chosen = tMatches.firstWhereOrNull((e) => e.isLatest == true) ?? tMatches.first;
+        flashFileUrl = chosen.dataFile;
+        resolvedDatasetId = chosen.id;
+      }
+    }
+
+    print('   Flash file resolved → $flashFileUrl (datasetId=$resolvedDatasetId)');
+
     return _IdentifiedEcu(
       ecuEntry: ecuEntry,
       vehicleModelId: matchedModel.id,
       subModelId: matchedSubModel.id,
+      flashFileUrl: flashFileUrl,
+      resolvedDatasetId: resolvedDatasetId,
+      esnRecordId: match.id,
     );
   }
-
   Future<void> applyLane(
     String esn,
     int laneIndex,
@@ -407,13 +481,20 @@ class PsfHomeScreenController extends GetxController {
     lane.isHarnessConnected.value = false;
     lane.esn.value = esn;
 
-    lane.matchedEcu = ecuEntry;
+   lane.matchedEcu = ecuEntry;
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
+    lane.esnRecordId = identified.esnRecordId;
+    lane.resolvedDatasetId = identified.resolvedDatasetId;
+    lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
+    lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
+    lane.flashCycleStartTime = DateTime.now();
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
-
+    lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
+    lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
+    
     final injectorCount = ecuEntry.noOfInjectors ?? 4;
     final firingOrder = (ecuEntry.firingSequence ?? '')
         .split(',')
@@ -742,10 +823,15 @@ class PsfHomeScreenController extends GetxController {
         print(
             '   🛑 physically power-cycle Lane ${lane.laneNumber}\'s dongle, then tap the reconnect button.');
         try {
-          Get.snackbar(
-            'Lane ${lane.laneNumber} dongle unresponsive',
-            'Power-cycle the dongle, then tap reconnect. Auto-retry stopped after $attempts failed attempts.',
-            duration: const Duration(seconds: 8),
+          if (Get.isDialogOpen == true) Get.back();
+          Get.dialog(
+            CustomPopup(
+              title: 'Lane ${lane.laneNumber} dongle unresponsive',
+              message:
+                  'Power-cycle the dongle, then tap reconnect. Auto-retry stopped after $attempts failed attempts.',
+              confirmText: 'OK',
+            ),
+            barrierDismissible: true,
           );
         } catch (_) {}
         return; // stop scheduling further retries
@@ -845,15 +931,30 @@ class PsfHomeScreenController extends GetxController {
     if (lane.resolvedFlashFileUrl.value == null) {
       print('   ❌ no flash file resolved — scan List Number first');
       print('══════════════════════════════════════════');
-      Get.snackbar(
-          'Flash', 'Scan a List Number first to resolve the flash file.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message: 'Scan a List Number first to resolve the flash file.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print('   ❌ this lane\'s dongle isn\'t connected — cannot flash');
       print('══════════════════════════════════════════');
-      Get.snackbar('Flash', 'Connect the dongle for this lane first.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message: 'Connect the dongle for this lane first.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
@@ -861,8 +962,16 @@ class PsfHomeScreenController extends GetxController {
       print(
           '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
       print('══════════════════════════════════════════');
-      Get.snackbar('Flash',
-          'This lane\'s dongle is busy — wait for the current operation to finish.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message:
+              'This lane\'s dongle is busy — wait for the current operation to finish.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
     lane.isDongleBusy = true;
@@ -969,16 +1078,57 @@ class PsfHomeScreenController extends GetxController {
       lane.isDongleBusy = false;
       return;
     }
+    //----------------------------
+    // print(
+    //     '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — reconnecting to read DTC/PID, write IQA…');
+    // print('══════════════════════════════════════════');
+    // lane.flashProgress.value = 1;
+    // lane.flashStatus.value = "Flash Completed";
+    // lane.isDongleBusy = false;
+    // await connectDongleForLane(index);
+    // lane.isDongleBusy = true;
 
+    //------------------------------------------------------
     print(
-        '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — reconnecting to read DTC/PID, write IQA…');
+        '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — letting dongle settle before reconnecting…');
     print('══════════════════════════════════════════');
     lane.flashProgress.value = 1;
     lane.flashStatus.value = "Flash Completed";
+    
+    //----------------------------------
+    
+    // await Future.delayed(const Duration(seconds: 3));
+    // lane.isDongleBusy = false;
+    // await connectDongleForLane(index);
+    // if (!lane.dongleConnected.value || lane.dllFunctions == null) {
+    //   print(
+    //       '   ⚠️ [Lane ${lane.laneNumber}] first reconnect attempt failed — waiting longer and trying once more...');
+    //   await Future.delayed(const Duration(seconds: 3));
+    //   await connectDongleForLane(index);
+    // }
+
+    // lane.isDongleBusy = true;
+
+    //------------------------------------------------
+    await Future.delayed(const Duration(seconds: 5));
     lane.isDongleBusy = false;
-    await connectDongleForLane(index);
+
+    int attempt = 0;
+    final reconnectDeadline = DateTime.now().add(const Duration(minutes: 3));
+    while (DateTime.now().isBefore(reconnectDeadline)) {
+      attempt++;
+      await connectDongleForLane(index);
+      if (lane.dongleConnected.value && lane.dllFunctions != null) {
+        print('   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+        break;
+      }
+      print('   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+      await Future.delayed(const Duration(seconds: 5));
+    }
+
     lane.isDongleBusy = true;
 
+    //---------------------------------------------
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print(
           '   ⚠️ [Lane ${lane.laneNumber}] could not reconnect after flash — skipping DTC/PID/IQA steps');
@@ -992,8 +1142,48 @@ class PsfHomeScreenController extends GetxController {
     await Future.delayed(const Duration(milliseconds: 500));
     await readLiveDtcForLane(index);
 
-    await Future.delayed(const Duration(milliseconds: 300));
+   await Future.delayed(const Duration(milliseconds: 300));
     await loadPidForLane(index);
+final flashPassed = result == 'NOERROR';
+    final iqaPassed = lane.iqaWriteStatus.value.toLowerCase().contains('successful');
+    final dtcPassed = lane.dtcError.value.isEmpty; // Pass = DTC read loaded successfully, regardless of what codes it found
+    final continutyPassed = lane.isHarnessConnected.value;
+
+    final startTime = lane.flashCycleStartTime ?? DateTime.now();
+    final endTime = DateTime.now();
+    String fmtTime(DateTime t) =>
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+
+    // One clear summary line covering the whole cycle — shows in the
+    // Activity Log as a single glance-able result, with any "Fail"
+    // rendering in red automatically.
+    lane.logActivity(
+      'SESSION SUMMARY — Start ${fmtTime(startTime)}  End ${fmtTime(endTime)}  |  '
+      'Flash: ${flashPassed ? "Pass" : "Fail"}  '
+      'IQA: ${iqaPassed ? "Pass" : "Fail"}  '
+      'DTC: ${dtcPassed ? "Pass" : "Fail"}  '
+      'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
+    );
+
+    lane.logActivity('Sending session report to server...');
+
+    unawaited(_authService.createEolSession(
+      esnId: lane.esnRecordId,
+      dongleId: lane.dongleDbId,
+      datasetType: lane.resolvedDatasetId,
+      startDate: startTime,
+      endDate: endTime,
+      continutyStatus: continutyPassed ? 'Pass' : 'Fail',
+      flashStatus: flashPassed ? 'Pass' : 'Fail',
+      iqaStatus: iqaPassed ? 'Pass' : 'Fail',
+      dtcStatus: dtcPassed ? 'Pass' : 'Fail',
+      activityLog: lane.activityLog.toList(),
+      accessToken: _accessToken,
+    ).then((_) {
+      lane.logActivity('✅ Session report sent to server successfully');
+    }).catchError((e) {
+      lane.logActivity('❌ Session report failed to send: $e');
+    }));
 
     lane.isDongleBusy = false;
   }
@@ -1192,10 +1382,14 @@ class PsfHomeScreenController extends GetxController {
 
       for (final row in rows) {
         if (row.length < 2) continue;
-        final code = row[0];
-        final status = row[1];
+        //final code = row[0];
+        final code = row[0].toString().toUpperCase();
+        final status = row[1].toString();
 
-        final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
+        //final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
+        final match =  lane.dtcCodes.firstWhereOrNull(
+            (c) => (c.code ?? '').toUpperCase() == code,
+          );
         final desc = match?.description ?? 'Description not found';
 
         merged[code] = '$code - $desc ($status)';
@@ -1500,18 +1694,42 @@ class PsfHomeScreenController extends GetxController {
     }
 
     if (lane.dllFunctions == null) {
-      Get.snackbar('Live Parameter', 'Connect the dongle for this lane first.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message: 'Connect the dongle for this lane first.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (lane.liveParameterCodes.isEmpty) {
-      Get.snackbar('Live Parameter', 'No parameters available to run.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message: 'No parameters available to run.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
     if (lane.isDongleBusy) {
-      Get.snackbar('Live Parameter',
-          'This lane\'s dongle is busy with another operation — try again shortly.');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Live Parameter',
+          message:
+              'This lane\'s dongle is busy with another operation — try again shortly.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
       return;
     }
 
@@ -1611,7 +1829,6 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-
   void onRefreshLane(
     int index,
   ) {
@@ -1649,10 +1866,16 @@ class _IdentifiedEcu {
   final all_ds.SubmodelModelecu ecuEntry;
   final int? vehicleModelId;
   final int? subModelId;
+  final String? flashFileUrl;
+  final int? resolvedDatasetId;
+  final int? esnRecordId;
 
   _IdentifiedEcu({
     required this.ecuEntry,
     required this.vehicleModelId,
     required this.subModelId,
+    this.flashFileUrl,
+    this.resolvedDatasetId,
+    this.esnRecordId,
   });
 }

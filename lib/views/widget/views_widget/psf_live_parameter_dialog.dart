@@ -3,9 +3,7 @@ import 'package:get/get.dart';
 import 'package:simpson/modals/pidDataset.model.dart' show Code, PiCodeVariables;
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 
-/// Same palette as the lane card — kept identical so every screen in
-/// the app reads as one consistent product rather than a patchwork of
-/// one-off colors per dialog.
+
 class _LaneColors {
   static const navy = Color(0xFF003874);
   static const navyLight = Color(0xFF1D5FA0);
@@ -19,9 +17,7 @@ class _LaneColors {
   static const slateBg = Color(0xFFF7F8FA);
 }
 
-/// Same signature diagonal sheen used across the lane card — the one
-/// glossy device repeated everywhere so gradients read as "this
-/// product's glass/lacquer style" rather than a one-off effect.
+
 class _GlossOverlay extends StatelessWidget {
   const _GlossOverlay({this.borderRadius, this.opacity = 0.16});
   final BorderRadius? borderRadius;
@@ -136,9 +132,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
     );
   }
 
-  /// Navy gradient header with the gloss sheen — same treatment as
-  /// the lane card's ECU header bar, so this dialog reads as part of
-  /// the same surface rather than a separate plain-white popup.
+
   Widget _header() {
     return Container(
       decoration: const BoxDecoration(
@@ -175,8 +169,9 @@ class PsfLiveParameterDialog extends StatelessWidget {
                 Obx(() {
                   final playing = lane.pidPlaying.value;
                   return _glossyPillButton(
-                    label: playing ? 'Stop' : 'Run',
+                    label: playing ? 'Reading...' : 'Run',
                     icon: playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                    showSpinner: playing,
                     colors: playing ? [_LaneColors.red, const Color(0xFF9E2E2E)] : [_LaneColors.green, _LaneColors.greenDark],
                     onPressed: onTogglePlayback,
                   );
@@ -214,6 +209,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
     required IconData icon,
     required List<Color> colors,
     required VoidCallback onPressed,
+    bool showSpinner = false,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -235,8 +231,17 @@ class PsfLiveParameterDialog extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(icon, size: 16, color: Colors.white),
-                    const SizedBox(width: 5),
+                    if (showSpinner) ...[
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      ),
+                      const SizedBox(width: 6),
+                    ] else ...[
+                      Icon(icon, size: 16, color: Colors.white),
+                      const SizedBox(width: 5),
+                    ],
                     Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white)),
                   ],
                 ),
@@ -248,8 +253,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
     );
   }
 
-  /// Tab bar — glass pill container with a raised white tab indicator
-  /// instead of the flat grey chrome before.
+ 
   Widget _tabBar() {
     return Container(
       decoration: BoxDecoration(
@@ -367,13 +371,13 @@ class PsfLiveParameterDialog extends StatelessWidget {
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: isError ? _LaneColors.red : (hasValue ? _LaneColors.greenDark : _LaneColors.slate),
-                ),
+                ),  
               ),
             );
           }),
         ],
       ),
-    );
+    ); 
   }
 
   // ═══════════════════════════════════════════════
@@ -396,9 +400,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
   }
 
   Widget _iqaWrittenTile(int i) {
-    // Each tile owns its own Obx, scoped to just this controller's text
-    // and the overall write-status line — same reasoning as the live
-    // parameter tiles above.
+   
     return Obx(() {
       final value = lane.iqaControllers[i].text.trim();
       final hasValue = value.isNotEmpty;
@@ -463,8 +465,7 @@ class PsfLiveParameterDialog extends StatelessWidget {
   }
 }
 
-/// One flattened, displayable row: a Code paired with one of its
-/// piCodeVariable sub-entries (or null if the Code has none at all).
+
 class _ParamRow {
   const _ParamRow({required this.code, required this.variable});
   final Code code;

@@ -25,6 +25,7 @@ class UDSDiagnostic {
   final ECUCalculateSeedkey _calculateSeedKey;
   UDSDiagnostic(this._dongleComm, this._calculateSeedKey);
 
+
   Future<ResponseArrayStatus?> enterExtendedSession(
     WriteParameterIndex writeParameterIndex,
     SEEDKEYINDEXTYPE seedKeyIndex,
