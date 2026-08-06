@@ -176,19 +176,26 @@ class PsfHomeScreenController extends GetxController {
       final List<dynamic> decoded = jsonDecode(raw);
       final built = <PsfLane>[];
 
-      for (int i = 0; i < decoded.length; i++) {
+     for (int i = 0; i < decoded.length; i++) {
         final entry = decoded[i] as Map<String, dynamic>;
         final ecuIdRaw = entry['ecuId'];
         final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
 
-        built.add(PsfLane(
+        final lane = PsfLane(
           i + 1,
           dongleIpFromLogin: entry['ip'] as String?,
           expectedEcuId: ecuId,
           macIdFromLogin: entry['macId'] as String?,
-        ));
-      }
+        );
+        lane.dongleDbId = entry['dongleDbId'] as int?;
 
+        final ecuNameFromLogin = entry['ecuName'] as String?;
+        if (ecuNameFromLogin != null && ecuNameFromLogin.isNotEmpty) {
+          lane.ecuModelName.value = ecuNameFromLogin;
+        }
+
+        built.add(lane);
+      }
       lanes.assignAll(built);
       debugPrint(
           "PFS Controller Loaded : ${lanes.length} lane(s) from login dongle list");
@@ -313,13 +320,27 @@ class PsfHomeScreenController extends GetxController {
       }
 
       await applyLane(esn, laneIndex, result);
+
+      unawaited(_authService.getSessionHistory(esn: esn, accessToken: _accessToken).then((history) {
+        final eol = (history['eol_sessions'] as List?) ?? [];
+        final testbed = (history['testbed_sessions'] as List?) ?? [];
+        print('   History for ESN $esn → ${eol.length} EOL session(s), ${testbed.length} testbed session(s)');
+        if (eol.isNotEmpty || testbed.isNotEmpty) {
+          lane.logActivity('Previous history: ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+        }
+      }));
       print(
           '   ✅ ESN accepted — model/sub-model/ECU applied to Lane ${lane.laneNumber}');
       print('══════════════════════════════════════════');
 
       // Auto-advance to List Number once ESN resolves successfully.
+     // Auto-advance directly to the first IQA field once ESN
+      // resolves successfully — List Number is no longer a separate
+      // step, everything now comes back from the ESN lookup itself.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        lane.listNumberFocusNode.requestFocus();
+        if (lane.iqaFocusNodes.isNotEmpty) {
+          lane.iqaFocusNodes.first.requestFocus();
+        }
       });
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
@@ -361,31 +382,31 @@ class PsfHomeScreenController extends GetxController {
       throw Exception('ESN is not active.');
     }
 
-    final modelName = match.model?.name?.trim();
-    final subModelName = match.subModel?.name?.trim();
-
-    print('   ESN catalog match → model="$modelName" subModel="$subModelName" '
-        '(model.id=${match.model?.id}, subModel.id=${match.subModel?.id})');
-
-    if (modelName == null ||
-        modelName.isEmpty ||
-        subModelName == null ||
-        subModelName.isEmpty) {
-      throw Exception('ESN match is missing model/sub-model information.');
+    final variant = match.prodbudVariant;
+    if (variant == null) {
+      throw Exception('This ESN has no vehicle variant assigned.');
     }
+
+    final vehicleModelId = variant.vehicleModel;
+    final subModelId = variant.subModel;
+
+    print('   ESN catalog match → vehicleModelId=$vehicleModelId '
+        'subModelId=$subModelId variantId=${variant.id}');
+
+    if (vehicleModelId == null || subModelId == null) {
+      throw Exception('ESN variant is missing vehicle model/sub-model.');
+    }
+
     final allModel = await _ensureModels();
 
     all_ds.Result? matchedModel;
     all_ds.SubModel? matchedSubModel;
 
     for (final result in allModel.results ?? <all_ds.Result>[]) {
-      if ((result.name ?? '').trim().toUpperCase() != modelName.toUpperCase()) {
-        continue;
-      }
+      if (result.id != vehicleModelId) continue;
       matchedModel = result;
       for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
-        if ((subModel.name ?? '').trim().toUpperCase() ==
-            subModelName.toUpperCase()) {
+        if (subModel.id == subModelId) {
           matchedSubModel = subModel;
           break;
         }
@@ -395,26 +416,55 @@ class PsfHomeScreenController extends GetxController {
 
     if (matchedModel == null || matchedSubModel == null) {
       throw Exception(
-          'No matching model/sub-model found in catalog for "$modelName — $subModelName".');
+          'No matching model/sub-model found in catalog '
+          '(vehicleModelId=$vehicleModelId, subModelId=$subModelId).');
     }
 
     final ecuEntry = matchedSubModel.submodelModelecu?.firstOrNull;
     if (ecuEntry == null) {
       throw Exception(
-          'No ECU configuration found for "$modelName — $subModelName".');
+          'No ECU configuration found for this model/sub-model.');
     }
 
     print('   Models catalog match → vehicleModel.id=${matchedModel.id} '
         'subModel.id=${matchedSubModel.id} ecu.id=${ecuEntry.ecu?.id} '
         'ecu.name=${ecuEntry.ecu?.name}');
 
+    String? flashFileUrl;
+    int? resolvedDatasetId;
+    final expectedEcuId = ecuEntry.ecu?.id;
+
+    final dMatches = (variant.dDatasetEcu ?? [])
+        .where((e) => e.ecu == expectedEcuId)
+        .toList();
+    if (dMatches.isNotEmpty) {
+      final chosen = dMatches.firstWhereOrNull((e) => e.isLatest == true) ?? dMatches.first;
+      flashFileUrl = chosen.dataFile;
+      resolvedDatasetId = chosen.id;
+    }
+
+    if (flashFileUrl == null || flashFileUrl.isEmpty) {
+      final tMatches = (variant.tDatasetEcu ?? [])
+          .where((e) => e.ecu == expectedEcuId)
+          .toList();
+      if (tMatches.isNotEmpty) {
+        final chosen = tMatches.firstWhereOrNull((e) => e.isLatest == true) ?? tMatches.first;
+        flashFileUrl = chosen.dataFile;
+        resolvedDatasetId = chosen.id;
+      }
+    }
+
+    print('   Flash file resolved → $flashFileUrl (datasetId=$resolvedDatasetId)');
+
     return _IdentifiedEcu(
       ecuEntry: ecuEntry,
       vehicleModelId: matchedModel.id,
       subModelId: matchedSubModel.id,
+      flashFileUrl: flashFileUrl,
+      resolvedDatasetId: resolvedDatasetId,
+      esnRecordId: match.id,
     );
   }
-
   Future<void> applyLane(
     String esn,
     int laneIndex,
@@ -431,13 +481,20 @@ class PsfHomeScreenController extends GetxController {
     lane.isHarnessConnected.value = false;
     lane.esn.value = esn;
 
-    lane.matchedEcu = ecuEntry;
+   lane.matchedEcu = ecuEntry;
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
+    lane.esnRecordId = identified.esnRecordId;
+    lane.resolvedDatasetId = identified.resolvedDatasetId;
+    lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
+    lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
+    lane.flashCycleStartTime = DateTime.now();
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
-
+    lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
+    lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
+    
     final injectorCount = ecuEntry.noOfInjectors ?? 4;
     final firingOrder = (ecuEntry.firingSequence ?? '')
         .split(',')
@@ -1085,8 +1142,48 @@ class PsfHomeScreenController extends GetxController {
     await Future.delayed(const Duration(milliseconds: 500));
     await readLiveDtcForLane(index);
 
-    await Future.delayed(const Duration(milliseconds: 300));
+   await Future.delayed(const Duration(milliseconds: 300));
     await loadPidForLane(index);
+final flashPassed = result == 'NOERROR';
+    final iqaPassed = lane.iqaWriteStatus.value.toLowerCase().contains('successful');
+    final dtcPassed = lane.dtcError.value.isEmpty; // Pass = DTC read loaded successfully, regardless of what codes it found
+    final continutyPassed = lane.isHarnessConnected.value;
+
+    final startTime = lane.flashCycleStartTime ?? DateTime.now();
+    final endTime = DateTime.now();
+    String fmtTime(DateTime t) =>
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+
+    // One clear summary line covering the whole cycle — shows in the
+    // Activity Log as a single glance-able result, with any "Fail"
+    // rendering in red automatically.
+    lane.logActivity(
+      'SESSION SUMMARY — Start ${fmtTime(startTime)}  End ${fmtTime(endTime)}  |  '
+      'Flash: ${flashPassed ? "Pass" : "Fail"}  '
+      'IQA: ${iqaPassed ? "Pass" : "Fail"}  '
+      'DTC: ${dtcPassed ? "Pass" : "Fail"}  '
+      'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
+    );
+
+    lane.logActivity('Sending session report to server...');
+
+    unawaited(_authService.createEolSession(
+      esnId: lane.esnRecordId,
+      dongleId: lane.dongleDbId,
+      datasetType: lane.resolvedDatasetId,
+      startDate: startTime,
+      endDate: endTime,
+      continutyStatus: continutyPassed ? 'Pass' : 'Fail',
+      flashStatus: flashPassed ? 'Pass' : 'Fail',
+      iqaStatus: iqaPassed ? 'Pass' : 'Fail',
+      dtcStatus: dtcPassed ? 'Pass' : 'Fail',
+      activityLog: lane.activityLog.toList(),
+      accessToken: _accessToken,
+    ).then((_) {
+      lane.logActivity('✅ Session report sent to server successfully');
+    }).catchError((e) {
+      lane.logActivity('❌ Session report failed to send: $e');
+    }));
 
     lane.isDongleBusy = false;
   }
@@ -1769,10 +1866,16 @@ class _IdentifiedEcu {
   final all_ds.SubmodelModelecu ecuEntry;
   final int? vehicleModelId;
   final int? subModelId;
+  final String? flashFileUrl;
+  final int? resolvedDatasetId;
+  final int? esnRecordId;
 
   _IdentifiedEcu({
     required this.ecuEntry,
     required this.vehicleModelId,
     required this.subModelId,
+    this.flashFileUrl,
+    this.resolvedDatasetId,
+    this.esnRecordId,
   });
 }

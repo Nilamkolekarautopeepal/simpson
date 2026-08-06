@@ -103,13 +103,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            if (isExpanded) {
-              controller.collapseLane();
-            } else {
-              controller.expandLane(index);
-            }
-          },
+       onTap: () => controller.expandLane(index),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(

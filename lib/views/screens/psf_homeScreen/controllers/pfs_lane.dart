@@ -17,7 +17,29 @@ class PsfLane {
     this.dongleIpFromLogin,
     this.expectedEcuId,
     this.macIdFromLogin,
-  });
+  }) {
+    ever(dongleConnected, (bool connected) {
+      logActivity(connected ? 'Dongle connected' : 'Dongle disconnected');
+    });
+    ever(esn, (String v) {
+      if (v.isNotEmpty) logActivity('ESN scanned: $v');
+    });
+    ever(esnError, (String v) {
+      if (v.isNotEmpty) logActivity('ESN error: $v');
+    });
+    ever(isFlashing, (bool flashing) {
+      if (flashing) logActivity('Flashing started');
+    });
+    ever(flashStatus, (String v) {
+      if (v.isNotEmpty) logActivity(v);
+    });
+    ever(dtcError, (String v) {
+      if (v.isNotEmpty) logActivity('DTC error: $v');
+    });
+    ever(iqaWriteStatus, (String v) {
+      if (v.isNotEmpty) logActivity(v);
+    });
+  }
 
   final String? dongleIpFromLogin;
   final int? expectedEcuId;
@@ -41,7 +63,6 @@ class PsfLane {
   final RxBool isLookingUpEsn = false.obs;
 
   final RxString esnError = "".obs;
-
 
   final RxList<String> activityLog = <String>[].obs;
 
@@ -82,6 +103,11 @@ class PsfLane {
   int? matchedVehicleModelId;
   int? matchedSubModelId;
 
+  // For EOL session reporting
+  int? esnRecordId;
+  int? resolvedDatasetId;
+  int? dongleDbId;
+  DateTime? flashCycleStartTime;
   // ===============================
   // PLC / HARNESS STATUS
   // ===============================
@@ -352,6 +378,12 @@ class PsfLane {
     matchedEcu = null;
     matchedVehicleModelId = null;
     matchedSubModelId = null;
+    esnRecordId = null;
+    resolvedDatasetId = null;
+    flashCycleStartTime = null;
+    // dongleDbId is intentionally NOT cleared — it's tied to the
+    // physical dongle wired to this lane, not to whichever engine
+    // is currently being flashed.
 
     dtcDatasetId.value = null;
 

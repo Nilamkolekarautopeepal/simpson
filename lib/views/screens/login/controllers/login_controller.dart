@@ -114,17 +114,28 @@ class LoginController extends GetxController {
       final stationType = station?.stationType?.trim();
 
       final dongleEntries = (station?.prodbudDongles ?? [])
-          .map((d) => {
-                'mac_id': d.macId,
-                'ip': d.ip,
-                'is_active': d.isActive,
-                'ecu_ids': (d.ecuStation ?? [])
-                    .map((e) => e.ecu)
-                    .whereType<int>()
-                    .toList(),
-              })
-          .toList();
+          .map((d) {
+            final ecuStations = d.ecuStation ?? [];
+            final ecuIds = ecuStations
+                .map((e) => e.ecu?.id)
+                .whereType<int>()
+                .toList();
 
+            final ecuName = ecuStations
+                .map((e) => e.ecu?.name)
+                .firstWhere((n) => n != null && n.isNotEmpty, orElse: () => null);
+
+            return {
+              'mac_id': d.macId,
+              'ip': d.ip,
+              'is_active': d.isActive,
+              'ecu_ids': ecuIds,
+              'ecuId': ecuIds.firstOrNull,
+              'ecuName': ecuName,
+              'dongleDbId': d.id,
+            };
+          })
+          .toList();
       debugPrint("🔵 [Login] dongle_entries=$dongleEntries");
 
       final plcIp = station?.plcIp;

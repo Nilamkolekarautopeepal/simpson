@@ -125,17 +125,17 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PsfTopLaneStatusBar(controller: controller),
-          Expanded(
+         Expanded(
             child: Obx(() {
-              final expanded = controller.expandedLaneIndex.value;
-              if (expanded != null) {
-                return PsfLaneFullScreenView(
-                  laneIndex: expanded,
-                  lane: controller.lanes[expanded],
-                  controller: controller,
-                );
+              if (controller.lanes.isEmpty) {
+                return const Center(child: Text('No dongles found for this station from login data.', style: TextStyle(color: Colors.grey)));
               }
-              return _buildLaneGrid();
+              final expanded = (controller.expandedLaneIndex.value ?? 0).clamp(0, controller.lanes.length - 1);
+              return PsfLaneFullScreenView(
+                laneIndex: expanded,
+                lane: controller.lanes[expanded],
+                controller: controller,
+              );
             }),
           ),
         ],

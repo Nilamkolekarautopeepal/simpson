@@ -849,7 +849,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               children: [
                 SizedBox(width: 320, child: _leftSidebar()),
                 const VerticalDivider(width: 1, thickness: 1, color: _StationColors.slateBorder),
-                Expanded(child: _mainArea()),
+               Expanded(child: _mainArea(context)),
               ],
             ),
           ),
@@ -858,22 +858,25 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-  Widget _topBar() {
+Widget _topBar() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      color: const Color.fromARGB(255, 205, 227, 234),
+      padding: const EdgeInsets.fromLTRB(12, 14, 20, 14),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: _StationColors.teal),
-            onPressed: controller.collapseLane,
-            tooltip: 'Back to all lanes',
-          ),
+        //  IconButton(
+        //     icon: const Icon(Icons.arrow_back, color: _StationColors.teal),
+        //     onPressed: controller.collapseLane,
+        //     tooltip: 'Back to all lanes',
+        //     padding: EdgeInsets.zero,
+        //     constraints: const BoxConstraints(),
+        //     visualDensity: VisualDensity.compact,
+        //   ),
           const SizedBox(width: 4),
           Obx(
             () => Text(
               'Lane ${lane.laneNumber} — ${lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
             ),
           ),
           const SizedBox(width: 10),
@@ -915,19 +918,6 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               onSubmit: () => controller.onScanEsnForLane(laneIndex),
               
             ),
-            const SizedBox(height: 18),
-            Obx(() => lane.esn.value.isEmpty
-                ? const SizedBox.shrink()
-                : _scanField(
-                    label: 'LIST NUMBER',
-                    textController: _listNumberController,
-                    focusNode: _listNumberFocusNode,
-                    isLoading: lane.isLookingUpListNumber,
-                    isResolved: lane.listNumber,
-                    error: lane.listNumberError,
-                    hint: 'e.g. 3293',
-                    onSubmit: () => controller.onScanListNumberForLane(laneIndex),
-                  )),
             const SizedBox(height: 22),
             const Text('IQA NUMBERS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
             const SizedBox(height: 8),
@@ -1089,21 +1079,42 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
 
   // ── RIGHT: Flash File / DTC / PID / Activity Log ────────────────
 
-  Widget _mainArea() {
+  Widget _mainArea(BuildContext context) {
     return Column(
       children: [
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Obx(() {
-              if (!lane.iqaAllFilled.value) {
-                return Container(
-                  padding: const EdgeInsets.all(40),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Complete ESN, List Number, and all IQA fields to continue.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: _StationColors.slate, fontSize: 14),
+             if (!lane.iqaAllFilled.value) {
+                return SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: _StationColors.tealBg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.checklist_rtl_rounded, color: _StationColors.teal, size: 34),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Waiting for scan',
+                          style: TextStyle(color: _StationColors.charcoal, fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Complete ESN, List Number, and all\nIQA fields to continue.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: _StationColors.slate, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }
@@ -1266,11 +1277,16 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         );
       }
 
-      if (lane.isFlashing.value) {
+     if (lane.isFlashing.value) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (lane.resolvedFlashFileName.value != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Text(lane.resolvedFlashFileName.value!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate)),
+              ),
             Center(
               child: Container(
                 width: 52,
@@ -1515,8 +1531,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
 
   Color _activityLogColor(String entry) {
     final lower = entry.toLowerCase();
-    if (entry.contains('❌') || lower.contains('failed') || lower.contains('error')) return _StationColors.red;
-    if (entry.contains('✅') || lower.contains('successful') || lower.contains('complete')) return _StationColors.greenDark;
+    if (entry.contains('❌') || lower.contains('fail') || lower.contains('error')) return _StationColors.red;
+    if (entry.contains('✅') || lower.contains('successful') || lower.contains('pass') || lower.contains('complete')) return _StationColors.greenDark;
     return _StationColors.slate;
   }
 
