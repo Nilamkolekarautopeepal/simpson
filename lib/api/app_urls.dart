@@ -15,8 +15,11 @@ class ApiUrls {
   static const String listNumber = "$baseUrl/variant/prodbud-variant/list";
   static const String pidDataset = "$baseUrl/datasets/get-pid-datasets/";
   static const String dtcDataset = "$baseUrl/datasets/get-dtc-datasets/";
-  static const String engineSerialNumber ="$baseUrl/analyze_prodbud/engslno/list/";
-  static const String harnessNumber = "$baseUrl/analyze_prodbud/harness/list/";
-  static const String createEolSession = "$baseUrl/analyze_prodbud/create/eol-session";
-  static const String sessionByEsn = "$baseUrl/analyze_prodbud/get/session/by-esn/";
+  static const String engineSerialNumber =
+      "$baseUrl/analyze_prodbud/engslno/list/";
+  // static const String harnessNumber = "$baseUrl/analyze_prodbud/harness/list/";
+  static const String createEolSession =
+      "$baseUrl/analyze_prodbud/create/eol-session";
+  static const String sessionByEsn =
+      "$baseUrl/analyze_prodbud/get/session/by-esn/";
 }

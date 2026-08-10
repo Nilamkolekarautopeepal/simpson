@@ -3,17 +3,6 @@ import 'dart:io';
 import 'package:get/get.dart';
 import 'package:simpson/services/local_storage_services/localstorage_services.dart';
 
-/// Modbus TCP client for the PFS Station's PLC.
-///
-/// Registered once as a GetxService (`Get.put(PlcService(), permanent: true)`
-/// in your bindings) so any screen can do `Get.find<PlcService>()`.
-///
-/// Improvements over the earlier prototype this is based on:
-///  - Each request gets its own transaction ID; responses are matched back
-///    to the exact request that asked for them (a Completer per txId), so
-///    a burst of reads can't get their responses crossed.
-///  - Writes are confirmed: Modbus echoes the address+value back on
-///    success, and [writeRegister] actually checks that before resolving.
 class PlcService extends GetxService {
   static const _ipKey = 'plc_ip';
   static const _portKey = 'plc_port';
@@ -26,8 +15,13 @@ class PlcService extends GetxService {
   Socket? _socket;
   StreamSubscription<List<int>>? _sub;
   List<int> _rxBuffer = [];
-  // Transaction ID is intentionally fixed at 1 — see _takeTransactionId().
   final Map<int, Completer<List<int>>> _pending = {};
+
+  int _lockRegister = 999;
+  Timer? _lockTimer;
+  static const Duration _lockRenewInterval = Duration(seconds: 2);
+  final int _ownerToken = 1 + (DateTime.now().microsecondsSinceEpoch % 65000);
+  final RxBool lockLost = false.obs;
 
   @override
   void onInit() {
@@ -51,9 +45,16 @@ class PlcService extends GetxService {
 
   // ── Connect / disconnect ──
 
-  Future<void> connect(String ip, {int port = 502}) async {
+  Future<void> connect(
+    String ip, {
+    int port = 502,
+    int? lockRegister,
+  }) async {
     if (isConnecting.value) return;
     await disconnect();
+
+    if (lockRegister != null) _lockRegister = lockRegister;
+    lockLost.value = false;
 
     try {
       isConnecting.value = true;
@@ -74,13 +75,26 @@ class PlcService extends GetxService {
         onDone: () => disconnect(),
         cancelOnError: true,
       );
-    } on SocketException catch (e) {
+
+      // ── Claim ownership before declaring the connection usable ──
+      final claimed = await _claimLock();
+      if (!claimed) {
+        status.value = 'In use by another station';
+        lockLost.value = true;
+        await disconnect();
+        throw StateError('PLC at $ip is already claimed by another station.');
+      }
+
+      _startLockRenewal();
+    } on SocketException {
       status.value = 'Unreachable';
       //print('❌ [PLC] Unreachable: ${e.message}');
       await disconnect();
       rethrow;
     } catch (e) {
-      status.value = 'Connect error';
+      if (status.value != 'In use by another station') {
+        status.value = 'Connect error';
+      }
       print('❌ [PLC] Connect error: $e');
       await disconnect();
       rethrow;
@@ -89,7 +103,67 @@ class PlcService extends GetxService {
     }
   }
 
+  Future<bool> _claimLock() async {
+    try {
+      final current =
+          await readRegister(_lockRegister).timeout(const Duration(seconds: 2));
+      if (current != 0 && current != _ownerToken) {
+        // Someone else already owns it.
+        return false;
+      }
+    } catch (e) {
+      print('⚠️ [PLC LOCK] Could not read lock register: $e — proceeding '
+          'without ownership check');
+      return true;
+    }
+
+    try {
+      await writeRegister(_lockRegister, _ownerToken)
+          .timeout(const Duration(seconds: 2));
+    } catch (e) {
+      print('⚠️ [PLC LOCK] Could not write lock register: $e — proceeding '
+          'without ownership check');
+    }
+    return true;
+  }
+
+  void _startLockRenewal() {
+    _lockTimer?.cancel();
+    _lockTimer = Timer.periodic(_lockRenewInterval, (_) async {
+      if (!isConnected.value) return;
+      try {
+        final current = await readRegister(_lockRegister)
+            .timeout(const Duration(seconds: 2));
+        if (current != _ownerToken && current != 0) {
+          print('❌ [PLC LOCK] Ownership lost — register now holds '
+              'token $current, expected $_ownerToken');
+          lockLost.value = true;
+          status.value = 'In use by another station';
+          await disconnect();
+          return;
+        }
+
+        await writeRegister(_lockRegister, _ownerToken)
+            .timeout(const Duration(seconds: 2));
+      } catch (e) {
+        print('⚠️ [PLC LOCK] Renewal check failed (ignored): $e');
+      }
+    });
+  }
+
+  Future<void> _releaseLock() async {
+    _lockTimer?.cancel();
+    _lockTimer = null;
+    if (_socket == null || !isConnected.value) return;
+    try {
+      await writeRegister(_lockRegister, 0).timeout(const Duration(seconds: 1));
+    } catch (_) {
+      // Best-effort — socket may already be on its way down.
+    }
+  }
+
   Future<void> disconnect() async {
+    await _releaseLock();
     await _sub?.cancel();
     _socket?.destroy();
     _socket = null;
@@ -174,19 +248,6 @@ class PlcService extends GetxService {
   }
 
   int _takeTransactionId() {
-    // NOTE: intentionally NOT incrementing. The test dongle firmware
-    // matches incoming requests via an exact byte comparison that
-    // includes the transaction ID — every entry in its lookup table is
-    // hardcoded to expect transaction ID = 1. Since PlcService only ever
-    // has one request in flight at a time (reads are sequential, not
-    // parallel — see home_page_controller._readLivePlcValuesForHarness),
-    // reusing a fixed transaction ID here is safe: there's never a
-    // second pending request that could be confused with this one.
-    //
-    // TODO: if/when this moves to a real Modbus PLC that expects unique
-    // incrementing transaction IDs per request (standard Modbus
-    // practice), restore the increment behavior — check with the
-    // hardware team which the real production PLC expects.
     return 1;
   }
 

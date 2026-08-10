@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-//import 'package:ap_diagnostic/models/writeParameterPIDModel.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
@@ -63,8 +62,6 @@ class HomePageController extends GetxController {
   final RxString listError = ''.obs;
   final RxBool isDongleBusy = false.obs;
 
-  /// Wraps any block of code that talks to the dongle, pausing the
-  /// heartbeat for its duration. Safe to nest.
   Future<T> _withDongleBusy<T>(Future<T> Function() action) async {
     final wasAlreadyBusy = isDongleBusy.value;
     isDongleBusy.value = true;
@@ -119,7 +116,7 @@ class HomePageController extends GetxController {
 
   void _startPlcRetryTimer() {
     _plcRetryTimer?.cancel();
-    _plcRetryTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _plcRetryTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (plcService.isConnected.value) {
         _plcRetryTimer?.cancel();
         return;
@@ -133,10 +130,9 @@ class HomePageController extends GetxController {
     _autoConnectPlc();
   }
 
-  // ignore: unused_element
   void _startPlcHeartbeat() {
     _plcHeartbeatTimer?.cancel();
-    _plcHeartbeatTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+    _plcHeartbeatTimer = Timer.periodic(const Duration(seconds: 1), (_) async {
       if (!plcService.isConnected.value) return;
       if (isReadingPlcValues.value) return;
 
@@ -147,17 +143,17 @@ class HomePageController extends GetxController {
       try {
         await plcService
             .readRegister(pingReg)
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(milliseconds: 800));
         return; // first attempt succeeded, all good
       } catch (_) {
         // fall through to retry below
       }
 
       try {
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 150));
         await plcService
             .readRegister(pingReg)
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(milliseconds: 800));
         // second attempt succeeded — connection is fine, no action needed
       } catch (e) {
         _log('❌ PLC heartbeat failed (twice) — connection lost: $e');
@@ -171,6 +167,7 @@ class HomePageController extends GetxController {
   final RxBool flashInProgress = false.obs;
   final RxBool flashComplete = false.obs;
   final RxDouble flashProgress = 0.0.obs;
+  final RxString flashPhaseLabel = ''.obs;
   final RxInt flashElapsedSeconds = 0.obs;
   final RxBool flashExpanded = true.obs;
   Timer? _flashStopwatch;
@@ -241,14 +238,8 @@ class HomePageController extends GetxController {
     _loadDongleEntries();
     _loadPlcConfig().then((_) => _autoConnectPlc());
     _startDongleHeartbeat();
+    _startPlcHeartbeat();
   }
-
-  // ══════════════════════════════════════════════════════════════════════
-// Additions to HomePageController (home_page_controller.dart)
-// ══════════════════════════════════════════════════════════════════════
-
-// ── 1) New state — tracks the manual read separately from flashing so
-//    the button can show its own spinner without touching flash flags.
 
   final RxBool isReadingDtcManually = false.obs;
 
@@ -345,11 +336,6 @@ class HomePageController extends GetxController {
 
     final variant = match.prodbudVariant;
     if (variant == null) return false;
-
-    // This function only stored names before — the new API gives IDs
-    // instead, so store those directly. If this function's return
-    // value is used elsewhere expecting a model NAME specifically,
-    // let me know and I'll look up the name from the catalog too.
     _esnVehicleModelId = variant.vehicleModel;
     _esnVehicleSubModelId = variant.subModel;
     return true;
@@ -489,8 +475,6 @@ class HomePageController extends GetxController {
           harnesses.firstWhereOrNull((h) => h.isActive == true);
 
       if (activeHarness == null) {
-        // No harness config found — safest default is to still require
-        // scanning, since we can't confirm it's meant to be skipped.
         _log('Harness requirement: no active harness entry found for '
             'list "$scannedListValue" — defaulting to requiring harness scan');
         harnessRequired = true;
@@ -501,9 +485,6 @@ class HomePageController extends GetxController {
       harnessRequired = type != 'without harness';
 
       if (!harnessRequired) {
-        // No scan needed — recipe sensors still come from this harness
-        // entry automatically, since Recipe/sensor data isn't tied to the
-        // act of scanning, just to which harness config applies.
         harnessReceipes.assignAll(activeHarness.receipes ?? []);
         _log('Harness type: "Without Harness" — scan step skipped, using '
             '"${activeHarness.name}" (${harnessReceipes.length} recipe '
@@ -836,7 +817,9 @@ class HomePageController extends GetxController {
   // ── Write ──
   final RxBool isWritingSensor = false.obs;
   final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
-
+// ── Write All (sequential) ──
+  final RxBool isWritingAllSensors = false.obs;
+  final Rx<int?> currentWritingSensorId = Rx<int?>(null);
   Future<void> writeSensorValue(list_ds.Receipe sensor, int value) async {
     final id = sensor.id;
     final reg = sensor.regAddress;
@@ -882,9 +865,6 @@ class HomePageController extends GetxController {
     }
   }
 
-  /// Reads [sensor]'s current value straight from the PLC and shows it
-  /// in the Recipe table's VALUE cell. No writing involved — this is
-  /// purely "what does the PLC have right now for this sensor."
   Future<void> readSensorValue(list_ds.Receipe sensor) async {
     final id = sensor.id;
     final reg = sensor.regAddress;
@@ -903,10 +883,6 @@ class HomePageController extends GetxController {
       try {
         raw = await plcService.readRegister(reg);
       } catch (firstError) {
-        // One quick retry — this test rig runs over WiFi, and a single
-        // dropped packet shouldn't be treated the same as a genuinely
-        // dead connection. If this second attempt also fails, give up
-        // for real and let the heartbeat/reconnect logic handle it.
         print(
             '[PLC READ] ${sensor.sensorName} | Reg $reg | first attempt failed ($firstError), retrying once...');
         await Future.delayed(const Duration(milliseconds: 200));
@@ -935,9 +911,6 @@ class HomePageController extends GetxController {
     }
   }
 
-  /// Reads every sensor's value from the PLC, one at a time, and shows
-  /// all of them in the Recipe table's VALUE cells. Same as tapping
-  /// "GET VALUE" on every row, just in one click.
   Future<void> readAllSensorValues() async {
     if (harnessReceipes.isEmpty) return;
 
@@ -949,18 +922,51 @@ class HomePageController extends GetxController {
     isReadingPlcValues.value = true;
     _log('Reading ${harnessReceipes.length} sensor value(s) from PLC…');
 
-    for (final sensor in harnessReceipes) {
-      await readSensorValue(sensor);
-      // Small gap between requests — same reasoning as everywhere else
-      // in this file: most PLCs can't handle overlapping requests.
-      await Future.delayed(const Duration(milliseconds: 50));
+    try {
+      for (final sensor in harnessReceipes) {
+        await readSensorValue(sensor);
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    } finally {
+      isReadingPlcValues.value = false;
+      _log('PLC read complete for ${harnessReceipes.length} sensor(s)');
     }
-
-    isReadingPlcValues.value = false;
-    _log('PLC read complete for ${harnessReceipes.length} sensor(s)');
   }
 
   Future<void> writeAllSensorValues() async {
+    if (isWritingAllSensors.value) return; // guard against double-tap
+    if (harnessReceipes.isEmpty) return;
+
+    isWritingAllSensors.value = true;
+    _log(
+        'Writing all ${harnessReceipes.length} sensor value(s) sequentially...');
+
+    try {
+      for (final sensor in harnessReceipes) {
+        if (sensor.value == null) {
+          _log('Skipping ${sensor.sensorName ?? '-'} — no value from server');
+          continue;
+        }
+
+        final int? value = int.tryParse(sensor.value.toString());
+        if (value == null) {
+          _log('Invalid value for ${sensor.sensorName}');
+          continue;
+        }
+
+        currentWritingSensorId.value = sensor.id;
+        await writeSensorValue(sensor, value);
+        // Small gap between writes — most PLCs can't handle overlapping requests.
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+    } finally {
+      currentWritingSensorId.value = null;
+      isWritingAllSensors.value = false;
+      _log('✅ Sequential write complete');
+    }
+  }
+
+  Future<void> writeAllSensorValues1() async {
     for (final sensor in harnessReceipes) {
       if (sensor.value == null) continue;
 
@@ -1209,6 +1215,109 @@ class HomePageController extends GetxController {
     }
   }
 
+  // Future<void> loadAvailableFlashFiles() async {
+  //   print("============= loadAvailableFlashFiles() =============");
+
+  //   flashFilesLoading.value = true;
+  //   flashFilesError.value = '';
+
+  //   try {
+  //     final scannedList = stepControllers[1].text.trim().toUpperCase();
+
+  //     final variants = await _ensureVariantList();
+
+  //     list_ds.Result? variant;
+  //     for (final v in variants.results ?? []) {
+  //       if ((v.variantCode ?? '').trim().toUpperCase() == scannedList) {
+  //         variant = v;
+  //         break;
+  //       }
+  //     }
+
+  //     if (variant == null) {
+  //       print("Variant not found");
+  //       availableFlashFiles.clear();
+  //       selectedFlashFile.value = null;
+  //       _currentDtcDatasetId = null;
+  //       _currentPidDatasetId = null;
+  //       return;
+  //     }
+
+  //     final vehicleModelId = variant.vehicleModel;
+  //     final subModelId = variant.subModel;
+
+  //     final models = await _ensureModels();
+
+  //     final files = <String>[];
+  //     _fileToDtcDatasetId.clear();
+  //     _fileToPidDatasetId.clear();
+  //     _fileToEcuId.clear();
+  //     _fileToHexUrl.clear();
+
+  //     final activetDatasets =
+  //         (variant.tDatasetEcu ?? []).where((t) => t.isActive == true);
+
+  //     for (final t in activetDatasets) {
+  //       final ecuId = t.ecu;
+  //       if (ecuId == null) continue;
+
+  //       all_ds.SubmodelModelecu? ecuModel;
+
+  //       for (final model in models.results ?? []) {
+  //         if (model.id != vehicleModelId) continue;
+  //         for (final sub in model.subModels ?? []) {
+  //           if (sub.id != subModelId) continue;
+  //           for (final ecu in sub.submodelModelecu ?? []) {
+  //             if (ecu.ecu?.id == ecuId) {
+  //               ecuModel = ecu;
+  //               break;
+  //             }
+  //           }
+  //           if (ecuModel != null) break;
+  //         }
+  //         if (ecuModel != null) break;
+  //       }
+
+  //       if (ecuModel == null) {
+  //         print("ECU Model not found for ECU ID : $ecuId");
+  //         continue;
+  //       }
+
+  //       final dataFileUrl = t.dataFile;
+  //       if (dataFileUrl == null || dataFileUrl.isEmpty) continue;
+
+  //       final fileName = dataFileUrl.split('/').last;
+  //       print(
+  //           "Flash File : $fileName (D-dataset id=${t.id}, isLatest=${t.isLatest})");
+
+  //       files.add(fileName);
+  //       _fileToEcuId[fileName] = ecuId;
+  //       _fileToHexUrl[fileName] = dataFileUrl;
+
+  //       if (ecuModel.datasets != null && ecuModel.datasets!.isNotEmpty) {
+  //         _fileToDtcDatasetId[fileName] = ecuModel.datasets!.first.id!;
+  //       }
+  //       if (ecuModel.pidDatasets != null && ecuModel.pidDatasets!.isNotEmpty) {
+  //         _fileToPidDatasetId[fileName] = ecuModel.pidDatasets!.first.id!;
+  //       }
+  //     }
+
+  //     availableFlashFiles.assignAll(files);
+
+  //     selectedFlashFile.value = null;
+  //     _currentDtcDatasetId = null;
+  //     _currentPidDatasetId = null;
+
+  //     print("Available Files : $files");
+  //   } catch (e, s) {
+  //     print("loadAvailableFlashFiles ERROR : $e");
+  //     print(s);
+  //     flashFilesError.value = e.toString();
+  //   } finally {
+  //     flashFilesLoading.value = false;
+  //   }
+  // }
+
   Future<void> loadAvailableFlashFiles() async {
     print("============= loadAvailableFlashFiles() =============");
 
@@ -1248,8 +1357,23 @@ class HomePageController extends GetxController {
       _fileToEcuId.clear();
       _fileToHexUrl.clear();
 
-      final activetDatasets =
-          (variant.tDatasetEcu ?? []).where((t) => t.isActive == true);
+      // ── Prefer T-dataset entries; fall back to D-dataset (active +
+      // latest) if no active T-dataset entries exist for this variant.
+      var activetDatasets =
+          (variant.tDatasetEcu ?? []).where((t) => t.isActive == true).toList();
+
+      bool usingDDataset = false;
+      if (activetDatasets.isEmpty) {
+        print("No active T-dataset entries — falling back to D-dataset");
+        usingDDataset = true;
+        activetDatasets = (variant.dDatasetEcu ?? [])
+            .where((d) => d.isActive == true && d.isLatest == true)
+            .toList();
+
+        if (activetDatasets.isEmpty) {
+          print("No active+latest D-dataset entries either");
+        }
+      }
 
       for (final t in activetDatasets) {
         final ecuId = t.ecu;
@@ -1282,7 +1406,7 @@ class HomePageController extends GetxController {
 
         final fileName = dataFileUrl.split('/').last;
         print(
-            "Flash File : $fileName (D-dataset id=${t.id}, isLatest=${t.isLatest})");
+            "Flash File : $fileName (${usingDDataset ? 'D' : 'T'}-dataset id=${t.id}, isLatest=${t.isLatest})");
 
         files.add(fileName);
         _fileToEcuId[fileName] = ecuId;
@@ -1311,120 +1435,6 @@ class HomePageController extends GetxController {
       flashFilesLoading.value = false;
     }
   }
-
-  // Future<void> submitStep(int index) async {
-  //   if (index == 0 && currentStepIndex.value != 0) {
-  //     _resetForEsnEdit();
-  //   }
-  //   if (index != currentStepIndex.value) return;
-  //   _idleTimers[index]?.cancel();
-
-  //   final value = stepControllers[index].text.trim();
-  //   if (value.isEmpty) return;
-
-  //   final step = steps[index];
-
-  //   if (step.key == 'esn') {
-  //     esnError.value = '';
-  //     try {
-  //       final isValid = await _isValidEsn(value);
-  //       if (!isValid) {
-  //         final message = 'ESN not recognized. Please rescan.';
-  //         esnError.value = message;
-  //         _log('ESN mismatch: scanned "$value"');
-  //         _showErrorPopup(message, title: 'ESN Mismatch');
-  //         return;
-  //       }
-  //       await _resolveVehicleFromEsn();
-  //     } catch (e) {
-  //       final message = e.toString().replaceFirst('Exception: ', '');
-  //       esnError.value = message;
-  //       _log('Failed to validate ESN: $e');
-  //       _showErrorPopup(message, title: 'ESN Validation Failed');
-  //       return;
-  //     }
-  //   }
-
-  //   // if (step.key == 'list') {
-  //   //   listError.value = '';
-  //   //   try {
-  //   //     final isValid = await _isValidListNumber(value);
-  //   //     if (!isValid) {
-  //   //       final message = 'List number not recognized. Please rescan.';
-  //   //       listError.value = message;
-  //   //       _log('List number mismatch: scanned "$value"');
-  //   //       _showErrorPopup(message, title: 'List Number Mismatch');
-  //   //       return;
-  //   //     }
-  //   //     await _resolveInjectorConfig(value);
-  //   //     await loadAvailableFlashFiles();
-  //   //   } catch (e) {
-  //   //     final message = e.toString().replaceFirst('Exception: ', '');
-  //   //     listError.value = message;
-  //   //     _log('Failed to validate list number: $e');
-  //   //     _showErrorPopup(message, title: 'List Validation Failed');
-  //   //     return;
-  //   //   }
-  //   // }
-
-  //   if (step.key == 'list') {
-  //     listError.value = '';
-  //     try {
-  //       final isValid = await _isValidListNumber(value);
-  //       if (!isValid) {
-  //         final message = 'List number not recognized. Please rescan.';
-  //         listError.value = message;
-  //         _log('List number mismatch: scanned "$value"');
-  //         _showErrorPopup(message, title: 'List Number Mismatch');
-  //         return;
-  //       }
-  //       await _resolveInjectorConfig(value);
-  //       await _resolveHarnessRequirement(value); // ✅ new
-  //       await loadAvailableFlashFiles();
-  //     } catch (e) {
-  //       final message = e.toString().replaceFirst('Exception: ', '');
-  //       listError.value = message;
-  //       _log('Failed to validate list number: $e');
-  //       _showErrorPopup(message, title: 'List Validation Failed');
-  //       return;
-  //     }
-  //   }
-
-  //   if (step.key == 'harness') {
-  //     try {
-  //       final isValid = await _isValidHarness(value);
-  //       if (!isValid) {
-  //         final message = 'Wrong harness entered. Please rescan.';
-  //         _log('Harness mismatch: scanned "$value"');
-  //         _showErrorPopup(message, title: 'Wrong Harness');
-  //         return;
-  //       }
-  //     } catch (e) {
-  //       final message = e.toString().replaceFirst('Exception: ', '');
-  //       _log('Failed to validate harness: $e');
-  //       _showErrorPopup(message, title: 'Harness Validation Failed');
-  //       return;
-  //     }
-  //   }
-
-  //   _log('${step.label} scanned: $value');
-  //   currentStepIndex.value = index + 1;
-
-  //   if (allStepsComplete) {
-  //     _log('All scan steps complete. Ready to flash.');
-  //     _onAllStepsComplete();
-  //     return;
-  //   }
-
-  //   final nextStep = steps[currentStepIndex.value];
-  //   WidgetsBinding.instance.addPostFrameCallback((_) {
-  //     if (nextStep.type == StepType.single) {
-  //       stepFocusNodes[currentStepIndex.value].requestFocus();
-  //     } else {
-  //       iqaFocusNodes[0].requestFocus();
-  //     }
-  //   });
-  // }
 
   Future<void> submitStep(int index) async {
     if (index == 0 && currentStepIndex.value != 0) {
@@ -1779,6 +1789,263 @@ class HomePageController extends GetxController {
     return result;
   }
 
+  // final RxString flashStatus = 'Preparing...'.obs;
+  // final RxDouble postFlashProgress = 0.0.obs;
+  // Future<void> startFlashing() async {
+  //   if (flashInProgress.value) {
+  //     return;
+  //   }
+
+  //   final fileName = selectedFlashFile.value;
+  //   if (fileName == null) {
+  //     _showErrorPopup('Select a flash file from the list first',
+  //         title: 'No File Selected');
+  //     return;
+  //   }
+
+  //   if (!dongleConnected.value || App.dllFunctions == null) {
+  //     _log('❌ Cannot flash — dongle not connected');
+  //     _showErrorPopup('Waiting for the dongle to connect before flashing',
+  //         title: 'Not Connected');
+  //     return;
+  //   }
+
+  //   flashErrorMessage.value = '';
+  //   flashComplete.value = false;
+  //   flashProgress.value = 0;
+  //   flashElapsedSeconds.value = 0;
+  //   flashStatus.value = 'Preparing Flash...';
+  //   postFlashProgress.value = 0;
+
+  //   // ✅ Keep device awake for the entire flashing operation
+  //   await WakelockPlus.enable();
+
+  //   try {
+  //     await _withDongleBusy(() async {
+  //       flashInProgress.value = true;
+  //       flashStatus.value = 'Preparing Flash...';
+
+  //       _log('Flashing started');
+
+  //       _flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
+  //         flashElapsedSeconds.value++;
+  //       });
+
+  //       Timer? percentTimer;
+
+  //       String? result;
+
+  //       try {
+  //         flashStatus.value = 'Validating vehicle...';
+
+  //         final scannedList = stepControllers[1].text.trim().toUpperCase();
+  //         final variants = await _ensureVariantList();
+
+  //         final variant = (variants.results ?? []).firstWhereOrNull(
+  //           (v) => (v.variantCode ?? '').trim().toUpperCase() == scannedList,
+  //         );
+
+  //         if (variant == null) {
+  //           throw Exception("Variant not found");
+  //         }
+
+  //         final targetEcuId = _fileToEcuId[fileName];
+  //         if (targetEcuId == null) {
+  //           throw Exception(
+  //               "Could not resolve ECU for selected file \"$fileName\"");
+  //         }
+
+  //         final variantEcu = (variant.tDatasetEcu ?? []).firstWhereOrNull(
+  //           (t) => t.ecu == targetEcuId && t.isActive == true,
+  //         );
+
+  //         if (variantEcu == null) {
+  //           throw Exception(
+  //               "Active D-dataset ECU entry not found for selected file");
+  //         }
+
+  //         final models = await _ensureModels();
+
+  //         all_ds.SubmodelModelecu? selectedEcu;
+
+  //         for (final model in models.results ?? []) {
+  //           if (model.id != variant.vehicleModel) continue;
+
+  //           for (final sub in model.subModels ?? []) {
+  //             if (sub.id != variant.subModel) continue;
+
+  //             for (final ecu in sub.submodelModelecu ?? []) {
+  //               if (ecu.ecu?.id == targetEcuId) {
+  //                 selectedEcu = ecu;
+  //                 break;
+  //               }
+  //             }
+
+  //             if (selectedEcu != null) break;
+  //           }
+
+  //           if (selectedEcu != null) break;
+  //         }
+
+  //         if (selectedEcu == null) {
+  //           throw Exception("ECU configuration not found");
+  //         }
+
+  //         if (selectedEcu.flashFile == null) {
+  //           final fallback = vehicleEcuEntries.firstWhereOrNull(
+  //             (e) => e.ecu?.id == targetEcuId,
+  //           );
+
+  //           if (fallback?.flashFile != null) {
+  //             selectedEcu = fallback;
+  //           }
+  //         }
+
+  //         if (selectedEcu!.flashFile == null) {
+  //           throw Exception("Flash file missing");
+  //         }
+
+  //         final flashConfig = selectedEcu.flashFile!;
+
+  //         flashStatus.value = 'Configuring ECU...';
+
+  //         await App.dllFunctions!.setDongleProperties(
+  //           selectedEcu.ecu?.protocol?.name ?? '',
+  //           selectedEcu.ecu?.protocol?.autopeepal ?? '',
+  //           selectedEcu.ecu?.txHeader ?? '',
+  //           selectedEcu.ecu?.rxHeader ?? '',
+  //         );
+
+  //         flashStatus.value = 'Downloading sequence file...';
+
+  //         final sequenceContent =
+  //             await _downloadAsRawString(flashConfig.sequenceFile!);
+
+  //         var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
+
+  //         if (ecuMapFiles.isEmpty) {
+  //           ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
+  //         }
+
+  //         if (ecuMapFiles.isEmpty) {
+  //           throw Exception(
+  //               "ECU MAP FILE missing — cannot generate flash JSON.");
+  //         }
+
+  //         flashStatus.value = 'Downloading Dataset...';
+
+  //         final hexUrl = variantEcu.dataFile ?? _fileToHexUrl[fileName];
+
+  //         if (hexUrl == null || hexUrl.isEmpty) {
+  //           throw Exception(
+  //               "Hex file URL missing for selected D-dataset entry");
+  //         }
+
+  //         final hexContent = await _downloadAsRawString(hexUrl);
+
+  //         flashStatus.value = 'Preparing flash data...';
+
+  //         final flashJson = await readJson(
+  //           ecuMapFiles,
+  //           flashConfig.flashCheckSumType?.toString() ?? '',
+  //           Uint8List.fromList(hexContent.codeUnits),
+  //         );
+
+  //         if (flashJson.isEmpty) {
+  //           throw Exception("Flash JSON generation failed");
+  //         }
+
+  //         _currentDtcDatasetId = _fileToDtcDatasetId[fileName];
+  //         _currentPidDatasetId = _fileToPidDatasetId[fileName];
+
+  //         flashProgress.value = 0;
+
+  //         flashStatus.value = 'Flashing ECU...';
+
+  //         percentTimer = Timer.periodic(
+  //           const Duration(
+  //               milliseconds:
+  //                   50), // 2 updates/sec — plenty for a UI progress bar
+  //           (_) async {
+  //             try {
+  //               flashProgress.value = await App.dllFunctions!.flashingData();
+  //             } catch (_) {}
+  //           },
+  //         );
+
+  //         result = await App.dllFunctions!.startECUFlashing(
+  //           flashJson,
+  //           sequenceContent,
+  //           selectedEcu.ecu!,
+  //           selectedEcu.ecu?.seedkeyalgoFnIndex?.value ?? '',
+  //         );
+
+  //         print("Flash Result : $result");
+  //       } catch (e, s) {
+  //         print("❌ FATAL ERROR : $e");
+  //         print(s);
+  //         result = e.toString();
+  //       }
+
+  //       _flashStopwatch?.cancel();
+  //       percentTimer?.cancel();
+
+  //       if (result == null || result.isEmpty || result != 'NOERROR') {
+  //         flashInProgress.value = false;
+
+  //         flashComplete.value = false;
+  //         _log('❌ Flashing failed: $result');
+
+  //         final r = (result ?? '').toLowerCase();
+  //         final looksDisconnected = r.contains('no resp') ||
+  //             r.contains('socket_closed') ||
+  //             r.contains('noresponsefromecu');
+
+  //         if (looksDisconnected) {
+  //           dongleConnected.value = false;
+  //           _startDongleRetryTimer();
+  //           _showReconnectPopup();
+  //         }
+
+  //         flashErrorMessage.value = result ?? 'Unknown error';
+  //         return;
+  //       }
+
+  //       flashComplete.value = true;
+  //       _log('Flashing completed successfully (${formattedElapsed})');
+
+  //       flashStatus.value = 'Writing PLC Values...';
+  //       if (harnessReceipes.isNotEmpty && plcService.isConnected.value) {
+  //         await writeAllSensorValues();
+  //       } else {
+  //         _log('Skipping PLC value write — PLC not connected or no '
+  //             'recipe sensors available');
+  //       }
+
+  //       flashStatus.value = 'Writing IQA Values...';
+  //       // await Future.delayed(const Duration(milliseconds: 500));
+  //       final iqaWriteStatus = await _autoWriteIqaValues();
+  //       _showFlashCompletePopup(iqaWriteStatus);
+
+  //       flashStatus.value = 'Loading DTCs...';
+  //       //await Future.delayed(const Duration(milliseconds: 300));
+  //       await _loadDtcResults();
+
+  //       flashStatus.value = 'Loading PIDs...';
+  //       //await Future.delayed(const Duration(milliseconds: 300));
+  //       await _loadPidResults();
+
+  //       flashStatus.value = 'Completed';
+
+  //       flashInProgress.value = false;
+  //     });
+  //   } finally {
+  //     // ✅ Always release the wakelock, whether flashing succeeded,
+  //     // failed, or threw — device can go back to sleep normally after this.
+  //     await WakelockPlus.disable();
+  //   }
+  // }
+
   final RxString flashStatus = 'Preparing...'.obs;
   final RxDouble postFlashProgress = 0.0.obs;
   Future<void> startFlashing() async {
@@ -1845,9 +2112,18 @@ class HomePageController extends GetxController {
                 "Could not resolve ECU for selected file \"$fileName\"");
           }
 
+          // ── Look up the same entry in T-dataset first; if it's not
+          // there, this file must have come from the D-dataset fallback
+          // in loadAvailableFlashFiles(), so check there too.
           final variantEcu = (variant.tDatasetEcu ?? []).firstWhereOrNull(
-            (t) => t.ecu == targetEcuId && t.isActive == true,
-          );
+                (t) => t.ecu == targetEcuId && t.isActive == true,
+              ) ??
+              (variant.dDatasetEcu ?? []).firstWhereOrNull(
+                (d) =>
+                    d.ecu == targetEcuId &&
+                    d.isActive == true &&
+                    d.isLatest == true,
+              );
 
           if (variantEcu == null) {
             throw Exception(
@@ -2009,6 +2285,14 @@ class HomePageController extends GetxController {
         final iqaWriteStatus = await _autoWriteIqaValues();
         _showFlashCompletePopup(iqaWriteStatus);
 
+        flashStatus.value = 'Writing PLC Values...';
+        if (harnessReceipes.isNotEmpty && plcService.isConnected.value) {
+          await writeAllSensorValues();
+        } else {
+          _log('Skipping PLC value write — PLC not connected or no '
+              'recipe sensors available');
+        }
+
         flashStatus.value = 'Loading DTCs...';
         //await Future.delayed(const Duration(milliseconds: 300));
         await _loadDtcResults();
@@ -2026,241 +2310,6 @@ class HomePageController extends GetxController {
       // failed, or threw — device can go back to sleep normally after this.
       await WakelockPlus.disable();
     }
-  }
-
-  Future<void> startFlashing1() async {
-    if (flashInProgress.value) {
-      return;
-    }
-
-    final fileName = selectedFlashFile.value;
-    if (fileName == null) {
-      _showErrorPopup('Select a flash file from the list first',
-          title: 'No File Selected');
-      return;
-    }
-
-    if (!dongleConnected.value || App.dllFunctions == null) {
-      _log('❌ Cannot flash — dongle not connected');
-      _showErrorPopup('Waiting for the dongle to connect before flashing',
-          title: 'Not Connected');
-      return;
-    }
-
-    flashErrorMessage.value = '';
-    flashComplete.value = false;
-    flashProgress.value = 0;
-    flashElapsedSeconds.value = 0;
-    flashStatus.value = 'Preparing Flash...';
-    postFlashProgress.value = 0;
-
-    await _withDongleBusy(() async {
-      flashInProgress.value = true;
-      flashStatus.value = 'Preparing Flash...';
-
-      _log('Flashing started');
-
-      _flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
-        flashElapsedSeconds.value++;
-      });
-
-      Timer? percentTimer;
-
-      String? result;
-
-      try {
-        flashStatus.value = 'Validating vehicle...';
-
-        final scannedList = stepControllers[1].text.trim().toUpperCase();
-        final variants = await _ensureVariantList();
-
-        final variant = (variants.results ?? []).firstWhereOrNull(
-          (v) => (v.variantCode ?? '').trim().toUpperCase() == scannedList,
-        );
-
-        if (variant == null) {
-          throw Exception("Variant not found");
-        }
-
-        final targetEcuId = _fileToEcuId[fileName];
-        if (targetEcuId == null) {
-          throw Exception(
-              "Could not resolve ECU for selected file \"$fileName\"");
-        }
-
-        final variantEcu = (variant.tDatasetEcu ?? []).firstWhereOrNull(
-          (t) => t.ecu == targetEcuId && t.isActive == true,
-        );
-
-        if (variantEcu == null) {
-          throw Exception(
-              "Active D-dataset ECU entry not found for selected file");
-        }
-
-        final models = await _ensureModels();
-
-        all_ds.SubmodelModelecu? selectedEcu;
-
-        for (final model in models.results ?? []) {
-          if (model.id != variant.vehicleModel) continue;
-
-          for (final sub in model.subModels ?? []) {
-            if (sub.id != variant.subModel) continue;
-
-            for (final ecu in sub.submodelModelecu ?? []) {
-              if (ecu.ecu?.id == targetEcuId) {
-                selectedEcu = ecu;
-                break;
-              }
-            }
-
-            if (selectedEcu != null) break;
-          }
-
-          if (selectedEcu != null) break;
-        }
-
-        if (selectedEcu == null) {
-          throw Exception("ECU configuration not found");
-        }
-
-        if (selectedEcu.flashFile == null) {
-          final fallback = vehicleEcuEntries.firstWhereOrNull(
-            (e) => e.ecu?.id == targetEcuId,
-          );
-
-          if (fallback?.flashFile != null) {
-            selectedEcu = fallback;
-          }
-        }
-
-        if (selectedEcu!.flashFile == null) {
-          throw Exception("Flash file missing");
-        }
-
-        final flashConfig = selectedEcu.flashFile!;
-
-        flashStatus.value = 'Configuring ECU...';
-
-        await App.dllFunctions!.setDongleProperties(
-          selectedEcu.ecu?.protocol?.name ?? '',
-          selectedEcu.ecu?.protocol?.autopeepal ?? '',
-          selectedEcu.ecu?.txHeader ?? '',
-          selectedEcu.ecu?.rxHeader ?? '',
-        );
-
-        flashStatus.value = 'Downloading sequence file...';
-
-        final sequenceContent =
-            await _downloadAsRawString(flashConfig.sequenceFile!);
-
-        var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
-
-        if (ecuMapFiles.isEmpty) {
-          ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
-        }
-
-        if (ecuMapFiles.isEmpty) {
-          throw Exception("ECU MAP FILE missing — cannot generate flash JSON.");
-        }
-
-        flashStatus.value = 'Downloading Dataset...';
-
-        final hexUrl = variantEcu.dataFile ?? _fileToHexUrl[fileName];
-
-        if (hexUrl == null || hexUrl.isEmpty) {
-          throw Exception("Hex file URL missing for selected D-dataset entry");
-        }
-
-        final hexContent = await _downloadAsRawString(hexUrl);
-
-        flashStatus.value = 'Preparing flash data...';
-
-        final flashJson = await readJson(
-          ecuMapFiles,
-          flashConfig.flashCheckSumType?.toString() ?? '',
-          Uint8List.fromList(hexContent.codeUnits),
-        );
-
-        if (flashJson.isEmpty) {
-          throw Exception("Flash JSON generation failed");
-        }
-
-        _currentDtcDatasetId = _fileToDtcDatasetId[fileName];
-        _currentPidDatasetId = _fileToPidDatasetId[fileName];
-
-        flashProgress.value = 0;
-
-        flashStatus.value = 'Flashing ECU...';
-
-        percentTimer = Timer.periodic(
-          const Duration(
-              milliseconds: 50), // 2 updates/sec — plenty for a UI progress bar
-          (_) async {
-            try {
-              flashProgress.value = await App.dllFunctions!.flashingData();
-            } catch (_) {}
-          },
-        );
-
-        result = await App.dllFunctions!.startECUFlashing(
-          flashJson,
-          sequenceContent,
-          selectedEcu.ecu!,
-          selectedEcu.ecu?.seedkeyalgoFnIndex?.value ?? '',
-        );
-
-        print("Flash Result : $result");
-      } catch (e, s) {
-        print("❌ FATAL ERROR : $e");
-        print(s);
-        result = e.toString();
-      }
-
-      _flashStopwatch?.cancel();
-      percentTimer?.cancel();
-
-      if (result == null || result.isEmpty || result != 'NOERROR') {
-        flashInProgress.value = false;
-
-        flashComplete.value = false;
-        _log('❌ Flashing failed: $result');
-
-        final r = (result ?? '').toLowerCase();
-        final looksDisconnected = r.contains('no resp') ||
-            r.contains('socket_closed') ||
-            r.contains('noresponsefromecu');
-
-        if (looksDisconnected) {
-          dongleConnected.value = false;
-          _startDongleRetryTimer();
-          _showReconnectPopup();
-        }
-
-        flashErrorMessage.value = result ?? 'Unknown error';
-        return;
-      }
-
-      flashComplete.value = true;
-      _log('Flashing completed successfully (${formattedElapsed})');
-
-      flashStatus.value = 'Writing IQA Values...';
-      // await Future.delayed(const Duration(milliseconds: 500));
-      final iqaWriteStatus = await _autoWriteIqaValues();
-      _showFlashCompletePopup(iqaWriteStatus);
-
-      flashStatus.value = 'Loading DTCs...';
-      //await Future.delayed(const Duration(milliseconds: 300));
-      await _loadDtcResults();
-
-      flashStatus.value = 'Loading PIDs...';
-      //await Future.delayed(const Duration(milliseconds: 300));
-      await _loadPidResults();
-
-      flashStatus.value = 'Completed';
-
-      flashInProgress.value = false;
-    });
   }
 
   Future<String> _downloadAsRawString(String url) async {

@@ -106,6 +106,40 @@ class HomePageView extends GetView<HomePageController> {
               ),
             );
           }),
+          // IconButton(
+          //   icon: const Icon(Icons.logout, color: Colors.white),
+          //   onPressed: controller.logout,
+          //   tooltip: 'Logout',
+          // ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            tooltip: 'More options',
+            offset: const Offset(0, 44),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            elevation: 4,
+            onSelected: (value) {
+              if (value == 'history') {}
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'history',
+                child: Row(
+                  children: [
+                    Icon(Icons.history_rounded,
+                        size: 18, color: AppColors.themeColor),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'History',
+                      style:
+                          TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
@@ -160,7 +194,7 @@ class HomePageView extends GetView<HomePageController> {
                   Icon(Icons.list_alt, size: 18, color: Colors.grey.shade700),
                   const SizedBox(width: 10),
                   Text(
-                    'Recipe',
+                    'HIL Setup',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
@@ -424,13 +458,6 @@ class HomePageView extends GetView<HomePageController> {
                     children: [
                       _buildFlashSection(),
                       const SizedBox(height: 16),
-                      // ── DTC section is now ALWAYS shown once scan steps
-                      // are complete — no longer gated behind
-                      // flashComplete. It's populated either by a
-                      // completed flash OR by the standalone "Read DTCs"
-                      // button in its header (no flashing required for
-                      // the latter). The section itself shows "No data
-                      // yet" until either path populates dtcList.
                       _buildDtcSection(),
                       if (controller.flashComplete.value) ...[
                         const SizedBox(height: 12),
@@ -448,13 +475,6 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
-  /// Recipe popup: static reference table straight from the harness
-  /// data (sensor_name / reg_address / type / pin_no / value / unit),
-  /// which now comes from the matched variant's prodbud_variant_harness
-  /// (see _isValidHarness in the controller) rather than a separate
-  /// harness API. A sensor's VALUE only ever changes from the static
-  /// value once the operator uses the WRITE action on that row — there
-  /// is no automatic PLC read here.
   void _showRecipeDialog() {
     Get.dialog(
       Dialog(
@@ -490,29 +510,82 @@ class HomePageView extends GetView<HomePageController> {
                     ),
                     const Spacer(),
                     Obx(
-                      () => ElevatedButton.icon(
-                        onPressed: controller.isReadingPlcValues.value
-                            ? null
-                            : controller.readAllSensorValues,
-                        icon: controller.isReadingPlcValues.value
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.download, size: 16),
-                        label: Text(controller.isReadingPlcValues.value
-                            ? 'Reading…'
-                            : 'Write Values'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.themeColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          textStyle: const TextStyle(
-                              fontSize: 12.5, fontWeight: FontWeight.w600),
-                        ),
+                      () => Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // ── Read: pulls live values FROM the PLC ──
+                          ElevatedButton.icon(
+                            onPressed: controller.isReadingPlcValues.value ||
+                                    controller.isWritingAllSensors.value
+                                ? null
+                                : controller.readAllSensorValues,
+                            icon: controller.isReadingPlcValues.value
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.download, size: 16),
+                            label: Text(controller.isReadingPlcValues.value
+                                ? 'Reading…'
+                                : 'Read Current value'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.themeColor,
+                              foregroundColor: Colors.white,
+                              // Stay colored (not grey) while THIS op is the
+                              // one running; only turn grey when blocked by
+                              // the OTHER op.
+                              disabledBackgroundColor:
+                                  controller.isReadingPlcValues.value
+                                      ? AppColors.themeColor
+                                      : Colors.grey.shade300,
+                              disabledForegroundColor:
+                                  controller.isReadingPlcValues.value
+                                      ? Colors.white
+                                      : Colors.grey.shade500,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              textStyle: const TextStyle(
+                                  fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // ── Write: pushes server values TO the PLC, one after another ──
+                          ElevatedButton.icon(
+                            onPressed: controller.isWritingAllSensors.value ||
+                                    controller.isReadingPlcValues.value
+                                ? null
+                                : controller.writeAllSensorValues,
+                            icon: controller.isWritingAllSensors.value
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.upload, size: 16),
+                            label: Text(controller.isWritingAllSensors.value
+                                ? 'Writing…'
+                                : 'Write'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.themeColor,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  controller.isWritingAllSensors.value
+                                      ? AppColors.themeColor
+                                      : Colors.grey.shade300,
+                              disabledForegroundColor:
+                                  controller.isWritingAllSensors.value
+                                      ? Colors.white
+                                      : Colors.grey.shade500,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              textStyle: const TextStyle(
+                                  fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -549,155 +622,219 @@ class HomePageView extends GetView<HomePageController> {
   }
 
   Widget _buildRecipeTable() {
+    final rows = controller.harnessReceipes;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F7FA),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Row(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        clipBehavior:
+            Clip.antiAlias, // keeps header/rows inside the rounded corners
+        child: Table(
+          columnWidths: const {
+            0: FlexColumnWidth(3), // Sensor Name
+            1: FlexColumnWidth(2), // Reg Address
+            2: FlexColumnWidth(2), // Type
+            3: FlexColumnWidth(1.4), // Pin No
+            4: FlexColumnWidth(2), // Current Value
+            5: FlexColumnWidth(1), // Unit
+            6: FlexColumnWidth(2), // Write
+          },
+          border: TableBorder(
+            horizontalInside: BorderSide(color: Colors.grey.shade200, width: 1),
+            verticalInside: BorderSide(color: Colors.grey.shade200, width: 1),
+          ),
+          children: [
+            // ── Header row ──
+            TableRow(
+              decoration: BoxDecoration(
+                color: AppColors.themeColor.withOpacity(0.06),
+              ),
               children: [
-                Expanded(
-                    flex: 3,
-                    child: Text('SENSOR NAME',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 2,
-                    child: Text('REG. ADDRESS',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 2,
-                    child: Text('TYPE',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 2,
-                    child: Text('PIN NO',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 2,
-                    child: Text('VALUE',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 1,
-                    child: Text('UNIT',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
-                Expanded(
-                    flex: 3,
-                    child: Text('WRITE',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.bold))),
+                _headerCell('SENSOR NAME'),
+                _headerCell('REG. ADDRESS'),
+                _headerCell('TYPE'),
+                _headerCell('PIN NO'),
+                _headerCell('CURRENT VALUE'),
+                _headerCell('UNIT'),
+                _headerCell('WRITE'),
               ],
             ),
-          ),
-          const SizedBox(height: 4),
-          ...controller.harnessReceipes.map((sensor) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-              margin: const EdgeInsets.only(bottom: 4),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade200),
-                borderRadius: BorderRadius.circular(6),
+
+            // ── Data rows ──
+            for (int i = 0; i < rows.length; i++)
+              TableRow(
+                decoration: BoxDecoration(
+                  color: i.isEven ? Colors.white : const Color(0xFFFAFBFC),
+                ),
+                children: _buildRecipeRowCells(rows[i]),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      sensor.sensorName ?? '-',
-                      style: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _headerCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            color: AppColors.themeColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildRecipeRowCells(list_ds.Receipe sensor) {
+    return [
+      // Sensor Name
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(
+              sensor.sensorName ?? '-',
+              style:
+                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+
+      // Reg Address
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(
+              '${sensor.regAddress ?? '-'}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ),
+        ),
+      ),
+
+      // Type — chip style
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F7FA),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Center(
+                child: Text(
+                  sensor.type ?? '-',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade800),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+
+      // Pin No
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(
+              '${sensor.pinNo ?? '-'}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ),
+        ),
+      ),
+
+      // Current Value — live, reactive
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Obx(() {
+            final live =
+                sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+            final display = live ?? '-';
+            final isLive = live != null && live != 'ERR';
+            final isError = live == 'ERR';
+
+            return Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isError
+                      ? Colors.red.withOpacity(0.08)
+                      : (isLive
+                          ? AppColors.themeColor.withOpacity(0.08)
+                          : Colors.transparent),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  display,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isError
+                        ? Colors.red
+                        : (isLive
+                            ? AppColors.themeColor
+                            : Colors.grey.shade500),
                   ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      '${sensor.regAddress ?? '-'}',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF5F7FA),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          sensor.type ?? '-',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      '${sensor.pinNo ?? '-'}',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Obx(() {
-                      final live = sensor.id != null
-                          ? controller.livePlcValues[sensor.id]
-                          : null;
-                      final display = live ?? '-';
-                      final isLive = live != null && live != 'ERR';
-                      return Text(
-                        display,
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.bold,
-                          color: live == 'ERR'
-                              ? Colors.red
-                              : (isLive
-                                  ? AppColors.themeColor
-                                  : Colors.grey.shade500),
-                        ),
-                      );
-                    }),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: Text(
-                      sensor.unit ?? '-',
-                      style:
-                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 3,
-                    child: _SensorWriteAction(
-                      sensor: sensor,
-                      controller: controller,
-                    ),
-                  ),
-                ],
+                ),
               ),
             );
           }),
-        ],
+        ),
       ),
-    );
+
+      // Unit
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(
+              sensor.unit ?? '-',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ),
+        ),
+      ),
+
+      // Write action — writes THIS row's server-supplied value to the PLC on tap
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Center(
+            child: _SensorWriteAction(
+              sensor: sensor,
+              controller: controller,
+            ),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildFlashSection() {
@@ -912,9 +1049,6 @@ class HomePageView extends GetView<HomePageController> {
                 'Completed in ${controller.formattedElapsed}',
                 style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600),
               ),
-              // ── NEW: allow re-flashing the ECU right from the success
-              // state, without needing to collapse/expand or re-select
-              // the file. Reuses the same file already selected.
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: controller.dongleConnected.value
@@ -995,6 +1129,9 @@ class HomePageView extends GetView<HomePageController> {
               switch (controller.flashStatus.value) {
                 case 'Writing IQA Values...':
                   message = 'Writing injector calibration values...';
+                  break;
+                case 'Writing PLC Values...':
+                  message = 'Writing sensor recipe values to PLC...';
                   break;
                 case 'Loading DTCs...':
                   message = 'Reading Diagnostic Trouble Codes...';
@@ -1233,11 +1370,6 @@ class HomePageView extends GetView<HomePageController> {
         itemBuilder: _buildDtcCard,
         onRefresh: controller.refreshDtcResults,
         onClear: controller.clearDTC,
-        // ── Standalone "Read DTCs" action — calls the SAME logic that
-        // populates dtcList after a successful flash (_loadDtcResults),
-        // but no flashing happens here at all. Requires the dongle to
-        // be connected and a flash file selected (so the correct DTC
-        // dataset is known) — see readDtcsManually() in the controller.
         extraAction: Obx(() {
           final busy = controller.isReadingDtcManually.value;
           final canRead = controller.dongleConnected.value && !busy;
@@ -1318,7 +1450,7 @@ class HomePageView extends GetView<HomePageController> {
       badgeLabel = 'Pending';
     } else if (statusLower == 'inactive') {
       badgeColor = Colors.green.shade600;
-      badgeLabel = 'InActive';
+      badgeLabel = 'History'; // ← was 'InActive'
     } else {
       badgeColor = Colors.green.shade600;
       badgeLabel = status.isNotEmpty ? 'History' : '-';
@@ -1847,11 +1979,6 @@ class HomePageView extends GetView<HomePageController> {
                         ? null
                         : () => _copyActivityLog(),
                   )),
-              // IconButton(
-              //   icon: const Icon(Icons.close,color:Colors.white),
-              //   tooltip: 'Close',
-              //   onPressed: () => Get.back(),
-              // ),
             ],
           ),
           backgroundColor: const Color(0xFFF4F5F7),
@@ -1910,65 +2037,29 @@ class _SensorWriteAction extends StatefulWidget {
   State<_SensorWriteAction> createState() => _SensorWriteActionState();
 }
 
-// class _SensorWriteActionState extends State<_SensorWriteAction> {
-//   final TextEditingController _valueController = TextEditingController();
-
-//   @override
-//   void dispose() {
-//     _valueController.dispose();
-//     super.dispose();
-//   }
-
-//   void _submit() async {
-//     final text = _valueController.text.trim();
-//     final value = int.tryParse(text);
-//     if (value == null) return;
-
-//     await widget.controller.writeSensorValue(widget.sensor, value);
-//     _valueController.clear();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Obx(() {
-//       final id = widget.sensor.id;
-//       final isBusy =
-//           id != null && widget.controller.writeInFlightSensorIds.contains(id);
-
-//       return Row(
-//         children: [
-//           SizedBox(
-//             width: 70,
-//             height: 32,
-//             child: TextField(
-//               controller: _valueController,
-//               enabled: !isBusy,
-//               keyboardType: TextInputType.number,
-//               style: const TextStyle(fontSize: 12),
-//               decoration: InputDecoration(
-//                 isDense: true,
-//                 contentPadding:
-//                     const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-//                 filled: true,
-//                 fillColor: const Color(0xFFF5F7FA),
-//                 border: OutlineInputBorder(
-//                   borderRadius: BorderRadius.circular(6),
-//                   borderSide: BorderSide.none,
-//                 ),
-//                 hintText: 'value',
-//                 hintStyle: const TextStyle(fontSize: 11),
-//               ),
-//               onSubmitted: (_) => _submit(),
-//             ),
-//           ),
-//         ],
-//       );
-//     });
-//   }
-// }
-
 class _SensorWriteActionState extends State<_SensorWriteAction> {
-  final TextEditingController _valueController = TextEditingController();
+  late final TextEditingController _valueController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Pre-fill from the server-supplied value instead of starting empty.
+    _valueController = TextEditingController(
+      text: widget.sensor.value?.toString() ?? '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _SensorWriteAction oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the recipe list is reloaded (e.g. harness rescanned) and this
+    // row now points at a different sensor's value, refresh the field.
+    if (oldWidget.sensor.value != widget.sensor.value) {
+      _valueController.text = widget.sensor.value?.toString() ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -1990,23 +2081,34 @@ class _SensorWriteActionState extends State<_SensorWriteAction> {
   Widget build(BuildContext context) {
     return Obx(() {
       final id = widget.sensor.id;
-      final isBusy =
+
+      // This row's own write in flight.
+      final isRowBusy =
           id != null && widget.controller.writeInFlightSensorIds.contains(id);
 
-      return Row(
-        children: [
-          SizedBox(
-            width: 70,
-            height: 32,
+      // Global Read or global Write in progress locks every row too.
+      final isGlobalBusy = widget.controller.isReadingPlcValues.value ||
+          widget.controller.isWritingAllSensors.value;
+
+      final isBusy = isRowBusy || isGlobalBusy;
+
+      // ✅ No fixed-size SizedBox — the field sizes itself from its
+      // content + padding via IntrinsicWidth, and is centered inside
+      // the table cell via the outer Center.
+      return Center(
+        child: IntrinsicWidth(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: TextField(
               controller: _valueController,
               enabled: !isBusy,
               keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 12),
               decoration: InputDecoration(
                 isDense: true,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 filled: true,
                 fillColor: const Color(0xFFF5F7FA),
                 border: OutlineInputBorder(
@@ -2019,39 +2121,8 @@ class _SensorWriteActionState extends State<_SensorWriteAction> {
               onSubmitted: (_) => _submit(),
             ),
           ),
-          const SizedBox(width: 6),
-          SizedBox(
-            height: 32,
-            child: ElevatedButton(
-              onPressed: isBusy ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.themeColor,
-                disabledBackgroundColor: Colors.grey.shade300,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                minimumSize: const Size(0, 32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: isBusy
-                  ? const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.8,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text(
-                      'Write',
-                      style: TextStyle(fontSize: 11, color: Colors.white),
-                    ),
-            ),
-          ),
-        ],
+        ),
       );
     });
   }
 }
-
-
