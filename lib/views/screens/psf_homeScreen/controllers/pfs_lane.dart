@@ -10,6 +10,7 @@ import 'package:simpson/modals/all.models.dart' show SubmodelModelecu;
 
 import 'package:simpson/modals/pidDataset.model.dart'
     show Code, MessageType, PiCodeVariables;
+import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 
 class PsfLane {
   PsfLane(
@@ -69,13 +70,22 @@ class PsfLane {
 
   final RxList<String> activityLog = <String>[].obs;
 
+  // void logActivity(String entry) {
+  //   final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+  //   activityLog.add('[$timestamp] $entry');
+  //   if (activityLog.length > 300) {
+  //     activityLog.removeAt(0);
+  //   }
+  // }
+
   void logActivity(String entry) {
-    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
-    activityLog.add('[$timestamp] $entry');
-    if (activityLog.length > 300) {
-      activityLog.removeAt(0);
-    }
+  final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+  final tag = ActivityLogTag.infer(entry);
+  activityLog.add('[$timestamp] [$tag] $entry');
+  if (activityLog.length > 300) {
+    activityLog.removeAt(0);
   }
+}
 
   /// Auto-scan debounce — no SCAN button anymore; typing pauses for
   /// 2s then submits automatically.

@@ -23,6 +23,7 @@ import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/pfs_isolate_flash.dart';
+import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 import 'pfs_lane.dart' hide psfLaneRegisterMap;
 
 String _decodeLatin1Isolate(Uint8List bytes) {
@@ -45,13 +46,21 @@ class PsfHomeScreenController extends GetxController {
     expandedLaneIndex.value = null;
   }
 
+  // void logActivity(String entry, dynamic activityLog) {
+  //   final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+  //   activityLog.add('[$timestamp] $entry');
+  //   if (activityLog.length > 300) {
+  //     activityLog.removeAt(0);
+  //   }
+  // }
   void logActivity(String entry, dynamic activityLog) {
-    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
-    activityLog.add('[$timestamp] $entry');
-    if (activityLog.length > 300) {
-      activityLog.removeAt(0);
-    }
+  final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+  final tag = ActivityLogTag.infer(entry);
+  activityLog.add('[$timestamp] [$tag] $entry');
+  if (activityLog.length > 300) {
+    activityLog.removeAt(0);
   }
+}
 
   String? station;
   final RxList<PsfLane> lanes = <PsfLane>[].obs;

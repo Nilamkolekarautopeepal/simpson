@@ -22,7 +22,6 @@ import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:simpson/modals/esn.model.dart' as esn_ds;
 
 enum StepType { single, iqaGroup }
 
@@ -35,7 +34,7 @@ class ScanStep {
 
 class HomePageController extends GetxController {
   late final String station;
-final List<ScanStep> steps = [
+  final List<ScanStep> steps = [
     ScanStep('esn', 'ESN'),
     ScanStep('iqa', 'IQA', type: StepType.iqaGroup),
   ];
@@ -51,7 +50,9 @@ final List<ScanStep> steps = [
   late List<TextEditingController> iqaControllers;
   late List<FocusNode> iqaFocusNodes;
   late List<Timer?> _iqaIdleTimers;
-
+  final RxList<Map<String, dynamic>> testbedSessionHistory =
+      <Map<String, dynamic>>[].obs;
+  final RxString currentEsn = ''.obs;
   static const _idleDuration = Duration(milliseconds: 400);
 
   final RxInt currentStepIndex = 0.obs;
@@ -287,7 +288,7 @@ final List<ScanStep> steps = [
     }
     try {
       final List<dynamic> decoded = jsonDecode(raw);
-     _dongleEntries = decoded.map((d) {
+      _dongleEntries = decoded.map((d) {
         final ecuIdsRaw = (d['ecu_ids'] as List?) ?? [];
         return _DongleEntry(
           macId: d['mac_id'] as String?,
@@ -309,8 +310,9 @@ final List<ScanStep> steps = [
     return '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
   }
 
-  void _log(String message) {
-    activityLog.insert(0, '[${_timestamp()}] $message');
+  void _log(String message, {String? tag}) {
+    final resolvedTag = tag ?? _inferLogTag(message);
+    activityLog.insert(0, '[${_timestamp()}] [$resolvedTag] $message');
   }
 
   void _showErrorPopup(String message, {String title = 'Error'}) {
@@ -327,6 +329,40 @@ final List<ScanStep> steps = [
     );
   }
 
+  // Future<bool> _isValidEsn(String value) async {
+  //   final scanned = value.trim();
+  //   final esnList = await _authService.getEsnList(
+  //     engSlno: scanned,
+  //     accessToken: _accessToken,
+  //   );
+
+  //   final match = (esnList.results ?? []).firstWhereOrNull(
+  //     (r) => (r.engSlno ?? '').trim().toUpperCase() == scanned.toUpperCase(),
+  //   );
+
+  //   if (match == null) return false;
+  //   if (match.isActive != true) return false;
+
+  //   final variant = match.prodbudVariant;
+  //   if (variant == null) return false;
+  //   _esnVehicleModelId = variant.vehicleModel;
+  //   _esnVehicleSubModelId = variant.subModel;
+  //   _resolvedVariant = variant;
+  //   _esnRecordId = match.id;
+  //   _flashCycleStartTime = DateTime.now();
+
+  //   // Fetch this ESN's session history — shown for context, doesn't block the flow.
+  //   unawaited(_authService
+  //       .getSessionHistory(esn: scanned, accessToken: _accessToken)
+  //       .then((history) {
+  //     final eol = (history['eol_sessions'] as List?) ?? [];
+  //     final testbed = (history['testbed_sessions'] as List?) ?? [];
+  //     _log(
+  //         'History for ESN $scanned → ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+  //   }));
+
+  //   return true;
+  // }
   Future<bool> _isValidEsn(String value) async {
     final scanned = value.trim();
     final esnList = await _authService.getEsnList(
@@ -349,17 +385,28 @@ final List<ScanStep> steps = [
     _esnRecordId = match.id;
     _flashCycleStartTime = DateTime.now();
 
-    // Fetch this ESN's session history — shown for context, doesn't block the flow.
-    unawaited(_authService.getSessionHistory(esn: scanned, accessToken: _accessToken).then((history) {
+    currentEsn.value = scanned; // ← ADD THIS: history screen needs it
+
+    // Fetch this ESN's session history and actually store it.
+    unawaited(_authService
+        .getSessionHistory(esn: scanned, accessToken: _accessToken)
+        .then((history) {
       final eol = (history['eol_sessions'] as List?) ?? [];
       final testbed = (history['testbed_sessions'] as List?) ?? [];
-      _log('History for ESN $scanned → ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+
+      testbedSessionHistory.assignAll(
+        // ← ADD THIS
+        testbed.map((e) => Map<String, dynamic>.from(e as Map)),
+      );
+
+      _log(
+          'History for ESN $scanned → ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+    }).catchError((e) {
+      _log('Failed to load session history: $e');
     }));
 
     return true;
   }
-
-
 
   //---------------------------------
   Future<void> _resolveInjectorConfigFromVariant() async {
@@ -411,7 +458,8 @@ final List<ScanStep> steps = [
       final firingSequenceStr = matched.firingSequence ?? '';
 
       if (noOfInjectors == null || noOfInjectors <= 0) {
-        _log('Injector config: no_of_injectors missing/invalid — using default');
+        _log(
+            'Injector config: no_of_injectors missing/invalid — using default');
         _configureIqaFields(_defaultIqaCount, null);
         return;
       }
@@ -422,7 +470,8 @@ final List<ScanStep> steps = [
           .where((s) => s.isNotEmpty)
           .toList();
 
-      _log('Injector config resolved: $noOfInjectors injector(s), firing sequence [${firingOrder.join(',')}]');
+      _log(
+          'Injector config resolved: $noOfInjectors injector(s), firing sequence [${firingOrder.join(',')}]');
       _configureIqaFields(
         noOfInjectors,
         firingOrder.length == noOfInjectors ? firingOrder : null,
@@ -449,7 +498,8 @@ final List<ScanStep> steps = [
     // station type first, not just grab the first active entry
     // regardless of which station it belongs to.
     final activeHarness = harnesses.firstWhereOrNull(
-      (h) => h.isActive == true &&
+      (h) =>
+          h.isActive == true &&
           (h.stationType ?? '').trim().toLowerCase() == 'testing',
     );
 
@@ -462,9 +512,11 @@ final List<ScanStep> steps = [
 
     // Harness is now fully resolved from the ESN response — no separate
     // scan step needed at all, "With Harness" or "Without Harness" alike.
-    resolvedHarnessName.value = '${activeHarness.name ?? '-'} (${activeHarness.harnessType ?? '-'})';
+    resolvedHarnessName.value =
+        '${activeHarness.name ?? '-'} (${activeHarness.harnessType ?? '-'})';
     harnessReceipes.assignAll(activeHarness.receipes ?? []);
-    _log('Harness resolved: "${activeHarness.name}" (${activeHarness.harnessType}) — '
+    _log(
+        'Harness resolved: "${activeHarness.name}" (${activeHarness.harnessType}) — '
         '${harnessReceipes.length} recipe sensor(s).');
   }
 
@@ -534,7 +586,8 @@ final List<ScanStep> steps = [
         if (dataFileUrl == null || dataFileUrl.isEmpty) continue;
 
         final fileName = dataFileUrl.split('/').last;
-        print("Flash File : $fileName (${usingDDataset ? 'D' : 'T'}-dataset id=${t.id}, isLatest=${t.isLatest})");
+        print(
+            "Flash File : $fileName (${usingDDataset ? 'D' : 'T'}-dataset id=${t.id}, isLatest=${t.isLatest})");
 
         files.add(fileName);
         _fileToEcuId[fileName] = ecuId;
@@ -593,10 +646,10 @@ final List<ScanStep> steps = [
     return _modelsCache!;
   }
 
-int? _esnVehicleModelId;
+  int? _esnVehicleModelId;
   int? _esnVehicleSubModelId;
   esn_ds.ProdbudVariant? _resolvedVariant;
-  
+
   Future<void> _resolveVehicleFromEsn() async {
     final modelId = _esnVehicleModelId;
     final subModelId = _esnVehicleSubModelId;
@@ -757,7 +810,7 @@ int? _esnVehicleModelId;
       canConnectDongle.value = false;
       return;
     }
-_dongleIp = matchedDongle.ip;
+    _dongleIp = matchedDongle.ip;
     dongleIp.value = matchedDongle.ip!;
     _dongleDbId = matchedDongle.dongleDbId;
 
@@ -1310,7 +1363,7 @@ _dongleIp = matchedDongle.ip;
     dtcList.clear();
     pidList.clear();
 
-   availableFlashFiles.clear();
+    availableFlashFiles.clear();
     _fileToDtcDatasetId.clear();
     _fileToPidDatasetId.clear();
     _fileToEcuId.clear();
@@ -1320,7 +1373,7 @@ _dongleIp = matchedDongle.ip;
     selectedFlashFile.value = null;
     flashFilesError.value = '';
 
-  esnError.value = '';
+    esnError.value = '';
     listError.value = '';
     _resolvedVariant = null;
     resolvedListNumber.value = '';
@@ -1333,6 +1386,8 @@ _dongleIp = matchedDongle.ip;
     _dongleRetryTimer?.cancel();
     canConnectDongle.value = false;
     dongleConnected.value = false;
+    testbedSessionHistory.clear();
+    currentEsn.value = '';
   }
 
   // ── Single-field steps (ESN, List, Harness) ──
@@ -1677,7 +1732,7 @@ _dongleIp = matchedDongle.ip;
       return; // wait for the remaining digits
     }
 
-  if (step.key == 'esn') {
+    if (step.key == 'esn') {
       esnError.value = '';
       try {
         final isValid = await _isValidEsn(value);
@@ -2268,7 +2323,7 @@ _dongleIp = matchedDongle.ip;
         String? result;
 
         try {
-         flashStatus.value = 'Validating vehicle...';
+          flashStatus.value = 'Validating vehicle...';
 
           final variant = _resolvedVariant;
 
@@ -2294,17 +2349,21 @@ _dongleIp = matchedDongle.ip;
                     d.isActive == true &&
                     d.isLatest == true,
               );
-if (variantEcu == null) {
+          if (variantEcu == null) {
             throw Exception(
                 "Active D-dataset ECU entry not found for selected file");
           }
 
-        _resolvedDatasetId = variantEcu.id;
-          final isFromTDataset = (variant.tDatasetEcu ?? []).any((t) => t.id == variantEcu.id);
+          _resolvedDatasetId = variantEcu.id;
+          final isFromTDataset =
+              (variant.tDatasetEcu ?? []).any((t) => t.id == variantEcu.id);
           print("🟣 [DatasetTracking] Selected file: $fileName");
-          print("🟣 [DatasetTracking] variantEcu.id (this becomes dataset_type sent to server): ${variantEcu.id}");
-          print("🟣 [DatasetTracking] Source: ${isFromTDataset ? 'T-dataset' : 'D-dataset'}");
-          print("🟣 [DatasetTracking] variantEcu.dataFile: ${variantEcu.dataFile}");
+          print(
+              "🟣 [DatasetTracking] variantEcu.id (this becomes dataset_type sent to server): ${variantEcu.id}");
+          print(
+              "🟣 [DatasetTracking] Source: ${isFromTDataset ? 'T-dataset' : 'D-dataset'}");
+          print(
+              "🟣 [DatasetTracking] variantEcu.dataFile: ${variantEcu.dataFile}");
           final models = await _ensureModels();
 
           all_ds.SubmodelModelecu? selectedEcu;
@@ -2472,7 +2531,7 @@ if (variantEcu == null) {
         //await Future.delayed(const Duration(milliseconds: 300));
         await _loadDtcResults();
 
-       flashStatus.value = 'Loading PIDs...';
+        flashStatus.value = 'Loading PIDs...';
         //await Future.delayed(const Duration(milliseconds: 300));
         await _loadPidResults();
 
@@ -2484,10 +2543,12 @@ if (variantEcu == null) {
         final startTime = _flashCycleStartTime ?? DateTime.now();
         final endTime = DateTime.now();
 
-        print("🟣 [DatasetTracking] About to send — esnId=$_esnRecordId dongleId=$_dongleDbId datasetType=$_resolvedDatasetId");
+        print(
+            "🟣 [DatasetTracking] About to send — esnId=$_esnRecordId dongleId=$_dongleDbId datasetType=$_resolvedDatasetId");
         _log('Sending test-bed session report to server...');
 
-        unawaited(_authService.createTestBedSession(
+        unawaited(_authService
+            .createTestBedSession(
           esnId: _esnRecordId,
           dongleId: _dongleDbId,
           datasetType: _resolvedDatasetId,
@@ -2498,7 +2559,8 @@ if (variantEcu == null) {
           dtcStatus: dtcPassed ? 'Pass' : 'Fail',
           activityLog: activityLog.toList(),
           accessToken: _accessToken,
-        ).then((_) {
+        )
+            .then((_) {
           _log('✅ Test-bed session report sent successfully');
         }).catchError((e) {
           _log('❌ Test-bed session report failed to send: $e');
@@ -2699,11 +2761,6 @@ if (variantEcu == null) {
           ecu.txHeader ?? '',
           ecu.rxHeader ?? '',
         );
-
-        // ── Read with one retry before treating it as a real disconnect ──
-        // A single dropped packet or a slow ECU response (common right
-        // after flashing, or over WiFi) shouldn't be treated the same as
-        // a genuinely dead connection.
         dynamic readResult;
         const maxAttempts = 2;
 
@@ -2729,7 +2786,7 @@ if (variantEcu == null) {
             await Future.delayed(const Duration(milliseconds: 300));
           }
         }
-if (readResult == null) {
+        if (readResult == null) {
           _log(
               'DTC read: ECU_COMMUNICATION_ERROR (after $maxAttempts attempts)');
           dtcList.clear();
@@ -2739,7 +2796,7 @@ if (readResult == null) {
           _showReconnectPopup();
           return;
         }
-if (readResult.status != 'NO_ERROR') {
+        if (readResult.status != 'NO_ERROR') {
           _log(
               'DTC read failed: ${readResult.status} (after $maxAttempts attempts)');
           dtcList.clear();
@@ -2771,9 +2828,14 @@ if (readResult.status != 'NO_ERROR') {
           final desc = match?.description ?? 'Description not found';
 
           dummy[code] = '$code - $desc ($status)';
+          final register =
+              null; // placeholder — becomes match?.regAddress later
+          final registerText = register?.toString() ?? '-';
+
+          dummy[code] = '$code - $desc ($status) [REG:$registerText]';
         }
 
-       dtcList.assignAll(dummy.values.toList());
+        dtcList.assignAll(dummy.values.toList());
         _lastDtcReadSucceeded = true;
         _log('DTC (${dtcList.length}) data loaded');
       } catch (e) {
@@ -3327,6 +3389,30 @@ if (readResult.status != 'NO_ERROR') {
     _dongleRetryTimer?.cancel();
     _dongleHeartbeatTimer?.cancel();
     super.onClose();
+  }
+
+  final Rx<String?> activityLogFilter = Rx<String?>(null);
+
+  void setActivityLogFilter(String? tag) {
+    // Tapping the same chip again clears the filter.
+    activityLogFilter.value = (activityLogFilter.value == tag) ? null : tag;
+  }
+
+  String _inferLogTag(String message) {
+    final m = message.toLowerCase();
+    // Check specific/narrow categories FIRST — many DTC/IQA/PID/Flash
+    // messages incidentally mention "dongle" (e.g. "No Resp From Dongle"),
+    // so "dongle" must be checked LAST or it swallows everything.
+    if (m.contains('esn')) return 'ESN';
+    if (m.contains('dtc')) return 'DTC';
+    if (m.contains('iqa')) return 'IQA';
+    if (m.contains('pid')) return 'PID';
+    if (m.contains('flash')) return 'FLASH';
+    if (m.contains('harness')) return 'HARNESS';
+    if (m.contains('plc')) return 'PLC';
+    if (m.contains('session started')) return 'SESSION';
+    if (m.contains('dongle')) return 'DONGLE';
+    return 'GENERAL';
   }
 }
 
