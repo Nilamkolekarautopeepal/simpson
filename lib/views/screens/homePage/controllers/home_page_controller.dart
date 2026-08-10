@@ -9,6 +9,7 @@ import 'package:simpson/AppPreferences/app_areferences.dart';
 import 'package:simpson/app.dart';
 import 'package:simpson/common_widgets/popup.dart';
 import 'package:simpson/modals/all.models.dart' as all_ds;
+import 'package:simpson/modals/esn_ds.dart' as esn_ds;
 import 'package:simpson/modals/liveParameter_model.dart';
 import 'package:simpson/modals/pidDataset.model.dart';
 import 'package:simpson/modals/staticData.dart';
@@ -21,6 +22,7 @@ import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:simpson/modals/esn.model.dart' as esn_ds;
 
 enum StepType { single, iqaGroup }
 
@@ -33,11 +35,8 @@ class ScanStep {
 
 class HomePageController extends GetxController {
   late final String station;
-
-  final List<ScanStep> steps = [
+final List<ScanStep> steps = [
     ScanStep('esn', 'ESN'),
-    ScanStep('list', 'List'),
-    ScanStep('harness', 'Harness'),
     ScanStep('iqa', 'IQA', type: StepType.iqaGroup),
   ];
 
@@ -61,6 +60,8 @@ class HomePageController extends GetxController {
   final RxString esnError = ''.obs;
   final RxString listError = ''.obs;
   final RxBool isDongleBusy = false.obs;
+  final RxString resolvedListNumber = ''.obs;
+  final RxString resolvedHarnessName = ''.obs;
 
   Future<T> _withDongleBusy<T>(Future<T> Function() action) async {
     final wasAlreadyBusy = isDongleBusy.value;
@@ -96,6 +97,11 @@ class HomePageController extends GetxController {
 
   Timer? _plcRetryTimer;
   Timer? _plcHeartbeatTimer;
+  int? _esnRecordId;
+  int? _resolvedDatasetId;
+  int? _dongleDbId;
+  DateTime? _flashCycleStartTime;
+  bool _lastDtcReadSucceeded = true;
 
   Future<void> _autoConnectPlc() async {
     if (plcService.isConnected.value || plcService.isConnecting.value) return;
@@ -281,13 +287,14 @@ class HomePageController extends GetxController {
     }
     try {
       final List<dynamic> decoded = jsonDecode(raw);
-      _dongleEntries = decoded.map((d) {
+     _dongleEntries = decoded.map((d) {
         final ecuIdsRaw = (d['ecu_ids'] as List?) ?? [];
         return _DongleEntry(
           macId: d['mac_id'] as String?,
           ip: d['ip'] as String?,
           isActive: d['is_active'] == true,
           ecuIds: ecuIdsRaw.whereType<num>().map((n) => n.toInt()).toList(),
+          dongleDbId: d['dongleDbId'] as int?,
         );
       }).toList();
       _log('Dongle: loaded ${_dongleEntries.length} dongle(s) from login data');
@@ -338,8 +345,232 @@ class HomePageController extends GetxController {
     if (variant == null) return false;
     _esnVehicleModelId = variant.vehicleModel;
     _esnVehicleSubModelId = variant.subModel;
+    _resolvedVariant = variant;
+    _esnRecordId = match.id;
+    _flashCycleStartTime = DateTime.now();
+
+    // Fetch this ESN's session history — shown for context, doesn't block the flow.
+    unawaited(_authService.getSessionHistory(esn: scanned, accessToken: _accessToken).then((history) {
+      final eol = (history['eol_sessions'] as List?) ?? [];
+      final testbed = (history['testbed_sessions'] as List?) ?? [];
+      _log('History for ESN $scanned → ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+    }));
+
     return true;
   }
+
+
+
+  //---------------------------------
+  Future<void> _resolveInjectorConfigFromVariant() async {
+    try {
+      final variant = _resolvedVariant;
+      if (variant == null) {
+        _log('Injector config: no resolved variant — using default');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final vehicleModelId = variant.vehicleModel;
+      final subModelId = variant.subModel;
+
+      final activetDatasets =
+          (variant.tDatasetEcu ?? []).where((t) => t.isActive == true);
+      final ecuId =
+          activetDatasets.map((t) => t.ecu).whereType<int>().firstOrNull;
+
+      if (vehicleModelId == null || subModelId == null || ecuId == null) {
+        _log('Injector config: variant missing model/submodel/ecu ids');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final models = await _ensureModels();
+      all_ds.SubmodelModelecu? matched;
+
+      for (final result in models.results ?? <all_ds.Result>[]) {
+        if (result.id != vehicleModelId) continue;
+        for (final subModel in result.subModels ?? <all_ds.SubModel>[]) {
+          if (subModel.id != subModelId) continue;
+          final candidates =
+              subModel.submodelModelecu ?? <all_ds.SubmodelModelecu>[];
+          if (candidates.isEmpty) continue;
+          matched =
+              candidates.firstWhereOrNull((sme) => sme.ecu?.id == ecuId) ??
+                  candidates.first;
+        }
+      }
+
+      if (matched == null) {
+        _log('Injector config: no submodel_modelecu match');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final noOfInjectors = matched.noOfInjectors;
+      final firingSequenceStr = matched.firingSequence ?? '';
+
+      if (noOfInjectors == null || noOfInjectors <= 0) {
+        _log('Injector config: no_of_injectors missing/invalid — using default');
+        _configureIqaFields(_defaultIqaCount, null);
+        return;
+      }
+
+      final firingOrder = firingSequenceStr
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+
+      _log('Injector config resolved: $noOfInjectors injector(s), firing sequence [${firingOrder.join(',')}]');
+      _configureIqaFields(
+        noOfInjectors,
+        firingOrder.length == noOfInjectors ? firingOrder : null,
+      );
+    } catch (e) {
+      _log('Injector config resolution failed: $e — using default');
+      _configureIqaFields(_defaultIqaCount, null);
+    }
+  }
+
+  Future<void> _resolveHarnessRequirementFromVariant() async {
+    final variant = _resolvedVariant;
+
+    resolvedListNumber.value = variant?.variantCode ?? '';
+
+    if (variant == null) {
+      resolvedHarnessName.value = '';
+      return;
+    }
+
+    final harnesses = variant.prodbudVariantHarness ?? [];
+    // Multiple harness entries can exist for the SAME variant, one per
+    // station type (PFS vs Testing) — must filter to this app's own
+    // station type first, not just grab the first active entry
+    // regardless of which station it belongs to.
+    final activeHarness = harnesses.firstWhereOrNull(
+      (h) => h.isActive == true &&
+          (h.stationType ?? '').trim().toLowerCase() == 'testing',
+    );
+
+    if (activeHarness == null) {
+      _log('No active harness entry found for this variant.');
+      resolvedHarnessName.value = '';
+      harnessReceipes.clear();
+      return;
+    }
+
+    // Harness is now fully resolved from the ESN response — no separate
+    // scan step needed at all, "With Harness" or "Without Harness" alike.
+    resolvedHarnessName.value = '${activeHarness.name ?? '-'} (${activeHarness.harnessType ?? '-'})';
+    harnessReceipes.assignAll(activeHarness.receipes ?? []);
+    _log('Harness resolved: "${activeHarness.name}" (${activeHarness.harnessType}) — '
+        '${harnessReceipes.length} recipe sensor(s).');
+  }
+
+  Future<void> loadAvailableFlashFilesFromVariant() async {
+    print("============= loadAvailableFlashFilesFromVariant() =============");
+
+    flashFilesLoading.value = true;
+    flashFilesError.value = '';
+
+    try {
+      final variant = _resolvedVariant;
+      if (variant == null) {
+        availableFlashFiles.clear();
+        selectedFlashFile.value = null;
+        _currentDtcDatasetId = null;
+        _currentPidDatasetId = null;
+        return;
+      }
+
+      final vehicleModelId = variant.vehicleModel;
+      final subModelId = variant.subModel;
+
+      final models = await _ensureModels();
+
+      final files = <String>[];
+      _fileToDtcDatasetId.clear();
+      _fileToPidDatasetId.clear();
+      _fileToEcuId.clear();
+      _fileToHexUrl.clear();
+
+      var activetDatasets =
+          (variant.tDatasetEcu ?? []).where((t) => t.isActive == true).toList();
+
+      bool usingDDataset = false;
+      if (activetDatasets.isEmpty) {
+        print("No active T-dataset entries — falling back to D-dataset");
+        usingDDataset = true;
+        activetDatasets = (variant.dDatasetEcu ?? [])
+            .where((d) => d.isActive == true && d.isLatest == true)
+            .toList();
+      }
+
+      for (final t in activetDatasets) {
+        final ecuId = t.ecu;
+        if (ecuId == null) continue;
+
+        all_ds.SubmodelModelecu? ecuModel;
+
+        for (final model in models.results ?? []) {
+          if (model.id != vehicleModelId) continue;
+          for (final sub in model.subModels ?? []) {
+            if (sub.id != subModelId) continue;
+            for (final ecu in sub.submodelModelecu ?? []) {
+              if (ecu.ecu?.id == ecuId) {
+                ecuModel = ecu;
+                break;
+              }
+            }
+            if (ecuModel != null) break;
+          }
+          if (ecuModel != null) break;
+        }
+
+        if (ecuModel == null) continue;
+
+        final dataFileUrl = t.dataFile;
+        if (dataFileUrl == null || dataFileUrl.isEmpty) continue;
+
+        final fileName = dataFileUrl.split('/').last;
+        print("Flash File : $fileName (${usingDDataset ? 'D' : 'T'}-dataset id=${t.id}, isLatest=${t.isLatest})");
+
+        files.add(fileName);
+        _fileToEcuId[fileName] = ecuId;
+        _fileToHexUrl[fileName] = dataFileUrl;
+
+        if (ecuModel.datasets != null && ecuModel.datasets!.isNotEmpty) {
+          _fileToDtcDatasetId[fileName] = ecuModel.datasets!.first.id!;
+        }
+        if (ecuModel.pidDatasets != null && ecuModel.pidDatasets!.isNotEmpty) {
+          _fileToPidDatasetId[fileName] = ecuModel.pidDatasets!.first.id!;
+        }
+      }
+
+      availableFlashFiles.assignAll(files);
+
+      // No more manual List Number selection step — auto-select the
+      // one resolved file immediately, so there's never a stale
+      // selection lingering from a previous ESN/session.
+      if (files.isNotEmpty) {
+        selectFlashFile(files.first);
+      } else {
+        selectedFlashFile.value = null;
+        _currentDtcDatasetId = null;
+        _currentPidDatasetId = null;
+      }
+
+      print("Available Files : $files");
+    } catch (e, s) {
+      print("loadAvailableFlashFilesFromVariant ERROR : $e");
+      print(s);
+      flashFilesError.value = e.toString();
+    } finally {
+      flashFilesLoading.value = false;
+    }
+  }
+  //------------------------additional variables for vehicle context
 
   final RxString vehicleDisplayName = ''.obs;
   String? _esnVehicleModelName;
@@ -362,26 +593,22 @@ class HomePageController extends GetxController {
     return _modelsCache!;
   }
 
-  int? _esnVehicleModelId;
+int? _esnVehicleModelId;
   int? _esnVehicleSubModelId;
-
+  esn_ds.ProdbudVariant? _resolvedVariant;
+  
   Future<void> _resolveVehicleFromEsn() async {
-    final modelName = _esnVehicleModelName?.trim();
-    final subModelName = _esnVehicleSubModelName?.trim();
+    final modelId = _esnVehicleModelId;
+    final subModelId = _esnVehicleSubModelId;
 
     void resetVehicleContext() {
       vehicleDisplayName.value = '';
       vehicleEcuEntries = <all_ds.SubmodelModelecu>[];
       canConnectDongle.value = false;
-      _esnVehicleModelId = null;
-      _esnVehicleSubModelId = null;
     }
 
-    if (modelName == null ||
-        modelName.isEmpty ||
-        subModelName == null ||
-        subModelName.isEmpty) {
-      _log('Vehicle context: ESN model/sub-model not found.');
+    if (modelId == null || subModelId == null) {
+      _log('Vehicle context: ESN model/sub-model IDs not found.');
       resetVehicleContext();
       return;
     }
@@ -393,16 +620,12 @@ class HomePageController extends GetxController {
       all_ds.SubModel? matchedSubModel;
 
       for (final model in models.results ?? <all_ds.Result>[]) {
-        if ((model.name ?? '').trim().toUpperCase() !=
-            modelName.toUpperCase()) {
-          continue;
-        }
+        if (model.id != modelId) continue;
 
         matchedModel = model;
 
         for (final sub in model.subModels ?? <all_ds.SubModel>[]) {
-          if ((sub.name ?? '').trim().toUpperCase() ==
-              subModelName.toUpperCase()) {
+          if (sub.id == subModelId) {
             matchedSubModel = sub;
             break;
           }
@@ -413,9 +636,9 @@ class HomePageController extends GetxController {
 
       if (matchedModel == null || matchedSubModel == null) {
         _log(
-            'Vehicle context: Unable to resolve Model="$modelName", SubModel="$subModelName".');
+            'Vehicle context: Unable to resolve modelId=$modelId, subModelId=$subModelId.');
 
-        vehicleDisplayName.value = '$modelName - $subModelName (Not Available)';
+        vehicleDisplayName.value = 'Not Available';
         resetVehicleContext();
         return;
       }
@@ -534,9 +757,9 @@ class HomePageController extends GetxController {
       canConnectDongle.value = false;
       return;
     }
-
-    _dongleIp = matchedDongle.ip;
+_dongleIp = matchedDongle.ip;
     dongleIp.value = matchedDongle.ip!;
+    _dongleDbId = matchedDongle.dongleDbId;
 
     _log('----------------------------------------');
     _log('Matching Dongle Found');
@@ -999,16 +1222,10 @@ class HomePageController extends GetxController {
 
   Future<bool> _isValidHarness(String value) async {
     final scannedHarness = value.trim();
-    final scannedList = stepControllers[1].text.trim().toUpperCase();
-
-    final list = await _ensureVariantList();
-    final variant = (list.results ?? []).firstWhereOrNull(
-      (r) => (r.variantCode ?? '').trim().toUpperCase() == scannedList,
-    );
+    final variant = _resolvedVariant;
 
     if (variant == null) {
-      _log(
-          'Harness validation: no variant found for list number "$scannedList"');
+      _log('Harness validation: no resolved variant — scan ESN first');
       return false;
     }
 
@@ -1021,8 +1238,8 @@ class HomePageController extends GetxController {
     );
 
     if (match == null) {
-      _log('Harness mismatch: scanned "$scannedHarness" not found in variant '
-          '$scannedList\'s harness list (available: '
+      _log('Harness mismatch: scanned "$scannedHarness" not found in '
+          'harness list (available: '
           '${harnesses.map((h) => h.name).join(', ')})');
       return false;
     }
@@ -1093,16 +1310,21 @@ class HomePageController extends GetxController {
     dtcList.clear();
     pidList.clear();
 
-    availableFlashFiles.clear();
+   availableFlashFiles.clear();
     _fileToDtcDatasetId.clear();
     _fileToPidDatasetId.clear();
+    _fileToEcuId.clear();
+    _fileToHexUrl.clear();
     _currentDtcDatasetId = null;
     _currentPidDatasetId = null;
     selectedFlashFile.value = null;
     flashFilesError.value = '';
 
-    esnError.value = '';
+  esnError.value = '';
     listError.value = '';
+    _resolvedVariant = null;
+    resolvedListNumber.value = '';
+    resolvedHarnessName.value = '';
     currentStepIndex.value = 0;
     canConnectDongle.value = false;
     dongleConnected.value = false;
@@ -1455,7 +1677,7 @@ class HomePageController extends GetxController {
       return; // wait for the remaining digits
     }
 
-    if (step.key == 'esn') {
+  if (step.key == 'esn') {
       esnError.value = '';
       try {
         final isValid = await _isValidEsn(value);
@@ -1467,6 +1689,9 @@ class HomePageController extends GetxController {
           return;
         }
         await _resolveVehicleFromEsn();
+        await _resolveInjectorConfigFromVariant();
+        await _resolveHarnessRequirementFromVariant();
+        await loadAvailableFlashFilesFromVariant();
       } catch (e) {
         final message = e.toString().replaceFirst('Exception: ', '');
         esnError.value = message;
@@ -1476,59 +1701,9 @@ class HomePageController extends GetxController {
       }
     }
 
-    if (step.key == 'list') {
-      listError.value = '';
-      try {
-        final isValid = await _isValidListNumber(value);
-        if (!isValid) {
-          final message = 'List number not recognized. Please rescan.';
-          listError.value = message;
-          _log('List number mismatch: scanned "$value"');
-          _showErrorPopup(message, title: 'List Number Mismatch');
-          return;
-        }
-        await _resolveInjectorConfig(value);
-        await _resolveHarnessRequirement(value);
-        await loadAvailableFlashFiles();
-      } catch (e) {
-        final message = e.toString().replaceFirst('Exception: ', '');
-        listError.value = message;
-        _log('Failed to validate list number: $e');
-        _showErrorPopup(message, title: 'List Validation Failed');
-        return;
-      }
-    }
-
-    if (step.key == 'harness') {
-      try {
-        final isValid = await _isValidHarness(value);
-        if (!isValid) {
-          final message = 'Wrong harness entered. Please rescan.';
-          _log('Harness mismatch: scanned "$value"');
-          _showErrorPopup(message, title: 'Wrong Harness');
-          return;
-        }
-      } catch (e) {
-        final message = e.toString().replaceFirst('Exception: ', '');
-        _log('Failed to validate harness: $e');
-        _showErrorPopup(message, title: 'Harness Validation Failed');
-        return;
-      }
-    }
-
     // ── Everything below here is the part you pasted — this is where it goes ──
     _log('${step.label} scanned: $value');
     currentStepIndex.value = index + 1;
-
-    // ✅ Auto-skip the harness scan step for variants marked
-    // "Without Harness" — jump straight to IQA.
-    if (!allStepsComplete &&
-        steps[currentStepIndex.value].key == 'harness' &&
-        !harnessRequired) {
-      _log(
-          'Harness scan not required for this variant — skipping to next step.');
-      currentStepIndex.value = currentStepIndex.value + 1;
-    }
 
     if (allStepsComplete) {
       _log('All scan steps complete. Ready to flash.');
@@ -2093,17 +2268,12 @@ class HomePageController extends GetxController {
         String? result;
 
         try {
-          flashStatus.value = 'Validating vehicle...';
+         flashStatus.value = 'Validating vehicle...';
 
-          final scannedList = stepControllers[1].text.trim().toUpperCase();
-          final variants = await _ensureVariantList();
-
-          final variant = (variants.results ?? []).firstWhereOrNull(
-            (v) => (v.variantCode ?? '').trim().toUpperCase() == scannedList,
-          );
+          final variant = _resolvedVariant;
 
           if (variant == null) {
-            throw Exception("Variant not found");
+            throw Exception("Variant not resolved — scan ESN again");
           }
 
           final targetEcuId = _fileToEcuId[fileName];
@@ -2124,12 +2294,17 @@ class HomePageController extends GetxController {
                     d.isActive == true &&
                     d.isLatest == true,
               );
-
-          if (variantEcu == null) {
+if (variantEcu == null) {
             throw Exception(
                 "Active D-dataset ECU entry not found for selected file");
           }
 
+        _resolvedDatasetId = variantEcu.id;
+          final isFromTDataset = (variant.tDatasetEcu ?? []).any((t) => t.id == variantEcu.id);
+          print("🟣 [DatasetTracking] Selected file: $fileName");
+          print("🟣 [DatasetTracking] variantEcu.id (this becomes dataset_type sent to server): ${variantEcu.id}");
+          print("🟣 [DatasetTracking] Source: ${isFromTDataset ? 'T-dataset' : 'D-dataset'}");
+          print("🟣 [DatasetTracking] variantEcu.dataFile: ${variantEcu.dataFile}");
           final models = await _ensureModels();
 
           all_ds.SubmodelModelecu? selectedEcu;
@@ -2297,11 +2472,37 @@ class HomePageController extends GetxController {
         //await Future.delayed(const Duration(milliseconds: 300));
         await _loadDtcResults();
 
-        flashStatus.value = 'Loading PIDs...';
+       flashStatus.value = 'Loading PIDs...';
         //await Future.delayed(const Duration(milliseconds: 300));
         await _loadPidResults();
 
         flashStatus.value = 'Completed';
+
+        final flashPassed = result == 'NOERROR';
+        final iqaPassed = iqaWriteStatus.toLowerCase().contains('successful');
+        final dtcPassed = _lastDtcReadSucceeded;
+        final startTime = _flashCycleStartTime ?? DateTime.now();
+        final endTime = DateTime.now();
+
+        print("🟣 [DatasetTracking] About to send — esnId=$_esnRecordId dongleId=$_dongleDbId datasetType=$_resolvedDatasetId");
+        _log('Sending test-bed session report to server...');
+
+        unawaited(_authService.createTestBedSession(
+          esnId: _esnRecordId,
+          dongleId: _dongleDbId,
+          datasetType: _resolvedDatasetId,
+          startDate: startTime,
+          endDate: endTime,
+          flashStatus: flashPassed ? 'Pass' : 'Fail',
+          iqaStatus: iqaPassed ? 'Pass' : 'Fail',
+          dtcStatus: dtcPassed ? 'Pass' : 'Fail',
+          activityLog: activityLog.toList(),
+          accessToken: _accessToken,
+        ).then((_) {
+          _log('✅ Test-bed session report sent successfully');
+        }).catchError((e) {
+          _log('❌ Test-bed session report failed to send: $e');
+        }));
 
         flashInProgress.value = false;
       });
@@ -2528,21 +2729,21 @@ class HomePageController extends GetxController {
             await Future.delayed(const Duration(milliseconds: 300));
           }
         }
-
-        if (readResult == null) {
+if (readResult == null) {
           _log(
               'DTC read: ECU_COMMUNICATION_ERROR (after $maxAttempts attempts)');
           dtcList.clear();
+          _lastDtcReadSucceeded = false;
           dongleConnected.value = false;
           _startDongleRetryTimer();
           _showReconnectPopup();
           return;
         }
-
-        if (readResult.status != 'NO_ERROR') {
+if (readResult.status != 'NO_ERROR') {
           _log(
               'DTC read failed: ${readResult.status} (after $maxAttempts attempts)');
           dtcList.clear();
+          _lastDtcReadSucceeded = false;
           final statusLower = readResult.status.toString().toLowerCase();
           if (readResult.status == 'No Resp From Dongle' ||
               readResult.status == 'SOCKET_CLOSED' ||
@@ -2572,12 +2773,14 @@ class HomePageController extends GetxController {
           dummy[code] = '$code - $desc ($status)';
         }
 
-        dtcList.assignAll(dummy.values.toList());
+       dtcList.assignAll(dummy.values.toList());
+        _lastDtcReadSucceeded = true;
         _log('DTC (${dtcList.length}) data loaded');
       } catch (e) {
         final message = e.toString().replaceFirst('Exception: ', '');
         _log('Failed to load DTC dataset: $e');
         dtcList.clear();
+        _lastDtcReadSucceeded = false;
         _showErrorPopup(message, title: 'Failed to Load DTC');
       }
     });
@@ -3132,10 +3335,12 @@ class _DongleEntry {
   final String? ip;
   final bool isActive;
   final List<int> ecuIds;
+  final int? dongleDbId;
   _DongleEntry({
     this.macId,
     this.ip,
     this.isActive = false,
     this.ecuIds = const [],
+    this.dongleDbId,
   });
 }

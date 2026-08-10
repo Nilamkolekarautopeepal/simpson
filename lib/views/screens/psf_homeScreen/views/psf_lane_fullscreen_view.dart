@@ -705,6 +705,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
@@ -726,6 +727,18 @@ class _StationColors {
   static const slateBg = Color(0xFFF7F8FA);
 }
 
+/// One lane's full detail view. Binds DIRECTLY to the lane's own
+/// TextEditingControllers/FocusNodes/RxValues — NEVER local copies.
+/// Local controllers seeded once in initState() only reflect
+/// whichever lane was first shown, and Flutter reuses the same State
+/// object when switching lanes unless given a distinct key — that
+/// combination is exactly what caused every lane to show the same
+/// ESN/IQA data. Direct binding has nothing to go stale.
+///
+/// IMPORTANT: wherever this widget is constructed (in
+/// psf_home_screen_view.dart), it must be given
+/// key: ValueKey(laneIndex) so switching lanes creates a genuinely
+/// fresh widget instance.
 class PsfLaneFullScreenView extends StatefulWidget {
   const PsfLaneFullScreenView({
     super.key,
@@ -743,13 +756,6 @@ class PsfLaneFullScreenView extends StatefulWidget {
 }
 
 class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
-  late final TextEditingController _esnController;
-  late final FocusNode _esnFocusNode;
-  late final TextEditingController _listNumberController;
-  late final FocusNode _listNumberFocusNode;
-  late final List<TextEditingController> _iqaControllers;
-  late final List<FocusNode> _iqaFocusNodes;
-
   bool _flashExpanded = true;
   bool _dtcExpanded = false;
   bool _pidExpanded = false;
@@ -761,145 +767,83 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   @override
   void initState() {
     super.initState();
-
-    _esnController = TextEditingController(text: lane.esnController.text);
-    _esnFocusNode = FocusNode();
-    _esnController.addListener(() {
-      if (lane.esnController.text != _esnController.text) {
-        lane.esnController.text = _esnController.text;
-        controller.onEsnFieldChanged(laneIndex);
-      }
-    });
-
-    _listNumberController = TextEditingController(text: lane.listNumberController.text);
-    _listNumberFocusNode = FocusNode();
-    _listNumberController.addListener(() {
-      if (lane.listNumberController.text != _listNumberController.text) {
-        lane.listNumberController.text = _listNumberController.text;
-        controller.onListNumberFieldChanged(laneIndex);
-      }
-    });
-
-    _iqaControllers = List.generate(
-      lane.iqaControllers.length,
-      (i) => TextEditingController(text: lane.iqaControllers[i].text),
-    );
-    _iqaFocusNodes = List.generate(lane.iqaControllers.length, (_) => FocusNode());
-    for (int i = 0; i < _iqaControllers.length; i++) {
-      _iqaControllers[i].addListener(() {
-        if (lane.iqaControllers[i].text != _iqaControllers[i].text) {
-          lane.iqaControllers[i].text = _iqaControllers[i].text;
-          controller.onIqaFieldChanged(laneIndex, i);
-        }
-      });
-    }
-
-    lane.esnController.addListener(() {
-      if (_esnController.text != lane.esnController.text) {
-        _esnController.text = lane.esnController.text;
-      }
-    });
-
-    lane.listNumberController.addListener(() {
-      if (_listNumberController.text != lane.listNumberController.text) {
-        _listNumberController.text = lane.listNumberController.text;
-      }
-    });
-
-    for (int i = 0; i < _iqaControllers.length; i++) {
-      lane.iqaControllers[i].addListener(() {
-        if (_iqaControllers[i].text != lane.iqaControllers[i].text) {
-          _iqaControllers[i].text = lane.iqaControllers[i].text;
-        }
-      });
-    }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.onOpenLiveParameter(laneIndex);
       controller.onOpenDtc(laneIndex);
     });
+
+    // Show a popup the instant THIS lane's flash succeeds, then
+    // transition it into "processing" while IQA/DTC load, and close
+    // it automatically once that's done. Reads lane.isPostFlashProcessing
+    // (owned by the controller) — never a local field, since a local
+    // one would never actually reflect real progress.
+    ever(lane.flashStatus, (String status) {
+      if (status == 'Flash Completed') {
+        _showFlashSuccessPopup();
+      }
+    });
   }
 
-  @override
-  void dispose() {
-    _esnController.dispose();
-    _esnFocusNode.dispose();
-    _listNumberController.dispose();
-    _listNumberFocusNode.dispose();
-    for (final c in _iqaControllers) {
-      c.dispose();
-    }
-    for (final f in _iqaFocusNodes) {
-      f.dispose();
-    }
-    super.dispose();
+  void _showFlashSuccessPopup() {
+    Get.dialog(
+      Obx(() => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle, color: _StationColors.greenDark),
+                SizedBox(width: 10),
+                Text('Flashing Successful'),
+              ],
+            ),
+            content: lane.isPostFlashProcessing.value
+                ? const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.teal)),
+                      SizedBox(width: 12),
+                      Expanded(child: Text('Reading DTC and writing IQA — please wait…')),
+                    ],
+                  )
+                : const Text('DTC read and IQA write complete.'),
+            actions: lane.isPostFlashProcessing.value
+                ? []
+                : [
+                    TextButton(
+                      onPressed: () => Get.back(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+          )),
+      barrierDismissible: false,
+    );
+
+    ever(lane.isPostFlashProcessing, (bool processing) {
+      if (!processing && Get.isDialogOpen == true) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (Get.isDialogOpen == true) Get.back();
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: _StationColors.slateBg,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _topBar(),
-          Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(width: 320, child: _leftSidebar()),
-                const VerticalDivider(width: 1, thickness: 1, color: _StationColors.slateBorder),
-               Expanded(child: _mainArea(context)),
-              ],
-            ),
-          ),
+          SizedBox(width: 320, child: _leftSidebar(context)),
+          const VerticalDivider(width: 1, thickness: 1, color: _StationColors.slateBorder),
+          Expanded(child: _mainArea(context)),
         ],
       ),
     );
   }
 
-Widget _topBar() {
-    return Container(
-      color: const Color.fromARGB(255, 205, 227, 234),
-      padding: const EdgeInsets.fromLTRB(12, 14, 20, 14),
-      child: Row(
-        children: [
-        //  IconButton(
-        //     icon: const Icon(Icons.arrow_back, color: _StationColors.teal),
-        //     onPressed: controller.collapseLane,
-        //     tooltip: 'Back to all lanes',
-        //     padding: EdgeInsets.zero,
-        //     constraints: const BoxConstraints(),
-        //     visualDensity: VisualDensity.compact,
-        //   ),
-          const SizedBox(width: 4),
-          Obx(
-            () => Text(
-              'Lane ${lane.laneNumber} — ${lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: _StationColors.tealBg,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.refresh, color: _StationColors.teal, size: 20),
-              onPressed: () => controller.resetLane(laneIndex),
-              tooltip: 'Reset lane for next engine',
-              visualDensity: VisualDensity.compact,
-            ),
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-  // ── LEFT: ESN / List Number / IQA ──────────────────────────────
+  // ── LEFT: ESN / IQA — bound directly to lane's real controllers,
+  // border-only design (no background tint), consistent alignment ──
 
-  Widget _leftSidebar() {
+  Widget _leftSidebar(BuildContext context) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(20),
@@ -907,49 +851,78 @@ Widget _topBar() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _scanField(
+            Row(
+              children: [
+                Expanded(
+                  child: Obx(
+                    () => Text(
+                      lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value,
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                Container(
+                  decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh, color: _StationColors.teal, size: 18),
+                    onPressed: () => controller.resetLane(laneIndex),
+                    tooltip: 'Reset lane for next engine',
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.all(6),
+                    constraints: const BoxConstraints(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+           _scanField(
+              context: context,
               label: 'ESN NUMBER',
-              textController: _esnController,
-              focusNode: _esnFocusNode,
+              textController: lane.esnController,
+              focusNode: lane.esnFocusNode,
               isLoading: lane.isLookingUpEsn,
               isResolved: lane.esn,
               error: lane.esnError,
-              hint: 'e.g. 12345678912345',
+              hint: 'e.g. 111111111111111',
+              onChanged: () => controller.onEsnFieldChanged(laneIndex),
               onSubmit: () => controller.onScanEsnForLane(laneIndex),
-              
             ),
             const SizedBox(height: 22),
             const Text('IQA NUMBERS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Column(
-              children: List.generate(_iqaControllers.length, (i) {
+              children: List.generate(lane.iqaControllers.length, (i) {
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 12),
                   child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _iqaControllers[i],
+                    valueListenable: lane.iqaControllers[i],
                     builder: (context, value, _) {
                       final filled = value.text.trim().length == 7;
+                     final borderColor = filled ? _StationColors.green : _StationColors.slateBorder;
                       return Row(
                         children: [
                           SizedBox(
-                            width: 90,
+                            width: 88,
+                            height: 44,
                             child: Container(
-                              height: 36,
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                border: Border.all(color: filled ? _StationColors.green : _StationColors.slateBorder),
-                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: borderColor, width: filled ? 1.6 : 1),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (filled) ...[
-                                    const Icon(Icons.check_circle, size: 12, color: _StationColors.greenDark),
+                                    const Icon(Icons.check_circle, size: 13, color: _StationColors.greenDark),
+                                    const SizedBox(width: 5),
                                   ],
                                   Text(
                                     'INJ ${i + 1}',
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: filled ? _StationColors.greenDark : _StationColors.charcoal),
+                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: filled ? _StationColors.greenDark : _StationColors.charcoal),
                                   ),
                                 ],
                               ),
@@ -958,38 +931,57 @@ Widget _topBar() {
                           const SizedBox(width: 10),
                           Expanded(
                             child: SizedBox(
-                              height: 36,
-                              child: TextField(
-                                controller: _iqaControllers[i],
-                                focusNode: _iqaFocusNodes[i],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12, color: filled ? _StationColors.greenDark : Colors.black87),
-                                decoration: InputDecoration(
-                                  hintText: lane.iqaLabelFor(i),
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                   borderSide: BorderSide(color: filled ? _StationColors.green : _StationColors.slateBorder),
+                              height: 44,
+                             child: Focus(
+                                onKeyEvent: (node, event) {
+                                  if (event is KeyDownEvent &&
+                                      (event.logicalKey == LogicalKeyboardKey.tab || event.logicalKey == LogicalKeyboardKey.enter)) {
+                                    if (i < lane.iqaFocusNodes.length - 1) {
+                                      lane.iqaFocusNodes[i + 1].requestFocus();
+                                    }
+                                    return KeyEventResult.handled;
+                                  }
+                                  return KeyEventResult.ignored;
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    border: Border.all(color: borderColor, width: filled ? 1.6 : 1),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(color: filled ? _StationColors.green : _StationColors.slateBorder),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: const BorderSide(color: _StationColors.tealLight, width: 1.6),
+                                  child: Theme(
+                                    data: Theme.of(context).copyWith(
+                                      textSelectionTheme: TextSelectionThemeData(
+                                        selectionColor: Colors.grey.withOpacity(0.4),
+                                        selectionHandleColor: _StationColors.teal,
+                                      ),
+                                    ),
+                                    child: TextField(
+                                    controller: lane.iqaControllers[i],
+                                    focusNode: lane.iqaFocusNodes[i],
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: filled ? _StationColors.greenDark : Colors.black87),
+                                    decoration: InputDecoration(
+                                      hintText: lane.iqaLabelFor(i),
+                                      hintStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+                                      isDense: true,
+                                      filled: false,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                    ),
+                                    onChanged: (_) => controller.onIqaFieldChanged(laneIndex, i),
+                                    onSubmitted: (_) {
+                                      if (i < lane.iqaFocusNodes.length - 1) {
+                                        lane.iqaFocusNodes[i + 1].requestFocus();
+                                      }
+                                    },
                                   ),
                                 ),
-                                onSubmitted: (_) {
-                                  if (i < _iqaFocusNodes.length - 1) {
-                                    _iqaFocusNodes[i + 1].requestFocus();
-                                  }
-                                },
                               ),
                             ),
+                          ),
                           ),
                         ],
                       );
@@ -1011,7 +1003,8 @@ Widget _topBar() {
     );
   }
 
-  Widget _scanField({
+Widget _scanField({
+    required BuildContext context,
     required String label,
     required TextEditingController textController,
     required FocusNode focusNode,
@@ -1019,6 +1012,7 @@ Widget _topBar() {
     required RxString isResolved,
     required RxString error,
     required String hint,
+    required VoidCallback onChanged,
     required VoidCallback onSubmit,
   }) {
     return Column(
@@ -1029,41 +1023,52 @@ Widget _topBar() {
         Obx(() {
           final resolved = isResolved.value.isNotEmpty;
           return Container(
-            height: 42,
+            height: 44,
             decoration: BoxDecoration(
-             //color: resolved ? _StationColors.greenBg : _StationColors.slateBg,
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: resolved ? _StationColors.green : _StationColors.slateBorder, width: resolved ? 1.6 : 1),
             ),
-            child: TextField(
-              controller: textController,
-              focusNode: focusNode,
-              enabled: !isLoading.value,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                hintText: hint,
-                isDense: true,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                suffixIcon: isLoading.value
-                    ? const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: resolved ? _StationColors.green : _StationColors.slateBorder),
+            child: Focus(
+              onKeyEvent: (node, event) {
+                if (event is KeyDownEvent &&
+                    (event.logicalKey == LogicalKeyboardKey.tab || event.logicalKey == LogicalKeyboardKey.enter)) {
+                  onSubmit();
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  textSelectionTheme: TextSelectionThemeData(
+                    selectionColor: Colors.grey.withOpacity(0.4),
+                    selectionHandleColor: _StationColors.teal,
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: resolved ? _StationColors.green : _StationColors.slateBorder),
+                child: TextField(
+                controller: textController,
+                focusNode: focusNode,
+                enabled: !isLoading.value,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: hint,
+                  isDense: true,
+                  filled: false,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  suffixIcon: isLoading.value
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                 // borderSide: const BorderSide(color: _StationColors.tealLight, width: 1.6),
-                ),
+                onChanged: (_) => onChanged(),
+                onSubmitted: (_) => onSubmit(),
               ),
-              onSubmitted: (_) => onSubmit(),
+            ),
             ),
           );
         }),
@@ -1084,9 +1089,9 @@ Widget _topBar() {
       children: [
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
             child: Obx(() {
-             if (!lane.iqaAllFilled.value) {
+              if (!lane.iqaAllFilled.value) {
                 return SizedBox(
                   height: MediaQuery.of(context).size.height * 0.6,
                   child: Center(
@@ -1096,20 +1101,14 @@ Widget _topBar() {
                         Container(
                           width: 72,
                           height: 72,
-                          decoration: BoxDecoration(
-                            color: _StationColors.tealBg,
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
                           child: const Icon(Icons.checklist_rtl_rounded, color: _StationColors.teal, size: 34),
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Waiting for scan',
-                          style: TextStyle(color: _StationColors.charcoal, fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
+                        const Text('Waiting for scan', style: TextStyle(color: _StationColors.charcoal, fontSize: 16, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
                         const Text(
-                          'Complete ESN, List Number, and all\nIQA fields to continue.',
+                          'Complete ESN and all\nIQA fields to continue.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: _StationColors.slate, fontSize: 13),
                         ),
@@ -1256,6 +1255,19 @@ Widget _topBar() {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Obx(() => lane.isPostFlashProcessing.value
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 14),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.teal)),
+                          SizedBox(height: 8),
+                          Text('Reading DTC/IQA — please wait…', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _StationColors.teal)),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink()),
               if (lane.resolvedFlashFileName.value != null)
                 Padding(padding: const EdgeInsets.only(bottom: 14), child: Text(lane.resolvedFlashFileName.value!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate))),
               Container(
@@ -1277,7 +1289,7 @@ Widget _topBar() {
         );
       }
 
-     if (lane.isFlashing.value) {
+      if (lane.isFlashing.value) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1296,13 +1308,17 @@ Widget _topBar() {
               ),
             ),
             const SizedBox(height: 14),
-            Text(lane.flashStatus.value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _StationColors.charcoal)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(8)),
+              child: Text(lane.flashStatus.value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _StationColors.teal)),
+            ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Elapsed  ${lane.formattedElapsed}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
-                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _StationColors.teal)),
+                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _StationColors.teal)),
               ],
             ),
             const SizedBox(height: 6),
@@ -1366,27 +1382,62 @@ Widget _topBar() {
           extraAction: Obx(() {
             final busy = lane.isReadingDtc.value;
             final canRead = lane.dongleConnected.value && !busy;
-            return InkWell(
-              borderRadius: BorderRadius.circular(6),
-              onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: canRead ? _StationColors.teal : _StationColors.slateBorder)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (busy)
-                    const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6))
-                  else
-                    Icon(Icons.search, size: 14, color: canRead ? _StationColors.teal : _StationColors.slate),
-                  const SizedBox(width: 5),
-                  Text(busy ? 'Reading…' : 'Read DTCs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: canRead ? _StationColors.teal : _StationColors.slate)),
-                ]),
-              ),
+            final canClear = canRead && lane.dtcReadResults.isNotEmpty;
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: canRead ? _StationColors.teal : _StationColors.slateBorder)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      if (busy)
+                        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6))
+                      else
+                        Icon(Icons.search, size: 14, color: canRead ? _StationColors.teal : _StationColors.slate),
+                      const SizedBox(width: 5),
+                      Text(busy ? 'Reading…' : 'Read DTCs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: canRead ? _StationColors.teal : _StationColors.slate)),
+                    ]),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                InkWell(
+                  borderRadius: BorderRadius.circular(6),
+                  onTap: canClear ? () => _confirmClearDtc() : null,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: canClear ? _StationColors.red : _StationColors.slateBorder)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.delete_sweep_rounded, size: 14, color: canClear ? _StationColors.red : _StationColors.slate),
+                      const SizedBox(width: 5),
+                      Text('Clear DTC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: canClear ? _StationColors.red : _StationColors.slate)),
+                    ]),
+                  ),
+                ),
+              ],
             );
           }),
           child: Obx(() => lane.dtcReadResults.isEmpty
               ? const Text('No data yet', style: TextStyle(color: _StationColors.slate, fontSize: 13))
               : Column(children: lane.dtcReadResults.map(_dtcTile).toList())),
         ));
+  }
+
+  void _confirmClearDtc() {
+    Get.defaultDialog(
+      title: 'Clear DTC?',
+      middleText: 'This will clear all fault codes stored on Lane ${lane.laneNumber}\'s ECU.',
+      textConfirm: 'Clear',
+      textCancel: 'Cancel',
+      confirmTextColor: Colors.white,
+      buttonColor: _StationColors.red,
+      onConfirm: () {
+        Get.back();
+        controller.clearDtcForLane(laneIndex);
+      },
+    );
   }
 
   Widget _dtcTile(String raw) {
@@ -1450,81 +1501,81 @@ Widget _topBar() {
 
   Widget _pidSection() {
     return _expandableCard(
-          title: 'PID',
-          expanded: _pidExpanded,
-          onTap: () => setState(() => _pidExpanded = !_pidExpanded),
-          trailing: Obx(() {
-            final playing = lane.pidPlaying.value;
-            return ElevatedButton.icon(
-              onPressed: () => controller.togglePidPlaybackForLane(laneIndex),
-              icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 16),
-              label: Text(playing ? 'Stop' : 'Run', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: playing ? _StationColors.red : _StationColors.teal,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            );
-          }),
-          child: Obx(() {
-            if (lane.liveParameterCodes.isEmpty) {
-              return const Text('No data yet', style: TextStyle(color: _StationColors.slate, fontSize: 13));
-            }
-            final isPlaying = lane.pidPlaying.value;
-            final list = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(lane.liveParameterCodes.length, (index) {
-                final code = lane.liveParameterCodes[index];
-                final variable = code.piCodeVariable?.firstOrNull;
-                final label = variable?.longName ?? variable?.shortName ?? code.shortName ?? code.code ?? 'PID';
-                final unit = variable?.unit ?? '';
-                return Obx(() {
-                  final liveValue = variable?.id != null ? lane.livePidValues[variable!.id] : null;
-                  final isError = liveValue != null && (liveValue == 'Not Found' || liveValue.toUpperCase().contains('ERROR'));
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Row(children: [
-                          Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: _StationColors.charcoal), overflow: TextOverflow.ellipsis)),
-                          const SizedBox(width: 12),
-                          Text(
-                            liveValue != null ? '$liveValue ${unit.isNotEmpty ? unit : ''}'.trim() : '—',
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: liveValue == null ? _StationColors.slate : (isError ? _StationColors.red : _StationColors.teal)),
-                          ),
-                        ]),
-                      ),
-                      if (index != lane.liveParameterCodes.length - 1) Divider(height: 1, thickness: 1, color: _StationColors.slateBorder.withOpacity(0.6)),
-                    ],
-                  );
-                });
-              }),
-            );
-
-            return Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                Opacity(opacity: isPlaying ? 0.35 : 1.0, child: IgnorePointer(ignoring: isPlaying, child: list)),
-                if (isPlaying)
+      title: 'PID',
+      expanded: _pidExpanded,
+      onTap: () => setState(() => _pidExpanded = !_pidExpanded),
+      trailing: Obx(() {
+        final playing = lane.pidPlaying.value;
+        return ElevatedButton.icon(
+          onPressed: () => controller.togglePidPlaybackForLane(laneIndex),
+          icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 16),
+          label: Text(playing ? 'Stop' : 'Run', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: playing ? _StationColors.red : _StationColors.teal,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }),
+      child: Obx(() {
+        if (lane.liveParameterCodes.isEmpty) {
+          return const Text('No data yet', style: TextStyle(color: _StationColors.slate, fontSize: 13));
+        }
+        final isPlaying = lane.pidPlaying.value;
+        final list = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(lane.liveParameterCodes.length, (index) {
+            final code = lane.liveParameterCodes[index];
+            final variable = code.piCodeVariable?.firstOrNull;
+            final label = variable?.longName ?? variable?.shortName ?? code.shortName ?? code.code ?? 'PID';
+            final unit = variable?.unit ?? '';
+            return Obx(() {
+              final liveValue = variable?.id != null ? lane.livePidValues[variable!.id] : null;
+              final isError = liveValue != null && (liveValue == 'Not Found' || liveValue.toUpperCase().contains('ERROR'));
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))]),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(_StationColors.teal)),
-                        const SizedBox(height: 10),
-                        Text('Reading live parameters...', style: TextStyle(fontSize: 12, color: _StationColors.slate.withOpacity(0.9), fontWeight: FontWeight.w600)),
-                      ]),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(children: [
+                      Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: _StationColors.charcoal), overflow: TextOverflow.ellipsis)),
+                      const SizedBox(width: 12),
+                      Text(
+                        liveValue != null ? '$liveValue ${unit.isNotEmpty ? unit : ''}'.trim() : '—',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: liveValue == null ? _StationColors.slate : (isError ? _StationColors.red : _StationColors.teal)),
+                      ),
+                    ]),
                   ),
-              ],
-            );
+                  if (index != lane.liveParameterCodes.length - 1) Divider(height: 1, thickness: 1, color: _StationColors.slateBorder.withOpacity(0.6)),
+                ],
+              );
+            });
           }),
         );
+
+        return Stack(
+          alignment: Alignment.topCenter,
+          children: [
+            Opacity(opacity: isPlaying ? 0.35 : 1.0, child: IgnorePointer(ignoring: isPlaying, child: list)),
+            if (isPlaying)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))]),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(_StationColors.teal)),
+                    const SizedBox(height: 10),
+                    Text('Reading live parameters...', style: TextStyle(fontSize: 12, color: _StationColors.slate.withOpacity(0.9), fontWeight: FontWeight.w600)),
+                  ]),
+                ),
+              ),
+          ],
+        );
+      }),
+    );
   }
 
   // ── ACTIVITY LOG ─────────────────────────────────────────────

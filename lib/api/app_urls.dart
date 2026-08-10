@@ -20,6 +20,8 @@ class ApiUrls {
   // static const String harnessNumber = "$baseUrl/analyze_prodbud/harness/list/";
   static const String createEolSession =
       "$baseUrl/analyze_prodbud/create/eol-session";
+  static const String createTestBedSession =
+      "$baseUrl/analyze_prodbud/create/test-bed-session";
   static const String sessionByEsn =
       "$baseUrl/analyze_prodbud/get/session/by-esn/";
 }

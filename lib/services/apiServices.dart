@@ -391,7 +391,64 @@ class AuthService {
     }
   }
 
-  //=================================
+
+  //------------------------test bed session and eol session apis-----------------------------
+  Future<void> createTestBedSession({
+    required int? esnId,
+    required int? dongleId,
+    required int? datasetType,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String flashStatus,
+    required String iqaStatus,
+    required String dtcStatus,
+    required List<String> activityLog,
+    String? accessToken,
+  }) async {
+    try {
+      final activityText = activityLog.join('\n');
+      final activityBytes = utf8.encode(activityText);
+
+      final formData = FormData.fromMap({
+        "esn_id": esnId?.toString() ?? '',
+        "dongle_id": dongleId?.toString() ?? '',
+        "dataset_type": datasetType?.toString() ?? '',
+        "start_date": startDate.toIso8601String(),
+        "end_date": endDate.toIso8601String(),
+        "flash_status": flashStatus,
+        "iqa_status": iqaStatus,
+        "dtc_status": dtcStatus,
+        "activity_report": MultipartFile.fromBytes(
+          activityBytes,
+          filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
+        ),
+      });
+
+      debugPrint("🔵 [TestBedSessionService] POST ${ApiUrls.createTestBedSession}");
+      debugPrint(
+          "🔵 [TestBedSessionService] esn_id=$esnId dongle_id=$dongleId dataset_type=$datasetType "
+          "flash=$flashStatus iqa=$iqaStatus dtc=$dtcStatus");
+
+      final response = await _dio.post(
+        ApiUrls.createTestBedSession,
+        data: formData,
+        options: Options(
+          headers: accessToken != null ? {"Authorization": "JWT $accessToken"} : null,
+        ),
+      );
+
+      debugPrint("🔵 [TestBedSessionService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [TestBedSessionService] response.data=${response.data}");
+    } on DioException catch (e) {
+      debugPrint("🔴 [TestBedSessionService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [TestBedSessionService] response.data=${e.response?.data}");
+      rethrow;
+    }
+  }
+
+  
+
+  //=================================eol session apis-----------------------------
   Future<void> createEolSession({
     required int? esnId,
     required int? dongleId,

@@ -165,23 +165,26 @@ class HomePageView extends GetView<HomePageController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
-            child: Obx(
-              () {
-                final visibleCount = (controller.currentStepIndex.value + 1)
-                    .clamp(0, controller.steps.length);
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: visibleCount,
-                  itemBuilder: (context, index) {
-                    final step = controller.steps[index];
-                    if (step.type == StepType.iqaGroup) {
-                      return _buildIqaGroupTile(index, context);
-                    }
-                    return _buildStepTile(index, context);
-                  },
-                );
-              },
+       Expanded(
+            child: Builder(
+              builder: (context) => Obx(
+                () {
+                  final visibleCount = (controller.currentStepIndex.value + 1)
+                      .clamp(0, controller.steps.length);
+                  return ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    children: [
+                      for (int index = 0; index < visibleCount; index++)
+                        controller.steps[index].type == StepType.iqaGroup
+                            ? _buildIqaGroupTile(index, context)
+                            : _buildStepTile(index, context),
+                      if (controller.resolvedListNumber.value.isNotEmpty ||
+                          controller.resolvedHarnessName.value.isNotEmpty)
+                        _buildResolvedInfoTile(),
+                    ],
+                  );
+                },
+              ),
             ),
           ),
           const Divider(height: 1),
@@ -255,10 +258,7 @@ class HomePageView extends GetView<HomePageController> {
     final isCompleted = index < controller.currentStepIndex.value;
     final isActive = index == controller.currentStepIndex.value;
 
-    int? maxLen;
-    if (step.key == 'list') {
-      maxLen = 4;
-    }
+  int? maxLen;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -335,6 +335,55 @@ class HomePageView extends GetView<HomePageController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildResolvedInfoTile() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle, size: 16, color: AppColors.themeColor),
+              const SizedBox(width: 6),
+              Text(
+                'Resolved from ESN',
+                style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (controller.resolvedListNumber.value.isNotEmpty)
+            _readOnlyInfoRow('List No.', controller.resolvedListNumber.value),
+          if (controller.resolvedHarnessName.value.isNotEmpty)
+            _readOnlyInfoRow('Harness', controller.resolvedHarnessName.value),
+        ],
+      ),
+    );
+  }
+
+  Widget _readOnlyInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.themeColor.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.themeColor.withOpacity(0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
+            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+          ],
+        ),
       ),
     );
   }

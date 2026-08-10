@@ -40,7 +40,10 @@ class PsfLane {
       if (v.isNotEmpty) logActivity(v);
     });
   }
-
+  final RxList<Map<String, dynamic>> eolSessionHistory =
+      <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> testbedSessionHistory =
+      <Map<String, dynamic>>[].obs;
   final String? dongleIpFromLogin;
   final int? expectedEcuId;
   final String? macIdFromLogin;
@@ -249,8 +252,8 @@ class PsfLane {
 
   final RxString flashStatus = "".obs;
 
-  final RxBool isFlashing = false.obs;
-
+ final RxBool isFlashing = false.obs;
+  final RxBool isPostFlashProcessing = false.obs;
   final RxDouble flashProgress = 0.0.obs;
 
   final RxInt flashElapsedSeconds = 0.obs;
@@ -373,7 +376,7 @@ class PsfLane {
     dllFunctions = null;
     isDongleBusy = false;
 
-    ecuModelName.value = "ECU MODEL NAME";
+    //ecuModelName.value = "ECU MODEL NAME";
 
     matchedEcu = null;
     matchedVehicleModelId = null;

@@ -1,3 +1,5 @@
+import 'package:simpson/modals/esn.model.dart';
+
 class ProdbudVariant {
   int? id;
   String? variantCode;
@@ -9,6 +11,7 @@ class ProdbudVariant {
   int? modelYear;
   List<DatasetEcu>? dDatasetEcu;
   List<DatasetEcu>? tDatasetEcu;
+  List<ProdbudVariantHarness>? prodbudVariantHarness;
   bool? isActive;
 
   ProdbudVariant({
@@ -22,6 +25,7 @@ class ProdbudVariant {
     this.modelYear,
     this.dDatasetEcu,
     this.tDatasetEcu,
+    this.prodbudVariantHarness,
     this.isActive,
   });
 
@@ -42,6 +46,10 @@ class ProdbudVariant {
             ? []
             : List<DatasetEcu>.from(
                 json["t_dataset_ecu"].map((x) => DatasetEcu.fromJson(x))),
+        prodbudVariantHarness: json["prodbud_variant_harness"] == null
+            ? []
+            : List<ProdbudVariantHarness>.from(
+                json["prodbud_variant_harness"].map((x) => ProdbudVariantHarness.fromJson(x))),
         isActive: json["is_active"] is bool ? json["is_active"] : null,
       );
 
@@ -56,6 +64,7 @@ class ProdbudVariant {
         "model_year": modelYear,
         "d_dataset_ecu": dDatasetEcu?.map((x) => x.toJson()).toList(),
         "t_dataset_ecu": tDatasetEcu?.map((x) => x.toJson()).toList(),
+        "prodbud_variant_harness": prodbudVariantHarness?.map((x) => x.toJson()).toList(),
         "is_active": isActive,
       };
 }

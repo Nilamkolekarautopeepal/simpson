@@ -1,4 +1,5 @@
 import 'package:simpson/modals/esn_ds.dart';
+import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 
 class EsnNumber {
   int? count;
@@ -30,6 +31,45 @@ class EsnNumber {
         "results": results == null
             ? []
             : List<dynamic>.from(results!.map((x) => x.toJson())),
+      };
+}
+
+
+class ProdbudVariantHarness {
+  int? id;
+  String? name;
+  String? stationType;
+  String? harnessType;
+  bool? isActive;
+  List<list_ds.Receipe>? receipes;
+
+  ProdbudVariantHarness({
+    this.id,
+    this.name,
+    this.stationType,
+    this.harnessType,
+    this.isActive,
+    this.receipes,
+  });
+
+  factory ProdbudVariantHarness.fromJson(Map<String, dynamic> json) => ProdbudVariantHarness(
+        id: json["id"],
+        name: json["name"],
+        stationType: json["station_type"],
+        harnessType: json["harness_type"],
+        isActive: json["is_active"],
+        receipes: json["receipes"] == null
+            ? []
+            : List<list_ds.Receipe>.from(json["receipes"].map((x) => list_ds.Receipe.fromJson(x))),
+      );
+
+  Map<String, dynamic> toJson() => {
+        "id": id,
+        "name": name,
+        "station_type": stationType,
+        "harness_type": harnessType,
+        "is_active": isActive,
+        "receipes": receipes?.map((x) => x.toJson()).toList(),
       };
 }
 

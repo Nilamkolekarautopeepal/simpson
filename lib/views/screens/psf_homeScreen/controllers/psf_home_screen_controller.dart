@@ -35,8 +35,7 @@ class PsfHomeScreenController extends GetxController {
     ..connectionTimeout = const Duration(seconds: 15);
   static const int _dongleFlashPort = 6888;
 
-
-  final RxnInt expandedLaneIndex = RxnInt();
+  final RxnInt expandedLaneIndex = RxnInt(0);
 
   void expandLane(int index) {
     expandedLaneIndex.value = index;
@@ -176,7 +175,7 @@ class PsfHomeScreenController extends GetxController {
       final List<dynamic> decoded = jsonDecode(raw);
       final built = <PsfLane>[];
 
-     for (int i = 0; i < decoded.length; i++) {
+      for (int i = 0; i < decoded.length; i++) {
         final entry = decoded[i] as Map<String, dynamic>;
         final ecuIdRaw = entry['ecuId'];
         final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
@@ -247,7 +246,7 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-   void _startPlcRetryTimer() {
+  void _startPlcRetryTimer() {
     _plcRetryTimer?.cancel();
     _schedulePlcRetry(const Duration(seconds: 10));
   }
@@ -321,12 +320,21 @@ class PsfHomeScreenController extends GetxController {
 
       await applyLane(esn, laneIndex, result);
 
-      unawaited(_authService.getSessionHistory(esn: esn, accessToken: _accessToken).then((history) {
+      unawaited(_authService
+          .getSessionHistory(esn: esn, accessToken: _accessToken)
+          .then((history) {
         final eol = (history['eol_sessions'] as List?) ?? [];
         final testbed = (history['testbed_sessions'] as List?) ?? [];
-        print('   History for ESN $esn → ${eol.length} EOL session(s), ${testbed.length} testbed session(s)');
+        print(
+            '   History for ESN $esn → ${eol.length} EOL session(s), ${testbed.length} testbed session(s)');
+
+        lane.eolSessionHistory.assignAll(eol.whereType<Map<String, dynamic>>());
+        lane.testbedSessionHistory
+            .assignAll(testbed.whereType<Map<String, dynamic>>());
+
         if (eol.isNotEmpty || testbed.isNotEmpty) {
-          lane.logActivity('Previous history: ${eol.length} EOL, ${testbed.length} testbed session(s) found');
+          lane.logActivity(
+              'Previous history: ${eol.length} EOL, ${testbed.length} testbed session(s) found');
         }
       }));
       print(
@@ -334,7 +342,7 @@ class PsfHomeScreenController extends GetxController {
       print('══════════════════════════════════════════');
 
       // Auto-advance to List Number once ESN resolves successfully.
-     // Auto-advance directly to the first IQA field once ESN
+      // Auto-advance directly to the first IQA field once ESN
       // resolves successfully — List Number is no longer a separate
       // step, everything now comes back from the ESN lookup itself.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -415,15 +423,13 @@ class PsfHomeScreenController extends GetxController {
     }
 
     if (matchedModel == null || matchedSubModel == null) {
-      throw Exception(
-          'No matching model/sub-model found in catalog '
+      throw Exception('No matching model/sub-model found in catalog '
           '(vehicleModelId=$vehicleModelId, subModelId=$subModelId).');
     }
 
     final ecuEntry = matchedSubModel.submodelModelecu?.firstOrNull;
     if (ecuEntry == null) {
-      throw Exception(
-          'No ECU configuration found for this model/sub-model.');
+      throw Exception('No ECU configuration found for this model/sub-model.');
     }
 
     print('   Models catalog match → vehicleModel.id=${matchedModel.id} '
@@ -438,7 +444,8 @@ class PsfHomeScreenController extends GetxController {
         .where((e) => e.ecu == expectedEcuId)
         .toList();
     if (dMatches.isNotEmpty) {
-      final chosen = dMatches.firstWhereOrNull((e) => e.isLatest == true) ?? dMatches.first;
+      final chosen = dMatches.firstWhereOrNull((e) => e.isLatest == true) ??
+          dMatches.first;
       flashFileUrl = chosen.dataFile;
       resolvedDatasetId = chosen.id;
     }
@@ -448,13 +455,15 @@ class PsfHomeScreenController extends GetxController {
           .where((e) => e.ecu == expectedEcuId)
           .toList();
       if (tMatches.isNotEmpty) {
-        final chosen = tMatches.firstWhereOrNull((e) => e.isLatest == true) ?? tMatches.first;
+        final chosen = tMatches.firstWhereOrNull((e) => e.isLatest == true) ??
+            tMatches.first;
         flashFileUrl = chosen.dataFile;
         resolvedDatasetId = chosen.id;
       }
     }
 
-    print('   Flash file resolved → $flashFileUrl (datasetId=$resolvedDatasetId)');
+    print(
+        '   Flash file resolved → $flashFileUrl (datasetId=$resolvedDatasetId)');
 
     return _IdentifiedEcu(
       ecuEntry: ecuEntry,
@@ -465,6 +474,7 @@ class PsfHomeScreenController extends GetxController {
       esnRecordId: match.id,
     );
   }
+
   Future<void> applyLane(
     String esn,
     int laneIndex,
@@ -481,7 +491,7 @@ class PsfHomeScreenController extends GetxController {
     lane.isHarnessConnected.value = false;
     lane.esn.value = esn;
 
-   lane.matchedEcu = ecuEntry;
+    lane.matchedEcu = ecuEntry;
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
     lane.esnRecordId = identified.esnRecordId;
@@ -494,7 +504,7 @@ class PsfHomeScreenController extends GetxController {
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
     lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
-    
+
     final injectorCount = ecuEntry.noOfInjectors ?? 4;
     final firingOrder = (ecuEntry.firingSequence ?? '')
         .split(',')
@@ -699,8 +709,9 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  Future<void> connectDongleForLane(int laneIndex) async {
+ Future<void> connectDongleForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
+    _dongleRetryAttempts[laneIndex] = 0; // any fresh connect call, manual or automatic, gets a full fresh attempt budget
 
     print('══════════════════════════════════════════');
     print(
@@ -708,17 +719,21 @@ class PsfHomeScreenController extends GetxController {
     print(
         '   IP: ${lane.dongleIpFromLogin}  ecu.id: ${lane.matchedEcu?.ecu?.id}');
 
-    if (lane.dongleConnected.value || lane.dongleConnecting.value) {
-      print('   ⏭️ already connected/connecting — skipping');
+    if (lane.dongleConnected.value) {
+      print('   ⏭️ already connected — skipping');
       print('══════════════════════════════════════════');
       return;
     }
 
-    if (lane.isDongleBusy) {
-      print(
-          '   ⏭️ dongle busy with another operation — skipping this connect attempt');
-      print('══════════════════════════════════════════');
-      return;
+    // If a manual tap comes in while an old attempt is genuinely still
+    // in flight, don't stack another one on top — but a "stuck" state
+    // that's been sitting for a while is more likely a leftover flag
+    // from a previous failure than a real in-progress attempt, so
+    // don't let this block a fresh manual retry indefinitely.
+    if (lane.dongleConnecting.value || lane.isDongleBusy) {
+      print('   ⚠️ dongle marked busy/connecting — forcing a clean retry anyway');
+      lane.dongleConnecting.value = false;
+      lane.isDongleBusy = false;
     }
 
     final ip = lane.dongleIpFromLogin;
@@ -794,7 +809,10 @@ class PsfHomeScreenController extends GetxController {
     final lane = lanes[laneIndex];
     lane.dongleRetryTimer?.cancel();
     _dongleRetryAttempts[laneIndex] = 0;
-    _scheduleDongleRetry(laneIndex, const Duration(seconds: 10));
+    // First retry is quick (3s) since most transient socket issues
+    // clear up fast — backoff only kicks in if it's still failing
+    // after that.
+    _scheduleDongleRetry(laneIndex, const Duration(seconds: 3));
   }
 
   void _scheduleDongleRetry(int laneIndex, Duration delay) {
@@ -857,6 +875,43 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
+  Future<void> reconnectDongleWithFeedback(int laneIndex) async {
+    final lane = lanes[laneIndex];
+
+    if (lane.dongleConnected.value) return; // already fine, nothing to do
+
+    Get.dialog(
+      const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text("Reconnecting..."),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+
+    await connectDongleForLane(laneIndex);
+
+    if (Get.isDialogOpen == true) Get.back();
+
+    if (!lane.dongleConnected.value) {
+      _showScanFailedPopup(
+        'Reconnect Failed',
+        'Could not reconnect to Lane ${lane.laneNumber}\'s dongle at ${lane.dongleIpFromLogin}. '
+        'If this keeps happening, try power-cycling the dongle.',
+      );
+    }
+  }
+
   void onIqaFieldChanged(int laneIndex, int iqaIndex) {
     final lane = lanes[laneIndex];
 
@@ -907,8 +962,17 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  void resetLane(int laneIndex) {
-    lanes[laneIndex].resetToUnlockedIdle();
+  void resetLane(int laneIndex) async {
+    final lane = lanes[laneIndex];
+    lane.resetToUnlockedIdle();
+
+    // Give the dongle's TCP stack a moment to fully settle after the
+    // previous flash before the next ESN scan tries to reconnect —
+    // reconnecting too quickly after a flash is a common cause of
+    // "semaphore timeout" style failures.
+    await releaseDongleForLane(laneIndex);
+    await Future.delayed(const Duration(seconds: 2));
+    unawaited(connectDongleForLane(laneIndex));
   }
 
   Future<void> onStartFlash(
@@ -1094,9 +1158,9 @@ class PsfHomeScreenController extends GetxController {
     print('══════════════════════════════════════════');
     lane.flashProgress.value = 1;
     lane.flashStatus.value = "Flash Completed";
-    
+
     //----------------------------------
-    
+
     // await Future.delayed(const Duration(seconds: 3));
     // lane.isDongleBusy = false;
     // await connectDongleForLane(index);
@@ -1119,10 +1183,12 @@ class PsfHomeScreenController extends GetxController {
       attempt++;
       await connectDongleForLane(index);
       if (lane.dongleConnected.value && lane.dllFunctions != null) {
-        print('   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+        print(
+            '   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
         break;
       }
-      print('   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+      print(
+          '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
       await Future.delayed(const Duration(seconds: 5));
     }
 
@@ -1137,16 +1203,22 @@ class PsfHomeScreenController extends GetxController {
       return;
     }
 
+    lane.isPostFlashProcessing.value = true;
+
     lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
 
     await Future.delayed(const Duration(milliseconds: 500));
     await readLiveDtcForLane(index);
 
-   await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 300));
     await loadPidForLane(index);
-final flashPassed = result == 'NOERROR';
-    final iqaPassed = lane.iqaWriteStatus.value.toLowerCase().contains('successful');
-    final dtcPassed = lane.dtcError.value.isEmpty; // Pass = DTC read loaded successfully, regardless of what codes it found
+
+    lane.isPostFlashProcessing.value = false;
+    final flashPassed = result == 'NOERROR';
+    final iqaPassed =
+        lane.iqaWriteStatus.value.toLowerCase().contains('successful');
+    final dtcPassed = lane.dtcError.value
+        .isEmpty; // Pass = DTC read loaded successfully, regardless of what codes it found
     final continutyPassed = lane.isHarnessConnected.value;
 
     final startTime = lane.flashCycleStartTime ?? DateTime.now();
@@ -1167,7 +1239,8 @@ final flashPassed = result == 'NOERROR';
 
     lane.logActivity('Sending session report to server...');
 
-    unawaited(_authService.createEolSession(
+    unawaited(_authService
+        .createEolSession(
       esnId: lane.esnRecordId,
       dongleId: lane.dongleDbId,
       datasetType: lane.resolvedDatasetId,
@@ -1179,7 +1252,8 @@ final flashPassed = result == 'NOERROR';
       dtcStatus: dtcPassed ? 'Pass' : 'Fail',
       activityLog: lane.activityLog.toList(),
       accessToken: _accessToken,
-    ).then((_) {
+    )
+        .then((_) {
       lane.logActivity('✅ Session report sent to server successfully');
     }).catchError((e) {
       lane.logActivity('❌ Session report failed to send: $e');
@@ -1387,9 +1461,9 @@ final flashPassed = result == 'NOERROR';
         final status = row[1].toString();
 
         //final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
-        final match =  lane.dtcCodes.firstWhereOrNull(
-            (c) => (c.code ?? '').toUpperCase() == code,
-          );
+        final match = lane.dtcCodes.firstWhereOrNull(
+          (c) => (c.code ?? '').toUpperCase() == code,
+        );
         final desc = match?.description ?? 'Description not found';
 
         merged[code] = '$code - $desc ($status)';
