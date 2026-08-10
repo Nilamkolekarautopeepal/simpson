@@ -5,6 +5,7 @@ import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/dev/dev_screen.dart';
 import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 import 'package:simpson/themes/app_colors.dart';
+import 'package:simpson/views/screens/homePage/views/home_session_history_screen.dart';
 import '../controllers/home_page_controller.dart';
 // StepType is exported from home_page_controller.dart
 
@@ -111,35 +112,7 @@ class HomePageView extends GetView<HomePageController> {
           //   onPressed: controller.logout,
           //   tooltip: 'Logout',
           // ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            tooltip: 'More options',
-            offset: const Offset(0, 44),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            elevation: 4,
-            onSelected: (value) {
-              if (value == 'history') {}
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'history',
-                child: Row(
-                  children: [
-                    Icon(Icons.history_rounded,
-                        size: 18, color: AppColors.themeColor),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'History',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
@@ -165,7 +138,7 @@ class HomePageView extends GetView<HomePageController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-       Expanded(
+          Expanded(
             child: Builder(
               builder: (context) => Obx(
                 () {
@@ -258,7 +231,7 @@ class HomePageView extends GetView<HomePageController> {
     final isCompleted = index < controller.currentStepIndex.value;
     final isActive = index == controller.currentStepIndex.value;
 
-  int? maxLen;
+    int? maxLen;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -285,54 +258,85 @@ class HomePageView extends GetView<HomePageController> {
             ],
           ),
           const SizedBox(height: 4),
-          Theme(
-            data: Theme.of(context).copyWith(
-              textSelectionTheme: TextSelectionThemeData(
-                selectionColor: Colors.blueAccent[100],
-                selectionHandleColor: AppColors.themeColor,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Theme(
+                  data: Theme.of(context).copyWith(
+                    textSelectionTheme: TextSelectionThemeData(
+                      selectionColor: Colors.blueAccent[100],
+                      selectionHandleColor: AppColors.themeColor,
+                    ),
+                  ),
+                  child: TextField(
+                    cursorColor: AppColors.themeColor,
+                    controller: controller.stepControllers[index],
+                    focusNode: controller.stepFocusNodes[index],
+                    enabled: true,
+                    maxLength: maxLen,
+                    keyboardType: null,
+                    inputFormatters: null,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: true,
+                      fillColor: isCompleted
+                          ? Colors.green.withOpacity(0.06)
+                          : Colors.white,
+                      counterText: null,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(color: AppColors.themeColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide:
+                            BorderSide(color: AppColors.themeColor, width: 1.5),
+                      ),
+                      hintText: isActive ? ('Scan or enter ${step.label}') : '',
+                    ),
+                    onChanged: (_) => controller.onFieldChanged(index),
+                    onSubmitted: (_) => controller.submitStep(index),
+                  ),
+                ),
               ),
-            ),
-            child: TextField(
-              cursorColor: AppColors.themeColor,
-              controller: controller.stepControllers[index],
-              focusNode: controller.stepFocusNodes[index],
-              enabled: true,
-              maxLength: maxLen,
-              keyboardType: maxLen != null ? TextInputType.number : null,
-              inputFormatters: maxLen != null
-                  ? [FilteringTextInputFormatter.digitsOnly]
-                  : null,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor:
-                    isCompleted ? Colors.green.withOpacity(0.06) : Colors.white,
-                counterText: maxLen != null ? '' : null,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: AppColors.themeColor),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide:
-                      BorderSide(color: AppColors.themeColor, width: 1.5),
-                ),
-                hintText: isActive
-                    ? (maxLen != null
-                        ? 'Scan or enter ${step.label} ($maxLen digits)'
-                        : 'Scan or enter ${step.label}')
-                    : '',
-              ),
-              onChanged: (_) => controller.onFieldChanged(index),
-              onSubmitted: (_) => controller.submitStep(index),
-            ),
+              // ── History button — only on the ESN row, once an ESN has resolved ──
+              if (step.key == 'esn')
+                Obx(() {
+                  if (controller.currentEsn.value.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 6),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: () => Get.to(() =>
+                          HomeSessionHistoryScreen(controller: controller)),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.themeColor.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: AppColors.themeColor.withOpacity(0.3)),
+                        ),
+                        child: Icon(
+                          Icons.history_rounded,
+                          size: 18,
+                          color: AppColors.themeColor,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+            ],
           ),
         ],
       ),
@@ -351,7 +355,10 @@ class HomePageView extends GetView<HomePageController> {
               const SizedBox(width: 6),
               Text(
                 'Resolved from ESN',
-                style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 13),
+                style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                    fontSize: 13),
               ),
             ],
           ),
@@ -379,9 +386,17 @@ class HomePageView extends GetView<HomePageController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10.5,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
-            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87)),
           ],
         ),
       ),
@@ -1469,16 +1484,116 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
+  // Widget _buildDtcCard(String raw) {
+  //   String code = raw;
+  //   String description = '';
+  //   String status = '';
+
+  //   final statusMatch = RegExp(r'\(([^()]*)\)\s*$').firstMatch(raw);
+  //   String withoutStatus = raw;
+  //   if (statusMatch != null) {
+  //     status = statusMatch.group(1)?.trim() ?? '';
+  //     withoutStatus = raw.substring(0, statusMatch.start).trim();
+  //   }
+
+  //   final splitIndex = withoutStatus.indexOf(' - ');
+  //   code = splitIndex == -1
+  //       ? withoutStatus
+  //       : withoutStatus.substring(0, splitIndex).trim();
+  //   description =
+  //       splitIndex == -1 ? '' : withoutStatus.substring(splitIndex + 3).trim();
+
+  //   final statusLower = status.toLowerCase();
+  //   Color badgeColor;
+  //   String badgeLabel;
+  //   if (statusLower == 'active' || statusLower == 'current') {
+  //     badgeColor = Colors.red.shade600;
+  //     badgeLabel = 'Active';
+  //   } else if (statusLower == 'pending') {
+  //     badgeColor = Colors.orange.shade700;
+  //     badgeLabel = 'Pending';
+  //   } else if (statusLower == 'inactive') {
+  //     badgeColor = Colors.green.shade600;
+  //     badgeLabel = 'History'; // ← was 'InActive'
+  //   } else {
+  //     badgeColor = Colors.green.shade600;
+  //     badgeLabel = status.isNotEmpty ? 'History' : '-';
+  //   }
+
+  //   return Container(
+  //     width: double.infinity,
+  //     margin: const EdgeInsets.only(bottom: 6),
+  //     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+  //     decoration: BoxDecoration(
+  //       border: Border.all(color: Colors.grey.shade300),
+  //       borderRadius: BorderRadius.circular(6),
+  //     ),
+  //     child: Row(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 code,
+  //                 style: const TextStyle(
+  //                   fontWeight: FontWeight.bold,
+  //                   fontSize: 12.5,
+  //                   color: Colors.black87,
+  //                 ),
+  //               ),
+  //               if (description.isNotEmpty) ...[
+  //                 const SizedBox(height: 2),
+  //                 Text(
+  //                   description,
+  //                   style:
+  //                       TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
+  //                 ),
+  //               ],
+  //             ],
+  //           ),
+  //         ),
+  //         const SizedBox(width: 10),
+  //         Container(
+  //           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+  //           decoration: BoxDecoration(
+  //             color: badgeColor.withOpacity(0.1),
+  //             borderRadius: BorderRadius.circular(10),
+  //             border: Border.all(color: badgeColor.withOpacity(0.4)),
+  //           ),
+  //           child: Text(
+  //             badgeLabel,
+  //             style: TextStyle(
+  //               fontSize: 10.5,
+  //               fontWeight: FontWeight.bold,
+  //               color: badgeColor,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
   Widget _buildDtcCard(String raw) {
     String code = raw;
     String description = '';
     String status = '';
+    String register = '-';
 
-    final statusMatch = RegExp(r'\(([^()]*)\)\s*$').firstMatch(raw);
-    String withoutStatus = raw;
+    // ✅ Extract register field first — format: ... [REG:xxx]
+    final registerMatch = RegExp(r'\[REG:([^\]]*)\]\s*$').firstMatch(raw);
+    String withoutRegister = raw;
+    if (registerMatch != null) {
+      register = registerMatch.group(1)?.trim() ?? '-';
+      withoutRegister = raw.substring(0, registerMatch.start).trim();
+    }
+
+    final statusMatch = RegExp(r'\(([^()]*)\)\s*$').firstMatch(withoutRegister);
+    String withoutStatus = withoutRegister;
     if (statusMatch != null) {
       status = statusMatch.group(1)?.trim() ?? '';
-      withoutStatus = raw.substring(0, statusMatch.start).trim();
+      withoutStatus = withoutRegister.substring(0, statusMatch.start).trim();
     }
 
     final splitIndex = withoutStatus.indexOf(' - ');
@@ -1499,7 +1614,7 @@ class HomePageView extends GetView<HomePageController> {
       badgeLabel = 'Pending';
     } else if (statusLower == 'inactive') {
       badgeColor = Colors.green.shade600;
-      badgeLabel = 'History'; // ← was 'InActive'
+      badgeLabel = 'History';
     } else {
       badgeColor = Colors.green.shade600;
       badgeLabel = status.isNotEmpty ? 'History' : '-';
@@ -1536,6 +1651,17 @@ class HomePageView extends GetView<HomePageController> {
                         TextStyle(fontSize: 11.5, color: Colors.grey.shade600),
                   ),
                 ],
+                // ✅ Register row — placeholder for now
+                // ✅ Register row — placeholder for now, colored like the status text
+                const SizedBox(height: 4),
+                Text(
+                  'Register: $register',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.grrenButtonn,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1921,9 +2047,173 @@ class HomePageView extends GetView<HomePageController> {
     return Colors.grey.shade700;
   }
 
+  Map<String, String> _parseLogEntry(String raw) {
+    final match =
+        RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]\s*\[(\w+)\]\s*(.*)$').firstMatch(raw);
+    if (match != null) {
+      return {
+        'time': match.group(1)!,
+        'tag': match.group(2)!,
+        'message': match.group(3)!,
+      };
+    }
+    // Fallback for any pre-existing untagged entries.
+    final legacy = RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]\s*(.*)$').firstMatch(raw);
+    if (legacy != null) {
+      return {
+        'time': legacy.group(1)!,
+        'tag': 'GENERAL',
+        'message': legacy.group(2)!,
+      };
+    }
+    return {'time': '', 'tag': 'GENERAL', 'message': raw};
+  }
+
+  Color _tagColor(String tag) {
+    switch (tag) {
+      case 'ESN':
+        return const Color(0xFF0E6E6E); // teal
+      case 'PLC':
+        return const Color(0xFF6C5CE7); // purple
+      case 'DONGLE':
+        return const Color(0xFFE67E22); // orange
+      case 'FLASH':
+        return const Color(0xFF2D6CDF); // blue
+      case 'DTC':
+        return const Color(0xFFD64545); // red
+      case 'IQA':
+        return const Color(0xFFDB2777); // pink
+      case 'PID':
+        return const Color(0xFF27AE60); // green
+      case 'HARNESS':
+        return const Color(0xFF8E7CC3); // lavender
+      case 'SESSION':
+        return const Color(0xFF34495E); // slate
+      default:
+        return Colors.grey.shade600;
+    }
+  }
+
+  Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
+    final color = _tagColor(tag);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withOpacity(0.5)),
+        ),
+        child: Text(
+          tag,
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+            color: selected ? Colors.white : color,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  }
+
+  static const _allTags = [
+    'ESN',
+    'PLC',
+    'DONGLE',
+    'FLASH',
+    'DTC',
+    'IQA',
+    'PID',
+    'HARNESS',
+    'SESSION',
+    'GENERAL'
+  ];
+
+  // Widget _buildActivitySection() {
+  //   return Container(
+  //     constraints: const BoxConstraints(maxHeight: 180),
+  //     margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(10),
+  //       border: Border.all(color: Colors.grey.shade300),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.04),
+  //           blurRadius: 8,
+  //           offset: const Offset(0, -2),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Row(
+  //           children: [
+  //             const Text('Activity',
+  //                 style: TextStyle(fontWeight: FontWeight.w600)),
+  //             const Spacer(),
+  //             // ── Open the full activity log in a full-screen dialog ──
+  //             IconButton(
+  //               icon: const Icon(Icons.fullscreen, size: 20),
+  //               color: AppColors.themeColor,
+  //               tooltip: 'Open full screen',
+  //               visualDensity: VisualDensity.compact,
+  //               onPressed: _showActivityFullScreen,
+  //             ),
+  //             Obx(() => IconButton(
+  //                   icon: const Icon(Icons.save_alt, size: 18),
+  //                   tooltip: "Save Activity Log",
+  //                   color: AppColors.themeColor,
+  //                   onPressed: controller.activityLog.isEmpty
+  //                       ? null
+  //                       : () async {
+  //                           await controller.saveActivityLog();
+  //                         },
+  //                 )),
+  //             Obx(
+  //               () => IconButton(
+  //                 icon: const Icon(Icons.copy, size: 18),
+  //                 color: AppColors.themeColor,
+  //                 tooltip: 'Copy all activity log',
+  //                 visualDensity: VisualDensity.compact,
+  //                 onPressed: controller.activityLog.isEmpty
+  //                     ? null
+  //                     : () => _copyActivityLog(),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const Divider(height: 16),
+  //         Expanded(
+  //           child: Obx(
+  //             () => ListView(
+  //               padding: EdgeInsets.zero,
+  //               children: controller.activityLog
+  //                   .map((entry) => Padding(
+  //                         padding: const EdgeInsets.symmetric(vertical: 3),
+  //                         child: Text(
+  //                           entry,
+  //                           style: TextStyle(
+  //                               fontSize: 12.5, color: Colors.grey.shade700),
+  //                         ),
+  //                       ))
+  //                   .toList(),
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
   Widget _buildActivitySection() {
     return Container(
-      constraints: const BoxConstraints(maxHeight: 180),
+      constraints: const BoxConstraints(maxHeight: 220),
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1946,7 +2236,6 @@ class HomePageView extends GetView<HomePageController> {
               const Text('Activity',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               const Spacer(),
-              // ── Open the full activity log in a full-screen dialog ──
               IconButton(
                 icon: const Icon(Icons.fullscreen, size: 20),
                 color: AppColors.themeColor,
@@ -1977,37 +2266,158 @@ class HomePageView extends GetView<HomePageController> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          // ── Tag filter row ──
+          Obx(() {
+            final active = controller.activityLogFilter.value;
+            return SizedBox(
+              height: 24,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _allTags.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, i) {
+                  final tag = _allTags[i];
+                  return _tagChip(
+                    tag,
+                    selected: active == tag,
+                    onTap: () => controller.setActivityLogFilter(tag),
+                  );
+                },
+              ),
+            );
+          }),
           const Divider(height: 16),
           Expanded(
-            child: Obx(
-              () => ListView(
+            child: Obx(() {
+              final filter = controller.activityLogFilter.value;
+              final entries = controller.activityLog.where((entry) {
+                if (filter == null) return true;
+                return _parseLogEntry(entry)['tag'] == filter;
+              }).toList();
+
+              if (entries.isEmpty) {
+                return Center(
+                  child: Text(
+                    filter == null
+                        ? 'No activity yet'
+                        : 'No "$filter" entries yet',
+                    style:
+                        TextStyle(color: Colors.grey.shade500, fontSize: 12.5),
+                  ),
+                );
+              }
+
+              return ListView(
                 padding: EdgeInsets.zero,
-                children: controller.activityLog
-                    .map((entry) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
+                children: entries.map((entry) {
+                  final parsed = _parseLogEntry(entry);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _tagChip(parsed['tag']!),
+                        const SizedBox(width: 6),
+                        Expanded(
                           child: Text(
-                            entry,
+                            '[${parsed['time']}] ${parsed['message']}',
                             style: TextStyle(
                                 fontSize: 12.5, color: Colors.grey.shade700),
                           ),
-                        ))
-                    .toList(),
-              ),
-            ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            }),
           ),
         ],
       ),
     );
   }
 
+  // void _showActivityFullScreen() {
+  //   Get.dialog(
+  //     Dialog.fullscreen(
+  //       child: Scaffold(
+  //         appBar: AppBar(
+  //           iconTheme: const IconThemeData(
+  //             color: Colors.white, // Back arrow color
+  //           ),
+  //           backgroundColor: AppColors.themeColor,
+  //           foregroundColor: Colors.white,
+  //           title: const Text('Activity Log'),
+  //           actions: [
+  //             Obx(() => IconButton(
+  //                   icon: const Icon(Icons.save_alt, color: Colors.white),
+  //                   tooltip: 'Save Activity Log',
+  //                   onPressed: controller.activityLog.isEmpty
+  //                       ? null
+  //                       : () async {
+  //                           await controller.saveActivityLog();
+  //                         },
+  //                 )),
+  //             Obx(() => IconButton(
+  //                   icon: const Icon(Icons.copy, color: Colors.white),
+  //                   tooltip: 'Copy all activity log',
+  //                   onPressed: controller.activityLog.isEmpty
+  //                       ? null
+  //                       : () => _copyActivityLog(),
+  //                 )),
+  //           ],
+  //         ),
+  //         backgroundColor: const Color(0xFFF4F5F7),
+  //         body: Padding(
+  //           padding: const EdgeInsets.all(16),
+  //           child: Obx(() {
+  //             if (controller.activityLog.isEmpty) {
+  //               return Center(
+  //                 child: Text(
+  //                   'No activity yet',
+  //                   style: TextStyle(color: Colors.grey.shade500),
+  //                 ),
+  //               );
+  //             }
+  //             return Container(
+  //               width: double.infinity,
+  //               padding: const EdgeInsets.all(16),
+  //               decoration: BoxDecoration(
+  //                 color: Colors.white,
+  //                 borderRadius: BorderRadius.circular(10),
+  //                 border: Border.all(color: Colors.white),
+  //               ),
+  //               child: ListView.builder(
+  //                 itemCount: controller.activityLog.length,
+  //                 itemBuilder: (context, index) {
+  //                   final entry = controller.activityLog[index];
+  //                   return Padding(
+  //                     padding: const EdgeInsets.symmetric(vertical: 5),
+  //                     child: SelectableText(
+  //                       entry,
+  //                       style: TextStyle(
+  //                         fontSize: 13.5,
+  //                         color: _activityLogColor(entry),
+  //                       ),
+  //                     ),
+  //                   );
+  //                 },
+  //               ),
+  //             );
+  //           }),
+  //         ),
+  //       ),
+  //     ),
+  //     barrierDismissible: true,
+  //   );
+  // }
   void _showActivityFullScreen() {
     Get.dialog(
       Dialog.fullscreen(
         child: Scaffold(
           appBar: AppBar(
-            iconTheme: const IconThemeData(
-              color: Colors.white, // Back arrow color
-            ),
+            iconTheme: const IconThemeData(color: Colors.white),
             backgroundColor: AppColors.themeColor,
             foregroundColor: Colors.white,
             title: const Text('Activity Log'),
@@ -2031,43 +2441,91 @@ class HomePageView extends GetView<HomePageController> {
             ],
           ),
           backgroundColor: const Color(0xFFF4F5F7),
-          body: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Obx(() {
-              if (controller.activityLog.isEmpty) {
-                return Center(
-                  child: Text(
-                    'No activity yet',
-                    style: TextStyle(color: Colors.grey.shade500),
-                  ),
-                );
-              }
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white),
-                ),
-                child: ListView.builder(
-                  itemCount: controller.activityLog.length,
-                  itemBuilder: (context, index) {
-                    final entry = controller.activityLog[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      child: SelectableText(
-                        entry,
-                        style: TextStyle(
-                          fontSize: 13.5,
-                          color: _activityLogColor(entry),
-                        ),
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Tag filter row ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Obx(() {
+                    final active = controller.activityLogFilter.value;
+                    return SizedBox(
+                      height: 30,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _allTags.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 6),
+                        itemBuilder: (context, i) {
+                          final tag = _allTags[i];
+                          return _tagChip(
+                            tag,
+                            selected: active == tag,
+                            onTap: () => controller.setActivityLogFilter(tag),
+                          );
+                        },
                       ),
                     );
-                  },
+                  }),
                 ),
-              );
-            }),
+                const Divider(height: 1),
+                // ── Log list fills all remaining space ──
+                Expanded(
+                  child: Obx(() {
+                    final filter = controller.activityLogFilter.value;
+                    final entries = controller.activityLog.where((entry) {
+                      if (filter == null) return true;
+                      return _parseLogEntry(entry)['tag'] == filter;
+                    }).toList();
+
+                    if (entries.isEmpty) {
+                      return Center(
+                        child: Text(
+                          filter == null
+                              ? 'No activity yet'
+                              : 'No "$filter" entries yet',
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      itemCount: entries.length,
+                      itemBuilder: (context, index) {
+                        final parsed = _parseLogEntry(entries[index]);
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _tagChip(parsed['tag']!),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: SelectableText(
+                                  '[${parsed['time']}] ${parsed['message']}',
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    color: _activityLogColor(entries[index]),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -20,7 +20,6 @@
 //   static const slateBg = Color(0xFFF7F8FA);
 // }
 
-
 // class PsfLaneFullScreenView extends StatefulWidget {
 //   const PsfLaneFullScreenView({
 //     super.key,
@@ -703,12 +702,13 @@
 //   }
 // }
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
+import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
+import 'package:simpson/views/screens/psf_homeScreen/views/psf_session_history_screen.dart';
 
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
@@ -759,7 +759,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   bool _flashExpanded = true;
   bool _dtcExpanded = false;
   bool _pidExpanded = false;
-
+  String? _activityFilter;
   int get laneIndex => widget.laneIndex;
   PsfLane get lane => widget.lane;
   PsfHomeScreenController get controller => widget.controller;
@@ -798,9 +798,15 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 ? const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.teal)),
+                      SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: _StationColors.teal)),
                       SizedBox(width: 12),
-                      Expanded(child: Text('Reading DTC and writing IQA — please wait…')),
+                      Expanded(
+                          child: Text(
+                              'Reading DTC and writing IQA — please wait…')),
                     ],
                   )
                 : const Text('DTC read and IQA write complete.'),
@@ -833,9 +839,58 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(width: 320, child: _leftSidebar(context)),
-          const VerticalDivider(width: 1, thickness: 1, color: _StationColors.slateBorder),
+          const VerticalDivider(
+              width: 1, thickness: 1, color: _StationColors.slateBorder),
           Expanded(child: _mainArea(context)),
         ],
+      ),
+    );
+  }
+
+  // adjust path
+
+  Map<String, String> _parseLogEntry(String raw) {
+    final match =
+        RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]\s*\[(\w+)\]\s*(.*)$').firstMatch(raw);
+    if (match != null) {
+      return {
+        'time': match.group(1)!,
+        'tag': match.group(2)!,
+        'message': match.group(3)!
+      };
+    }
+    final legacy = RegExp(r'^\[(\d{2}:\d{2}:\d{2})\]\s*(.*)$').firstMatch(raw);
+    if (legacy != null) {
+      return {
+        'time': legacy.group(1)!,
+        'tag': 'GENERAL',
+        'message': legacy.group(2)!
+      };
+    }
+    return {'time': '', 'tag': 'GENERAL', 'message': raw};
+  }
+
+  Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
+    final color = Color(ActivityLogTag.colorValue(tag));
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: selected ? color : color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withOpacity(0.5)),
+        ),
+        child: Text(
+          tag,
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+            color: selected ? Colors.white : color,
+            letterSpacing: 0.3,
+          ),
+        ),
       ),
     );
   }
@@ -856,16 +911,23 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 Expanded(
                   child: Obx(
                     () => Text(
-                      lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value,
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+                      lane.ecuModelName.value.isEmpty
+                          ? "ECU MODEL NAME"
+                          : lane.ecuModelName.value,
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _StationColors.charcoal),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
                 Container(
-                  decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                      color: _StationColors.tealBg, shape: BoxShape.circle),
                   child: IconButton(
-                    icon: const Icon(Icons.refresh, color: _StationColors.teal, size: 18),
+                    icon: const Icon(Icons.refresh,
+                        color: _StationColors.teal, size: 18),
                     onPressed: () => controller.resetLane(laneIndex),
                     tooltip: 'Reset lane for next engine',
                     visualDensity: VisualDensity.compact,
@@ -876,20 +938,74 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               ],
             ),
             const SizedBox(height: 18),
-           _scanField(
-              context: context,
-              label: 'ESN NUMBER',
-              textController: lane.esnController,
-              focusNode: lane.esnFocusNode,
-              isLoading: lane.isLookingUpEsn,
-              isResolved: lane.esn,
-              error: lane.esnError,
-              hint: 'e.g. 111111111111111',
-              onChanged: () => controller.onEsnFieldChanged(laneIndex),
-              onSubmit: () => controller.onScanEsnForLane(laneIndex),
+            // _scanField(
+            //   context: context,
+            //   label: 'ESN NUMBER',
+            //   textController: lane.esnController,
+            //   focusNode: lane.esnFocusNode,
+            //   isLoading: lane.isLookingUpEsn,
+            //   isResolved: lane.esn,
+            //   error: lane.esnError,
+            //   hint: 'e.g. 111111111111111',
+            //   onChanged: () => controller.onEsnFieldChanged(laneIndex),
+            //   onSubmit: () => controller.onScanEsnForLane(laneIndex),
+            // ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _scanField(
+                    context: context,
+                    label: 'ESN NUMBER',
+                    textController: lane.esnController,
+                    focusNode: lane.esnFocusNode,
+                    isLoading: lane.isLookingUpEsn,
+                    isResolved: lane.esn,
+                    error: lane.esnError,
+                    hint: 'e.g. 111111111111111',
+                    onChanged: () => controller.onEsnFieldChanged(laneIndex),
+                    onSubmit: () => controller.onScanEsnForLane(laneIndex),
+                  ),
+                ),
+                Obx(() {
+                  if (lane.esn.value.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    // Nudge down so it lines up with the input box, not the label above it.
+                    padding: const EdgeInsets.only(left: 8, top: 22),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(10),
+                      onTap: () =>
+                          Get.to(() => PsfSessionHistoryScreen(lane: lane)),
+                      child: Container(
+                        height: 44,
+                        width: 44,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: _StationColors.tealBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                              color: _StationColors.teal.withOpacity(0.3)),
+                        ),
+                        child: const Icon(
+                          Icons.history_rounded,
+                          size: 18,
+                          color: _StationColors.teal,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
             const SizedBox(height: 22),
-            const Text('IQA NUMBERS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
+            const Text('IQA NUMBERS',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _StationColors.slate,
+                    letterSpacing: 0.5)),
             const SizedBox(height: 10),
             Column(
               children: List.generate(lane.iqaControllers.length, (i) {
@@ -899,7 +1015,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     valueListenable: lane.iqaControllers[i],
                     builder: (context, value, _) {
                       final filled = value.text.trim().length == 7;
-                     final borderColor = filled ? _StationColors.green : _StationColors.slateBorder;
+                      final borderColor = filled
+                          ? _StationColors.green
+                          : _StationColors.slateBorder;
                       return Row(
                         children: [
                           SizedBox(
@@ -909,7 +1027,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                border: Border.all(color: borderColor, width: filled ? 1.6 : 1),
+                                border: Border.all(
+                                    color: borderColor,
+                                    width: filled ? 1.6 : 1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
@@ -917,12 +1037,19 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (filled) ...[
-                                    const Icon(Icons.check_circle, size: 13, color: _StationColors.greenDark),
+                                    const Icon(Icons.check_circle,
+                                        size: 13,
+                                        color: _StationColors.greenDark),
                                     const SizedBox(width: 5),
                                   ],
                                   Text(
                                     'INJ ${i + 1}',
-                                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: filled ? _StationColors.greenDark : _StationColors.charcoal),
+                                    style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: filled
+                                            ? _StationColors.greenDark
+                                            : _StationColors.charcoal),
                                   ),
                                 ],
                               ),
@@ -932,10 +1059,13 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           Expanded(
                             child: SizedBox(
                               height: 44,
-                             child: Focus(
+                              child: Focus(
                                 onKeyEvent: (node, event) {
                                   if (event is KeyDownEvent &&
-                                      (event.logicalKey == LogicalKeyboardKey.tab || event.logicalKey == LogicalKeyboardKey.enter)) {
+                                      (event.logicalKey ==
+                                              LogicalKeyboardKey.tab ||
+                                          event.logicalKey ==
+                                              LogicalKeyboardKey.enter)) {
                                     if (i < lane.iqaFocusNodes.length - 1) {
                                       lane.iqaFocusNodes[i + 1].requestFocus();
                                     }
@@ -946,42 +1076,58 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    border: Border.all(color: borderColor, width: filled ? 1.6 : 1),
+                                    border: Border.all(
+                                        color: borderColor,
+                                        width: filled ? 1.6 : 1),
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Theme(
                                     data: Theme.of(context).copyWith(
-                                      textSelectionTheme: TextSelectionThemeData(
-                                        selectionColor: Colors.grey.withOpacity(0.4),
-                                        selectionHandleColor: _StationColors.teal,
+                                      textSelectionTheme:
+                                          TextSelectionThemeData(
+                                        selectionColor:
+                                            Colors.grey.withOpacity(0.4),
+                                        selectionHandleColor:
+                                            _StationColors.teal,
                                       ),
                                     ),
                                     child: TextField(
-                                    controller: lane.iqaControllers[i],
-                                    focusNode: lane.iqaFocusNodes[i],
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: filled ? _StationColors.greenDark : Colors.black87),
-                                    decoration: InputDecoration(
-                                      hintText: lane.iqaLabelFor(i),
-                                      hintStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
-                                      isDense: true,
-                                      filled: false,
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
+                                      controller: lane.iqaControllers[i],
+                                      focusNode: lane.iqaFocusNodes[i],
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: filled
+                                              ? _StationColors.greenDark
+                                              : Colors.black87),
+                                      decoration: InputDecoration(
+                                        hintText: lane.iqaLabelFor(i),
+                                        hintStyle: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.normal),
+                                        isDense: true,
+                                        filled: false,
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                vertical: 12),
+                                        border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                      ),
+                                      onChanged: (_) => controller
+                                          .onIqaFieldChanged(laneIndex, i),
+                                      onSubmitted: (_) {
+                                        if (i < lane.iqaFocusNodes.length - 1) {
+                                          lane.iqaFocusNodes[i + 1]
+                                              .requestFocus();
+                                        }
+                                      },
                                     ),
-                                    onChanged: (_) => controller.onIqaFieldChanged(laneIndex, i),
-                                    onSubmitted: (_) {
-                                      if (i < lane.iqaFocusNodes.length - 1) {
-                                        lane.iqaFocusNodes[i + 1].requestFocus();
-                                      }
-                                    },
                                   ),
                                 ),
                               ),
                             ),
-                          ),
                           ),
                         ],
                       );
@@ -994,7 +1140,10 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             Obx(
               () => Text(
                 'IQA STATUS  ${lane.filledIqaCount.value} / ${lane.iqaControllers.length} scanned',
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _StationColors.teal),
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: _StationColors.teal),
               ),
             ),
           ],
@@ -1003,7 +1152,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-Widget _scanField({
+  Widget _scanField({
     required BuildContext context,
     required String label,
     required TextEditingController textController,
@@ -1018,7 +1167,12 @@ Widget _scanField({
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: _StationColors.slate,
+                letterSpacing: 0.5)),
         const SizedBox(height: 6),
         Obx(() {
           final resolved = isResolved.value.isNotEmpty;
@@ -1027,12 +1181,17 @@ Widget _scanField({
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: resolved ? _StationColors.green : _StationColors.slateBorder, width: resolved ? 1.6 : 1),
+              border: Border.all(
+                  color: resolved
+                      ? _StationColors.green
+                      : _StationColors.slateBorder,
+                  width: resolved ? 1.6 : 1),
             ),
             child: Focus(
               onKeyEvent: (node, event) {
                 if (event is KeyDownEvent &&
-                    (event.logicalKey == LogicalKeyboardKey.tab || event.logicalKey == LogicalKeyboardKey.enter)) {
+                    (event.logicalKey == LogicalKeyboardKey.tab ||
+                        event.logicalKey == LogicalKeyboardKey.enter)) {
                   onSubmit();
                   return KeyEventResult.handled;
                 }
@@ -1046,29 +1205,34 @@ Widget _scanField({
                   ),
                 ),
                 child: TextField(
-                controller: textController,
-                focusNode: focusNode,
-                enabled: !isLoading.value,
-                style: const TextStyle(fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: hint,
-                  isDense: true,
-                  filled: false,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  suffixIcon: isLoading.value
-                      ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                        )
-                      : null,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+                  controller: textController,
+                  focusNode: focusNode,
+                  enabled: !isLoading.value,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    isDense: true,
+                    filled: false,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    suffixIcon: isLoading.value
+                        ? const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                  ),
+                  onChanged: (_) => onChanged(),
+                  onSubmitted: (_) => onSubmit(),
                 ),
-                onChanged: (_) => onChanged(),
-                onSubmitted: (_) => onSubmit(),
               ),
-            ),
             ),
           );
         }),
@@ -1076,7 +1240,9 @@ Widget _scanField({
             ? const SizedBox.shrink()
             : Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(error.value, style: const TextStyle(fontSize: 11, color: _StationColors.red)),
+                child: Text(error.value,
+                    style: const TextStyle(
+                        fontSize: 11, color: _StationColors.red)),
               )),
       ],
     );
@@ -1101,16 +1267,24 @@ Widget _scanField({
                         Container(
                           width: 72,
                           height: 72,
-                          decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
-                          child: const Icon(Icons.checklist_rtl_rounded, color: _StationColors.teal, size: 34),
+                          decoration: const BoxDecoration(
+                              color: _StationColors.tealBg,
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.checklist_rtl_rounded,
+                              color: _StationColors.teal, size: 34),
                         ),
                         const SizedBox(height: 20),
-                        const Text('Waiting for scan', style: TextStyle(color: _StationColors.charcoal, fontSize: 16, fontWeight: FontWeight.w700)),
+                        const Text('Waiting for scan',
+                            style: TextStyle(
+                                color: _StationColors.charcoal,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
                         const SizedBox(height: 8),
                         const Text(
                           'Complete ESN and all\nIQA fields to continue.',
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: _StationColors.slate, fontSize: 13),
+                          style: TextStyle(
+                              color: _StationColors.slate, fontSize: 13),
                         ),
                       ],
                     ),
@@ -1158,11 +1332,22 @@ Widget _scanField({
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _StationColors.charcoal)),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: _StationColors.charcoal)),
                   const Spacer(),
-                  if (trailing != null) ...[trailing, const SizedBox(width: 10)],
-                  if (extraAction != null) ...[extraAction, const SizedBox(width: 6)],
-                  Icon(expanded ? Icons.expand_less : Icons.expand_more, color: _StationColors.slate),
+                  if (trailing != null) ...[
+                    trailing,
+                    const SizedBox(width: 10)
+                  ],
+                  if (extraAction != null) ...[
+                    extraAction,
+                    const SizedBox(width: 6)
+                  ],
+                  Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                      color: _StationColors.slate),
                 ],
               ),
             ),
@@ -1192,21 +1377,36 @@ Widget _scanField({
             Container(
               width: 20,
               height: 20,
-              decoration: const BoxDecoration(color: _StationColors.greenDark, shape: BoxShape.circle),
+              decoration: const BoxDecoration(
+                  color: _StationColors.greenDark, shape: BoxShape.circle),
               child: const Icon(Icons.check, color: Colors.white, size: 13),
             ),
             const SizedBox(width: 6),
-            const Text('Successful', style: TextStyle(fontSize: 11.5, color: _StationColors.greenDark, fontWeight: FontWeight.bold)),
+            const Text('Successful',
+                style: TextStyle(
+                    fontSize: 11.5,
+                    color: _StationColors.greenDark,
+                    fontWeight: FontWeight.bold)),
           ],
         );
       } else if (lane.isFlashing.value) {
         trailing = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(12)),
-          child: Text('${(lane.flashProgress.value * 100).toStringAsFixed(0)}%', style: const TextStyle(fontSize: 11.5, color: _StationColors.teal, fontWeight: FontWeight.bold)),
+          decoration: BoxDecoration(
+              color: _StationColors.tealBg,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text('${(lane.flashProgress.value * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _StationColors.teal,
+                  fontWeight: FontWeight.bold)),
         );
       } else if (failed) {
-        trailing = const Text('Failed', style: TextStyle(fontSize: 11.5, color: _StationColors.red, fontWeight: FontWeight.bold));
+        trailing = const Text('Failed',
+            style: TextStyle(
+                fontSize: 11.5,
+                color: _StationColors.red,
+                fontWeight: FontWeight.bold));
       }
 
       return _expandableCard(
@@ -1232,18 +1432,39 @@ Widget _scanField({
               Container(
                 width: 52,
                 height: 52,
-                decoration: const BoxDecoration(color: _StationColors.redBg, shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded, color: _StationColors.red, size: 28),
+                decoration: const BoxDecoration(
+                    color: _StationColors.redBg, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded,
+                    color: _StationColors.red, size: 28),
               ),
               const SizedBox(height: 14),
-              const Text('Flashing Failed', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _StationColors.red)),
+              const Text('Flashing Failed',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: _StationColors.red)),
               const SizedBox(height: 6),
-              Text(lane.flashStatus.value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12.5, color: _StationColors.slate)),
+              Text(lane.flashStatus.value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12.5, color: _StationColors.slate)),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: lane.dongleConnected.value ? () => controller.onStartFlash(laneIndex) : null,
-                style: ElevatedButton.styleFrom(backgroundColor: _StationColors.teal, disabledBackgroundColor: _StationColors.slateBorder, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                child: const Text('Start Flashing', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                onPressed: lane.dongleConnected.value
+                    ? () => controller.onStartFlash(laneIndex)
+                    : null,
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: _StationColors.teal,
+                    disabledBackgroundColor: _StationColors.slateBorder,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8))),
+                child: const Text('Start Flashing',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13)),
               ),
             ],
           ),
@@ -1261,28 +1482,57 @@ Widget _scanField({
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.teal)),
+                          SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: _StationColors.teal)),
                           SizedBox(height: 8),
-                          Text('Reading DTC/IQA — please wait…', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _StationColors.teal)),
+                          Text('Reading DTC/IQA — please wait…',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: _StationColors.teal)),
                         ],
                       ),
                     )
                   : const SizedBox.shrink()),
               if (lane.resolvedFlashFileName.value != null)
-                Padding(padding: const EdgeInsets.only(bottom: 14), child: Text(lane.resolvedFlashFileName.value!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate))),
+                Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: Text(lane.resolvedFlashFileName.value!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 11.5, color: _StationColors.slate))),
               Container(
                 width: 52,
                 height: 52,
-                decoration: const BoxDecoration(color: _StationColors.teal, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded, color: Colors.white, size: 28),
+                decoration: const BoxDecoration(
+                    color: _StationColors.teal, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded,
+                    color: Colors.white, size: 28),
               ),
               const SizedBox(height: 14),
-              const Text('Flashing successful', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _StationColors.charcoal)),
+              const Text('Flashing successful',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: _StationColors.charcoal)),
               const SizedBox(height: 4),
-              Text('Completed in ${lane.formattedElapsed}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+              Text('Completed in ${lane.formattedElapsed}',
+                  style: const TextStyle(
+                      fontSize: 12, color: _StationColors.slate)),
               if (lane.iqaWriteStatus.value.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(lane.iqaWriteStatus.value, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: lane.iqaWriteStatus.value.toLowerCase().contains('successful') ? _StationColors.greenDark : _StationColors.red)),
+                Text(lane.iqaWriteStatus.value,
+                    style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: lane.iqaWriteStatus.value
+                                .toLowerCase()
+                                .contains('successful')
+                            ? _StationColors.greenDark
+                            : _StationColors.red)),
               ],
             ],
           ),
@@ -1297,34 +1547,61 @@ Widget _scanField({
             if (lane.resolvedFlashFileName.value != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Text(lane.resolvedFlashFileName.value!, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate)),
+                child: Text(lane.resolvedFlashFileName.value!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 11.5, color: _StationColors.slate)),
               ),
             Center(
               child: Container(
                 width: 52,
                 height: 52,
-                decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
-                child: const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(_StationColors.teal))),
+                decoration: const BoxDecoration(
+                    color: _StationColors.tealBg, shape: BoxShape.circle),
+                child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor:
+                            AlwaysStoppedAnimation(_StationColors.teal))),
               ),
             ),
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(8)),
-              child: Text(lane.flashStatus.value, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _StationColors.teal)),
+              decoration: BoxDecoration(
+                  color: _StationColors.tealBg,
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(lane.flashStatus.value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: _StationColors.teal)),
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Elapsed  ${lane.formattedElapsed}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
-                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: _StationColors.teal)),
+                Text('Elapsed  ${lane.formattedElapsed}',
+                    style: const TextStyle(
+                        fontSize: 12, color: _StationColors.slate)),
+                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%',
+                    style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: _StationColors.teal)),
               ],
             ),
             const SizedBox(height: 6),
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(value: lane.flashProgress.value.clamp(0.0, 1.0), minHeight: 10, backgroundColor: _StationColors.slateBg, valueColor: const AlwaysStoppedAnimation(_StationColors.teal)),
+              child: LinearProgressIndicator(
+                  value: lane.flashProgress.value.clamp(0.0, 1.0),
+                  minHeight: 10,
+                  backgroundColor: _StationColors.slateBg,
+                  valueColor:
+                      const AlwaysStoppedAnimation(_StationColors.teal)),
             ),
           ],
         );
@@ -1337,29 +1614,60 @@ Widget _scanField({
             Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              decoration: BoxDecoration(color: _StationColors.greenBg, border: Border.all(color: _StationColors.green), borderRadius: BorderRadius.circular(6)),
+              decoration: BoxDecoration(
+                  color: _StationColors.greenBg,
+                  border: Border.all(color: _StationColors.green),
+                  borderRadius: BorderRadius.circular(6)),
               child: Row(children: [
-                const Icon(Icons.check_circle, size: 15, color: _StationColors.green),
+                const Icon(Icons.check_circle,
+                    size: 15, color: _StationColors.green),
                 const SizedBox(width: 6),
-                Expanded(child: Text(lane.resolvedFlashFileName.value!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _StationColors.greenDark), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(lane.resolvedFlashFileName.value!,
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: _StationColors.greenDark),
+                        overflow: TextOverflow.ellipsis)),
               ]),
             ),
           if (!lane.dongleConnected.value)
             Container(
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(color: _StationColors.amberBg, borderRadius: BorderRadius.circular(6), border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
+              decoration: BoxDecoration(
+                  color: _StationColors.amberBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border:
+                      Border.all(color: _StationColors.amber.withOpacity(0.4))),
               child: Row(children: [
-                const Icon(Icons.info_outline, size: 16, color: _StationColors.amber),
+                const Icon(Icons.info_outline,
+                    size: 16, color: _StationColors.amber),
                 const SizedBox(width: 8),
-                const Expanded(child: Text('Waiting for the dongle to connect…', style: TextStyle(fontSize: 12, color: _StationColors.amber))),
+                const Expanded(
+                    child: Text('Waiting for the dongle to connect…',
+                        style: TextStyle(
+                            fontSize: 12, color: _StationColors.amber))),
               ]),
             ),
           Center(
             child: ElevatedButton(
-              onPressed: (lane.resolvedFlashFileUrl.value != null && lane.dongleConnected.value) ? () => controller.onStartFlash(laneIndex) : null,
-              style: ElevatedButton.styleFrom(backgroundColor: _StationColors.teal, disabledBackgroundColor: _StationColors.slateBorder, padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-              child: const Text('Start Flashing', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+              onPressed: (lane.resolvedFlashFileUrl.value != null &&
+                      lane.dongleConnected.value)
+                  ? () => controller.onStartFlash(laneIndex)
+                  : null,
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: _StationColors.teal,
+                  disabledBackgroundColor: _StationColors.slateBorder,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8))),
+              child: const Text('Start Flashing',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13)),
             ),
           ),
         ],
@@ -1376,8 +1684,12 @@ Widget _scanField({
           onTap: () => setState(() => _dtcExpanded = !_dtcExpanded),
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(12)),
-            child: Text('Count: ${lane.dtcReadResults.length}', style: const TextStyle(fontSize: 11.5, color: _StationColors.teal)),
+            decoration: BoxDecoration(
+                color: _StationColors.tealBg,
+                borderRadius: BorderRadius.circular(12)),
+            child: Text('Count: ${lane.dtcReadResults.length}',
+                style: const TextStyle(
+                    fontSize: 11.5, color: _StationColors.teal)),
           ),
           extraAction: Obx(() {
             final busy = lane.isReadingDtc.value;
@@ -1388,17 +1700,38 @@ Widget _scanField({
               children: [
                 InkWell(
                   borderRadius: BorderRadius.circular(6),
-                  onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
+                  onTap: canRead
+                      ? () => controller.readLiveDtcForLane(laneIndex)
+                      : null,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: canRead ? _StationColors.teal : _StationColors.slateBorder)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: canRead
+                                ? _StationColors.teal
+                                : _StationColors.slateBorder)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       if (busy)
-                        const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.6))
+                        const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 1.6))
                       else
-                        Icon(Icons.search, size: 14, color: canRead ? _StationColors.teal : _StationColors.slate),
+                        Icon(Icons.search,
+                            size: 14,
+                            color: canRead
+                                ? _StationColors.teal
+                                : _StationColors.slate),
                       const SizedBox(width: 5),
-                      Text(busy ? 'Reading…' : 'Read DTCs', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: canRead ? _StationColors.teal : _StationColors.slate)),
+                      Text(busy ? 'Reading…' : 'Read DTCs',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: canRead
+                                  ? _StationColors.teal
+                                  : _StationColors.slate)),
                     ]),
                   ),
                 ),
@@ -1407,12 +1740,28 @@ Widget _scanField({
                   borderRadius: BorderRadius.circular(6),
                   onTap: canClear ? () => _confirmClearDtc() : null,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(6), border: Border.all(color: canClear ? _StationColors.red : _StationColors.slateBorder)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                            color: canClear
+                                ? _StationColors.red
+                                : _StationColors.slateBorder)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.delete_sweep_rounded, size: 14, color: canClear ? _StationColors.red : _StationColors.slate),
+                      Icon(Icons.delete_sweep_rounded,
+                          size: 14,
+                          color: canClear
+                              ? _StationColors.red
+                              : _StationColors.slate),
                       const SizedBox(width: 5),
-                      Text('Clear DTC', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: canClear ? _StationColors.red : _StationColors.slate)),
+                      Text('Clear DTC',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: canClear
+                                  ? _StationColors.red
+                                  : _StationColors.slate)),
                     ]),
                   ),
                 ),
@@ -1420,7 +1769,8 @@ Widget _scanField({
             );
           }),
           child: Obx(() => lane.dtcReadResults.isEmpty
-              ? const Text('No data yet', style: TextStyle(color: _StationColors.slate, fontSize: 13))
+              ? const Text('No data yet',
+                  style: TextStyle(color: _StationColors.slate, fontSize: 13))
               : Column(children: lane.dtcReadResults.map(_dtcTile).toList())),
         ));
   }
@@ -1428,7 +1778,8 @@ Widget _scanField({
   void _confirmClearDtc() {
     Get.defaultDialog(
       title: 'Clear DTC?',
-      middleText: 'This will clear all fault codes stored on Lane ${lane.laneNumber}\'s ECU.',
+      middleText:
+          'This will clear all fault codes stored on Lane ${lane.laneNumber}\'s ECU.',
       textConfirm: 'Clear',
       textCancel: 'Cancel',
       confirmTextColor: Colors.white,
@@ -1473,7 +1824,9 @@ Widget _scanField({
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(border: Border.all(color: _StationColors.slateBorder), borderRadius: BorderRadius.circular(6)),
+      decoration: BoxDecoration(
+          border: Border.all(color: _StationColors.slateBorder),
+          borderRadius: BorderRadius.circular(6)),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1481,16 +1834,32 @@ Widget _scanField({
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(code, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Colors.black87)),
-                if (rest.isNotEmpty) ...[const SizedBox(height: 2), Text(rest, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate))],
+                Text(code,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12.5,
+                        color: Colors.black87)),
+                if (rest.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(rest,
+                      style: const TextStyle(
+                          fontSize: 11.5, color: _StationColors.slate))
+                ],
               ],
             ),
           ),
           const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(color: badgeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: badgeColor.withOpacity(0.4))),
-            child: Text(badgeLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: badgeColor)),
+            decoration: BoxDecoration(
+                color: badgeColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: badgeColor.withOpacity(0.4))),
+            child: Text(badgeLabel,
+                style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: badgeColor)),
           ),
         ],
       ),
@@ -1508,20 +1877,25 @@ Widget _scanField({
         final playing = lane.pidPlaying.value;
         return ElevatedButton.icon(
           onPressed: () => controller.togglePidPlaybackForLane(laneIndex),
-          icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 16),
-          label: Text(playing ? 'Stop' : 'Run', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          icon: Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+              size: 16),
+          label: Text(playing ? 'Stop' : 'Run',
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           style: ElevatedButton.styleFrom(
             backgroundColor: playing ? _StationColors.red : _StationColors.teal,
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       }),
       child: Obx(() {
         if (lane.liveParameterCodes.isEmpty) {
-          return const Text('No data yet', style: TextStyle(color: _StationColors.slate, fontSize: 13));
+          return const Text('No data yet',
+              style: TextStyle(color: _StationColors.slate, fontSize: 13));
         }
         final isPlaying = lane.pidPlaying.value;
         final list = Column(
@@ -1529,26 +1903,51 @@ Widget _scanField({
           children: List.generate(lane.liveParameterCodes.length, (index) {
             final code = lane.liveParameterCodes[index];
             final variable = code.piCodeVariable?.firstOrNull;
-            final label = variable?.longName ?? variable?.shortName ?? code.shortName ?? code.code ?? 'PID';
+            final label = variable?.longName ??
+                variable?.shortName ??
+                code.shortName ??
+                code.code ??
+                'PID';
             final unit = variable?.unit ?? '';
             return Obx(() {
-              final liveValue = variable?.id != null ? lane.livePidValues[variable!.id] : null;
-              final isError = liveValue != null && (liveValue == 'Not Found' || liveValue.toUpperCase().contains('ERROR'));
+              final liveValue = variable?.id != null
+                  ? lane.livePidValues[variable!.id]
+                  : null;
+              final isError = liveValue != null &&
+                  (liveValue == 'Not Found' ||
+                      liveValue.toUpperCase().contains('ERROR'));
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     child: Row(children: [
-                      Expanded(child: Text(label, style: const TextStyle(fontSize: 13, color: _StationColors.charcoal), overflow: TextOverflow.ellipsis)),
+                      Expanded(
+                          child: Text(label,
+                              style: const TextStyle(
+                                  fontSize: 13, color: _StationColors.charcoal),
+                              overflow: TextOverflow.ellipsis)),
                       const SizedBox(width: 12),
                       Text(
-                        liveValue != null ? '$liveValue ${unit.isNotEmpty ? unit : ''}'.trim() : '—',
-                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: liveValue == null ? _StationColors.slate : (isError ? _StationColors.red : _StationColors.teal)),
+                        liveValue != null
+                            ? '$liveValue ${unit.isNotEmpty ? unit : ''}'.trim()
+                            : '—',
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: liveValue == null
+                                ? _StationColors.slate
+                                : (isError
+                                    ? _StationColors.red
+                                    : _StationColors.teal)),
                       ),
                     ]),
                   ),
-                  if (index != lane.liveParameterCodes.length - 1) Divider(height: 1, thickness: 1, color: _StationColors.slateBorder.withOpacity(0.6)),
+                  if (index != lane.liveParameterCodes.length - 1)
+                    Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: _StationColors.slateBorder.withOpacity(0.6)),
                 ],
               );
             });
@@ -1558,17 +1957,35 @@ Widget _scanField({
         return Stack(
           alignment: Alignment.topCenter,
           children: [
-            Opacity(opacity: isPlaying ? 0.35 : 1.0, child: IgnorePointer(ignoring: isPlaying, child: list)),
+            Opacity(
+                opacity: isPlaying ? 0.35 : 1.0,
+                child: IgnorePointer(ignoring: isPlaying, child: list)),
             if (isPlaying)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4))]),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4))
+                      ]),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation(_StationColors.teal)),
+                    const CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor:
+                            AlwaysStoppedAnimation(_StationColors.teal)),
                     const SizedBox(height: 10),
-                    Text('Reading live parameters...', style: TextStyle(fontSize: 12, color: _StationColors.slate.withOpacity(0.9), fontWeight: FontWeight.w600)),
+                    Text('Reading live parameters...',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: _StationColors.slate.withOpacity(0.9),
+                            fontWeight: FontWeight.w600)),
                   ]),
                 ),
               ),
@@ -1582,43 +1999,184 @@ Widget _scanField({
 
   Color _activityLogColor(String entry) {
     final lower = entry.toLowerCase();
-    if (entry.contains('❌') || lower.contains('fail') || lower.contains('error')) return _StationColors.red;
-    if (entry.contains('✅') || lower.contains('successful') || lower.contains('pass') || lower.contains('complete')) return _StationColors.greenDark;
+    if (entry.contains('❌') ||
+        lower.contains('fail') ||
+        lower.contains('error')) return _StationColors.red;
+    if (entry.contains('✅') ||
+        lower.contains('successful') ||
+        lower.contains('pass') ||
+        lower.contains('complete')) return _StationColors.greenDark;
     return _StationColors.slate;
   }
 
+  // Widget _activityLogSection() {
+  //   return Container(
+  //     constraints: const BoxConstraints(maxHeight: 160),
+  //     margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+  //     padding: const EdgeInsets.all(14),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(10),
+  //       border: Border.all(color: _StationColors.slateBorder),
+  //       boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2))],
+  //     ),
+  //     child: Column(
+  //       crossAxisAlignment: CrossAxisAlignment.start,
+  //       children: [
+  //         Row(
+  //           children: [
+  //             const Text('Activity', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _StationColors.charcoal)),
+  //             const Spacer(),
+  //             IconButton(icon: const Icon(Icons.fullscreen, size: 20), color: _StationColors.teal, visualDensity: VisualDensity.compact, onPressed: _showActivityFullScreen),
+  //           ],
+  //         ),
+  //         const Divider(height: 14),
+  //         Expanded(
+  //           child: Obx(() => ListView(
+  //                 padding: EdgeInsets.zero,
+  //                 children: lane.activityLog.map((e) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(e, style: TextStyle(fontSize: 11.5, color: _activityLogColor(e))))).toList(),
+  //               )),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
   Widget _activityLogSection() {
     return Container(
-      constraints: const BoxConstraints(maxHeight: 160),
+      constraints: const BoxConstraints(maxHeight: 200),
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _StationColors.slateBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, -2))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, -2))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text('Activity', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _StationColors.charcoal)),
+              const Text('Activity',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: _StationColors.charcoal)),
               const Spacer(),
-              IconButton(icon: const Icon(Icons.fullscreen, size: 20), color: _StationColors.teal, visualDensity: VisualDensity.compact, onPressed: _showActivityFullScreen),
+              IconButton(
+                  icon: const Icon(Icons.fullscreen, size: 20),
+                  color: _StationColors.teal,
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _showActivityFullScreen),
             ],
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 24,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: ActivityLogTag.allTags.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, i) {
+                final tag = ActivityLogTag.allTags[i];
+                return _tagChip(
+                  tag,
+                  selected: _activityFilter == tag,
+                  onTap: () => setState(() =>
+                      _activityFilter = _activityFilter == tag ? null : tag),
+                );
+              },
+            ),
           ),
           const Divider(height: 14),
           Expanded(
-            child: Obx(() => ListView(
-                  padding: EdgeInsets.zero,
-                  children: lane.activityLog.map((e) => Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Text(e, style: TextStyle(fontSize: 11.5, color: _activityLogColor(e))))).toList(),
-                )),
+            child: Obx(() {
+              final entries = lane.activityLog.where((e) {
+                if (_activityFilter == null) return true;
+                return _parseLogEntry(e)['tag'] == _activityFilter;
+              }).toList();
+
+              if (entries.isEmpty) {
+                return Center(
+                  child: Text(
+                    _activityFilter == null
+                        ? 'No activity yet'
+                        : 'No "$_activityFilter" entries yet',
+                    style: const TextStyle(
+                        color: _StationColors.slate, fontSize: 11.5),
+                  ),
+                );
+              }
+
+              return ListView(
+                padding: EdgeInsets.zero,
+                children: entries.map((e) {
+                  final parsed = _parseLogEntry(e);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _tagChip(parsed['tag']!),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            '[${parsed['time']}] ${parsed['message']}',
+                            style: TextStyle(
+                                fontSize: 11.5, color: _activityLogColor(e)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            }),
           ),
         ],
       ),
     );
   }
+
+  // void _showActivityFullScreen() {
+  //   Get.dialog(
+  //     Dialog.fullscreen(
+  //       child: Scaffold(
+  //         appBar: AppBar(
+  //           iconTheme: const IconThemeData(color: Colors.white),
+  //           backgroundColor: _StationColors.teal,
+  //           foregroundColor: Colors.white,
+  //           title: Text('Activity Log — Lane ${lane.laneNumber}'),
+  //         ),
+  //         backgroundColor: _StationColors.slateBg,
+  //         body: Padding(
+  //           padding: const EdgeInsets.all(16),
+  //           child: Obx(() => lane.activityLog.isEmpty
+  //               ? const Center(
+  //                   child: Text('No activity yet',
+  //                       style: TextStyle(color: _StationColors.slate)))
+  //               : ListView.builder(
+  //                   itemCount: lane.activityLog.length,
+  //                   itemBuilder: (context, i) => Padding(
+  //                     padding: const EdgeInsets.symmetric(vertical: 5),
+  //                     child: SelectableText(lane.activityLog[i],
+  //                         style: TextStyle(
+  //                             fontSize: 13,
+  //                             color: _activityLogColor(lane.activityLog[i]))),
+  //                   ),
+  //                 )),
+  //         ),
+  //       ),
+  //     ),
+  //     barrierDismissible: true,
+  //   );
+  // }
 
   void _showActivityFullScreen() {
     Get.dialog(
@@ -1631,17 +2189,92 @@ Widget _scanField({
             title: Text('Activity Log — Lane ${lane.laneNumber}'),
           ),
           backgroundColor: _StationColors.slateBg,
-          body: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Obx(() => lane.activityLog.isEmpty
-                ? const Center(child: Text('No activity yet', style: TextStyle(color: _StationColors.slate)))
-                : ListView.builder(
-                    itemCount: lane.activityLog.length,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 5),
-                      child: SelectableText(lane.activityLog[i], style: TextStyle(fontSize: 13, color: _activityLogColor(lane.activityLog[i]))),
+          body: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: SizedBox(
+                        height: 30,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: ActivityLogTag.allTags.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 6),
+                          itemBuilder: (context, i) {
+                            final tag = ActivityLogTag.allTags[i];
+                            return _tagChip(
+                              tag,
+                              selected: _activityFilter == tag,
+                              onTap: () => setDialogState(() =>
+                                  _activityFilter =
+                                      _activityFilter == tag ? null : tag),
+                            );
+                          },
+                        ),
+                      ),
                     ),
-                  )),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: Obx(() {
+                        final entries = lane.activityLog.where((e) {
+                          if (_activityFilter == null) return true;
+                          return _parseLogEntry(e)['tag'] == _activityFilter;
+                        }).toList();
+
+                        if (entries.isEmpty) {
+                          return Center(
+                            child: Text(
+                              _activityFilter == null
+                                  ? 'No activity yet'
+                                  : 'No "$_activityFilter" entries yet',
+                              style:
+                                  const TextStyle(color: _StationColors.slate),
+                            ),
+                          );
+                        }
+
+                        return ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                          itemCount: entries.length,
+                          itemBuilder: (context, i) {
+                            final parsed = _parseLogEntry(entries[i]);
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: _StationColors.slateBorder),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _tagChip(parsed['tag']!),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: SelectableText(
+                                      '[${parsed['time']}] ${parsed['message']}',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: _activityLogColor(entries[i])),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ),

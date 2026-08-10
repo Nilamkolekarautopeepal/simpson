@@ -143,9 +143,8 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
     );
   }
 
-  /// The original grid view — unchanged from before, just pulled out
-  /// into its own method so it can be swapped in/out by the Obx above
-  /// depending on whether a lane is currently expanded full-screen.
+
+  // ignore: unused_element
   Widget _buildLaneGrid() {
     return Padding(
       padding: const EdgeInsets.all(16),

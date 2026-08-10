@@ -5,10 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
-  static const tealLight = Color(0xFF1B9494);
   static const tealBg = Color(0xFFE8F5F5);
   static const charcoal = Color(0xFF1E2A32);
-  static const green = Color(0xFF2ECC71);
   static const greenDark = Color(0xFF1B7A3E);
   static const red = Color(0xFFD64545);
   static const redBg = Color(0xFFFDEDED);
@@ -17,9 +15,6 @@ class _StationColors {
   static const slateBg = Color(0xFFF7F8FA);
 }
 
-/// Full-screen history view for one lane's ESN — shows every past
-/// EOL/testbed session, most recent first, as clean cards. Opened
-/// from the three-dot menu on that lane's chip in the top status bar.
 class PsfSessionHistoryScreen extends StatelessWidget {
   const PsfSessionHistoryScreen({super.key, required this.lane});
 
@@ -28,11 +23,8 @@ class PsfSessionHistoryScreen extends StatelessWidget {
   static void show(PsfLane lane) {
     Get.to(() => PsfSessionHistoryScreen(lane: lane));
   }
+
   Future<void> _openActivityReport(String relativePath) async {
-    // The server returns a relative path (e.g.
-    // "analyze_prodbud/activity_log_....txt") — files themselves are
-    // served from the media root, same pattern as flash file URLs
-    // elsewhere in this app.
     final url = Uri.parse('https://sidia.simpsons.in/media/$relativePath');
     final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
     if (!launched) {
@@ -72,11 +64,17 @@ class PsfSessionHistoryScreen extends StatelessWidget {
                 Container(
                   width: 72,
                   height: 72,
-                  decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
-                  child: const Icon(Icons.history, color: _StationColors.teal, size: 34),
+                  decoration: const BoxDecoration(
+                      color: _StationColors.tealBg, shape: BoxShape.circle),
+                  child: const Icon(Icons.history,
+                      color: _StationColors.teal, size: 34),
                 ),
                 const SizedBox(height: 20),
-                const Text('No previous sessions found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _StationColors.charcoal)),
+                const Text('No previous sessions found',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _StationColors.charcoal)),
                 const SizedBox(height: 8),
                 const Text(
                   'This ESN has no EOL or testbed session history yet.',
@@ -111,12 +109,23 @@ class PsfSessionHistoryScreen extends StatelessWidget {
   Widget _sectionHeader(String title, int count) {
     return Row(
       children: [
-        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: _StationColors.slate,
+                letterSpacing: 0.5)),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(12)),
-          child: Text('$count', style: const TextStyle(fontSize: 11.5, color: _StationColors.teal, fontWeight: FontWeight.bold)),
+          decoration: BoxDecoration(
+              color: _StationColors.tealBg,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text('$count',
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _StationColors.teal,
+                  fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -125,7 +134,9 @@ class PsfSessionHistoryScreen extends StatelessWidget {
   Widget _sessionCard(Map<String, dynamic> session) {
     final startDate = _parseDate(session['start_date']);
     final endDate = _parseDate(session['end_date']);
-    final duration = (startDate != null && endDate != null) ? endDate.difference(startDate) : null;
+    final duration = (startDate != null && endDate != null)
+        ? endDate.difference(startDate)
+        : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -134,7 +145,12 @@ class PsfSessionHistoryScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _StationColors.slateBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,12 +165,16 @@ class PsfSessionHistoryScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${session['model'] ?? '—'} — ${session['sub_model'] ?? '—'}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _StationColors.charcoal),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'List No. ${session['list_no'] ?? '—'}',
-                      style: const TextStyle(fontSize: 12, color: _StationColors.slate),
+                      style: const TextStyle(
+                          fontSize: 12, color: _StationColors.slate),
                     ),
                   ],
                 ),
@@ -164,12 +184,16 @@ class PsfSessionHistoryScreen extends StatelessWidget {
                 children: [
                   Text(
                     startDate != null ? _formatDate(startDate) : '—',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _StationColors.charcoal),
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _StationColors.charcoal),
                   ),
                   if (duration != null)
                     Text(
                       'Duration: ${_formatDuration(duration)}',
-                      style: const TextStyle(fontSize: 11, color: _StationColors.slate),
+                      style: const TextStyle(
+                          fontSize: 11, color: _StationColors.slate),
                     ),
                 ],
               ),
@@ -182,8 +206,10 @@ class PsfSessionHistoryScreen extends StatelessWidget {
           // Middle — dongle / harness / dataset info
           _infoRow('Station', session['station_id']?.toString()),
           _infoRow('Dongle', session['dongle_id']?.toString()),
-          _infoRow('Harness', '${session['harness_name'] ?? '—'} (${session['harness_type'] ?? '—'})'),
-          _infoRow('Dataset', '${session['dataset_type'] ?? '—'} — ${session['datafile_name'] ?? '—'}'),
+          _infoRow('Harness',
+              '${session['harness_name'] ?? '—'} (${session['harness_type'] ?? '—'})'),
+          _infoRow('Dataset',
+              '${session['dataset_type'] ?? '—'} — ${session['datafile_name'] ?? '—'}'),
 
           const SizedBox(height: 12),
           const Divider(height: 1),
@@ -194,30 +220,37 @@ class PsfSessionHistoryScreen extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _statusBadge('Continuity', session['continuty_status']?.toString()),
+              _statusBadge(
+                  'Continuity', session['continuty_status']?.toString()),
               _statusBadge('Flash', session['flash_status']?.toString()),
               _statusBadge('IQA', session['iqa_status']?.toString()),
               _statusBadge('DTC', session['dtc_status']?.toString()),
             ],
           ),
 
-         if (session['activity_report'] != null) ...[
+          if (session['activity_report'] != null) ...[
             const SizedBox(height: 10),
             InkWell(
-              onTap: () => _openActivityReport(session['activity_report'].toString()),
+              onTap: () =>
+                  _openActivityReport(session['activity_report'].toString()),
               borderRadius: BorderRadius.circular(6),
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined, size: 14, color: _StationColors.teal),
+                  const Icon(Icons.description_outlined,
+                      size: 14, color: _StationColors.teal),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       session['activity_report'].toString(),
-                      style: const TextStyle(fontSize: 11, color: _StationColors.teal, decoration: TextDecoration.underline),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: _StationColors.teal,
+                          decoration: TextDecoration.underline),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.open_in_new, size: 12, color: _StationColors.teal),
+                  const Icon(Icons.open_in_new,
+                      size: 12, color: _StationColors.teal),
                 ],
               ),
             ),
@@ -234,10 +267,17 @@ class PsfSessionHistoryScreen extends StatelessWidget {
         children: [
           SizedBox(
             width: 70,
-            child: Text(label, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate, fontWeight: FontWeight.w600)),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    color: _StationColors.slate,
+                    fontWeight: FontWeight.w600)),
           ),
           Expanded(
-            child: Text(value ?? '—', style: const TextStyle(fontSize: 12.5, color: _StationColors.charcoal), overflow: TextOverflow.ellipsis),
+            child: Text(value ?? '—',
+                style: const TextStyle(
+                    fontSize: 12.5, color: _StationColors.charcoal),
+                overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -247,18 +287,32 @@ class PsfSessionHistoryScreen extends StatelessWidget {
   Widget _statusBadge(String label, String? status) {
     final isPass = (status ?? '').toLowerCase() == 'pass';
     final isFail = (status ?? '').toLowerCase() == 'fail';
-    final color = isPass ? _StationColors.greenDark : (isFail ? _StationColors.red : _StationColors.slate);
-    final bg = isPass ? const Color(0xFFEAFAF1) : (isFail ? _StationColors.redBg : _StationColors.slateBg);
+    final color = isPass
+        ? _StationColors.greenDark
+        : (isFail ? _StationColors.red : _StationColors.slate);
+    final bg = isPass
+        ? const Color(0xFFEAFAF1)
+        : (isFail ? _StationColors.redBg : _StationColors.slateBg);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, border: Border.all(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+          color: bg,
+          border: Border.all(color: color.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(isPass ? Icons.check_circle : (isFail ? Icons.cancel : Icons.help_outline), size: 13, color: color),
+          Icon(
+              isPass
+                  ? Icons.check_circle
+                  : (isFail ? Icons.cancel : Icons.help_outline),
+              size: 13,
+              color: color),
           const SizedBox(width: 5),
-          Text('$label: ${status ?? "—"}', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: color)),
+          Text('$label: ${status ?? "—"}',
+              style: TextStyle(
+                  fontSize: 11.5, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );
