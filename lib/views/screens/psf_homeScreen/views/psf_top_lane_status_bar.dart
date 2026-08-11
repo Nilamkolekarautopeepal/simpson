@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
 
 class _StationColors {
@@ -21,12 +20,12 @@ Widget _glowDot(Color core, {double size = 10}) {
       shape: BoxShape.circle,
       gradient: RadialGradient(
         center: const Alignment(-0.3, -0.3),
-        colors: [Colors.white.withOpacity(0.85), core, core],
+        colors: [Colors.white.withValues(alpha: 0.85), core, core],
         stops: const [0.0, 0.35, 1.0],
       ),
       boxShadow: [
         BoxShadow(
-            color: core.withOpacity(0.7), blurRadius: 6, spreadRadius: 0.4),
+            color: core.withValues(alpha: 0.7), blurRadius: 6, spreadRadius: 0.4),
       ],
     ),
   );
@@ -45,7 +44,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
         color: _StationColors.charcoal,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.25),
+              color: Colors.black.withValues(alpha: 0.25),
               blurRadius: 8,
               offset: const Offset(0, 3)),
         ],
@@ -100,12 +99,12 @@ class PsfTopLaneStatusBar extends StatelessWidget {
             decoration: BoxDecoration(
               color: isExpanded
                   ? _StationColors.teal
-                  : Colors.white.withOpacity(0.06),
+                  : Colors.white.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
                   color: isExpanded
                       ? _StationColors.tealLight
-                      : Colors.white.withOpacity(0.12)),
+                      : Colors.white.withValues(alpha: 0.12)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -130,7 +129,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         color: isExpanded
                             ? Colors.white
-                            : Colors.white.withOpacity(0.9),
+                            : Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                     Text(

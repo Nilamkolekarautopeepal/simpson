@@ -1,5 +1,7 @@
 //Prathmesh Girme
 import 'dart:async';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 
 import 'package:flutter/material.dart';
@@ -19,26 +21,79 @@ class PsfLane {
     this.expectedEcuId,
     this.macIdFromLogin,
   }) {
+    // ── Dongle ──
     ever(dongleConnected, (bool connected) {
-      logActivity(connected ? 'Dongle connected' : 'Dongle disconnected');
+      final ip = dongleIpFromLogin ?? 'unknown IP';
+      logActivity(connected ? 'Dongle connected ($ip)' : 'Dongle disconnected ($ip)');
     });
+    ever(dongleConnecting, (bool connecting) {
+      if (connecting) logActivity('Connecting to dongle at ${dongleIpFromLogin ?? "unknown IP"}...');
+    });
+    ever(dongleError, (String v) {
+      if (v.isNotEmpty) logActivity('Dongle error: $v');
+    });
+
+    // ── ESN / variant resolution ──
     ever(esn, (String v) {
       if (v.isNotEmpty) logActivity('ESN scanned: $v');
     });
     ever(esnError, (String v) {
       if (v.isNotEmpty) logActivity('ESN error: $v');
     });
+    ever(listNumber, (String v) {
+      if (v.isNotEmpty) logActivity('List Number: $v');
+    });
+    ever(ecuModelName, (String v) {
+      if (v.isNotEmpty && v != 'ECU MODEL NAME') logActivity('Model: $v');
+    });
+    ever(resolvedFlashFileName, (String? v) {
+      if (v != null && v.isNotEmpty) logActivity('Flash file: $v');
+    });
+
+    // ── IQA ──
+    for (int i = 0; i < iqaControllers.length; i++) {
+      final index = i;
+      iqaControllers[index].addListener(() {
+        final value = iqaControllers[index].text.trim();
+        if (value.length == 7) {
+          logActivity('${iqaLabelFor(index)} entered: $value');
+        }
+      });
+    }
+    ever(filledIqaCount, (int count) {
+      if (count == iqaControllers.length && count > 0) {
+        logActivity('All $count IQA value(s) entered');
+      }
+    });
+    ever(iqaWriteStatus, (String v) {
+      if (v.isNotEmpty) logActivity(v);
+    });
+
+    // ── Flash ──
     ever(isFlashing, (bool flashing) {
       if (flashing) logActivity('Flashing started');
     });
     ever(flashStatus, (String v) {
       if (v.isNotEmpty) logActivity(v);
     });
+
+    // ── DTC ──
+    ever(isReadingDtc, (bool reading) {
+      if (reading) logActivity('Reading DTCs...');
+    });
     ever(dtcError, (String v) {
       if (v.isNotEmpty) logActivity('DTC error: $v');
     });
-    ever(iqaWriteStatus, (String v) {
-      if (v.isNotEmpty) logActivity(v);
+    ever(dtcReadResults, (List<String> results) {
+      logActivity('DTC read complete: ${results.length} code(s) found');
+    });
+
+    // ── Live Parameter (PID) ──
+    ever(pidPlaying, (bool playing) {
+      logActivity(playing ? 'Live Parameter read started' : 'Live Parameter read stopped');
+    });
+    ever(pidError, (String v) {
+      if (v.isNotEmpty) logActivity('PID error: $v');
     });
   }
   final RxList<Map<String, dynamic>> eolSessionHistory =
@@ -79,13 +134,13 @@ class PsfLane {
   // }
 
   void logActivity(String entry) {
-  final timestamp = DateTime.now().toIso8601String().substring(11, 19);
-  final tag = ActivityLogTag.infer(entry);
-  activityLog.add('[$timestamp] [$tag] $entry');
-  if (activityLog.length > 300) {
-    activityLog.removeAt(0);
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    final tag = ActivityLogTag.infer(entry);
+    activityLog.add('[$timestamp] [$tag] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
   }
-}
 
   /// Auto-scan debounce — no SCAN button anymore; typing pauses for
   /// 2s then submits automatically.
@@ -118,7 +173,9 @@ class PsfLane {
 
   // For EOL session reporting
   int? esnRecordId;
-  int? resolvedDatasetId;
+  String?
+      resolvedDatasetType; // "D Dataset" or "T Dataset" — the actual label the server now expects
+  String? resolvedDatasetFileName;
   int? dongleDbId;
   DateTime? flashCycleStartTime;
   // ===============================
@@ -262,7 +319,7 @@ class PsfLane {
 
   final RxString flashStatus = "".obs;
 
- final RxBool isFlashing = false.obs;
+  final RxBool isFlashing = false.obs;
   final RxBool isPostFlashProcessing = false.obs;
   final RxDouble flashProgress = 0.0.obs;
 
@@ -392,7 +449,8 @@ class PsfLane {
     matchedVehicleModelId = null;
     matchedSubModelId = null;
     esnRecordId = null;
-    resolvedDatasetId = null;
+    resolvedDatasetType = null;
+    resolvedDatasetFileName = null;
     flashCycleStartTime = null;
     // dongleDbId is intentionally NOT cleared — it's tied to the
     // physical dongle wired to this lane, not to whichever engine
@@ -462,6 +520,31 @@ class PsfLane {
     }
   }
 }
+Future<bool> saveActivityLog(dynamic activityLog) async {
+    try {
+      if (activityLog.isEmpty) return false;
+
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final activityDir = Directory('${documentsDir.path}/ActivityLog');
+
+      if (!await activityDir.exists()) {
+        await activityDir.create(recursive: true);
+      }
+
+      var laneNumber;
+      final fileName =
+          'Lane${laneNumber}_ActivityLog_${DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-')}.txt';
+
+      final file = File('${activityDir.path}/$fileName');
+      await file.writeAsString(activityLog.join('\n'));
+
+      print('Activity log saved: ${file.path}');
+      return true;
+    } catch (e) {
+      print('Failed to save activity log: $e');
+      return false;
+    }
+  }
 
 // =====================================================
 // PLC REGISTER MODEL

@@ -23,7 +23,6 @@ import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/pfs_isolate_flash.dart';
-import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 import 'pfs_lane.dart' hide psfLaneRegisterMap;
 
 String _decodeLatin1Isolate(Uint8List bytes) {
@@ -46,21 +45,13 @@ class PsfHomeScreenController extends GetxController {
     expandedLaneIndex.value = null;
   }
 
-  // void logActivity(String entry, dynamic activityLog) {
-  //   final timestamp = DateTime.now().toIso8601String().substring(11, 19);
-  //   activityLog.add('[$timestamp] $entry');
-  //   if (activityLog.length > 300) {
-  //     activityLog.removeAt(0);
-  //   }
-  // }
   void logActivity(String entry, dynamic activityLog) {
-  final timestamp = DateTime.now().toIso8601String().substring(11, 19);
-  final tag = ActivityLogTag.infer(entry);
-  activityLog.add('[$timestamp] [$tag] $entry');
-  if (activityLog.length > 300) {
-    activityLog.removeAt(0);
+    final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+    activityLog.add('[$timestamp] $entry');
+    if (activityLog.length > 300) {
+      activityLog.removeAt(0);
+    }
   }
-}
 
   String? station;
   final RxList<PsfLane> lanes = <PsfLane>[].obs;
@@ -444,9 +435,8 @@ class PsfHomeScreenController extends GetxController {
     print('   Models catalog match → vehicleModel.id=${matchedModel.id} '
         'subModel.id=${matchedSubModel.id} ecu.id=${ecuEntry.ecu?.id} '
         'ecu.name=${ecuEntry.ecu?.name}');
-
     String? flashFileUrl;
-    int? resolvedDatasetId;
+    String? resolvedDatasetType;
     final expectedEcuId = ecuEntry.ecu?.id;
 
     final dMatches = (variant.dDatasetEcu ?? [])
@@ -456,7 +446,7 @@ class PsfHomeScreenController extends GetxController {
       final chosen = dMatches.firstWhereOrNull((e) => e.isLatest == true) ??
           dMatches.first;
       flashFileUrl = chosen.dataFile;
-      resolvedDatasetId = chosen.id;
+      resolvedDatasetType = 'D Dataset';
     }
 
     if (flashFileUrl == null || flashFileUrl.isEmpty) {
@@ -467,23 +457,23 @@ class PsfHomeScreenController extends GetxController {
         final chosen = tMatches.firstWhereOrNull((e) => e.isLatest == true) ??
             tMatches.first;
         flashFileUrl = chosen.dataFile;
-        resolvedDatasetId = chosen.id;
+        resolvedDatasetType = 'T Dataset';
       }
     }
 
     print(
-        '   Flash file resolved → $flashFileUrl (datasetId=$resolvedDatasetId)');
+        '   Flash file resolved → $flashFileUrl (datasetType=$resolvedDatasetType)');
 
     return _IdentifiedEcu(
       ecuEntry: ecuEntry,
       vehicleModelId: matchedModel.id,
       subModelId: matchedSubModel.id,
       flashFileUrl: flashFileUrl,
-      resolvedDatasetId: resolvedDatasetId,
+      resolvedDatasetType: resolvedDatasetType,
       esnRecordId: match.id,
+      variantCode: variant.variantCode,
     );
   }
-
   Future<void> applyLane(
     String esn,
     int laneIndex,
@@ -504,9 +494,11 @@ class PsfHomeScreenController extends GetxController {
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
     lane.esnRecordId = identified.esnRecordId;
-    lane.resolvedDatasetId = identified.resolvedDatasetId;
+    lane.resolvedDatasetType = identified.resolvedDatasetType;
+    lane.listNumber.value = identified.variantCode ?? '';
     lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
+    lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
     lane.flashCycleStartTime = DateTime.now();
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
@@ -718,9 +710,12 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
- Future<void> connectDongleForLane(int laneIndex) async {
+  
+
+  Future<void> connectDongleForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
-    _dongleRetryAttempts[laneIndex] = 0; // any fresh connect call, manual or automatic, gets a full fresh attempt budget
+    _dongleRetryAttempts[laneIndex] =
+        0; // any fresh connect call, manual or automatic, gets a full fresh attempt budget
 
     print('══════════════════════════════════════════');
     print(
@@ -740,7 +735,8 @@ class PsfHomeScreenController extends GetxController {
     // from a previous failure than a real in-progress attempt, so
     // don't let this block a fresh manual retry indefinitely.
     if (lane.dongleConnecting.value || lane.isDongleBusy) {
-      print('   ⚠️ dongle marked busy/connecting — forcing a clean retry anyway');
+      print(
+          '   ⚠️ dongle marked busy/connecting — forcing a clean retry anyway');
       lane.dongleConnecting.value = false;
       lane.isDongleBusy = false;
     }
@@ -916,7 +912,7 @@ class PsfHomeScreenController extends GetxController {
       _showScanFailedPopup(
         'Reconnect Failed',
         'Could not reconnect to Lane ${lane.laneNumber}\'s dongle at ${lane.dongleIpFromLogin}. '
-        'If this keeps happening, try power-cycling the dongle.',
+            'If this keeps happening, try power-cycling the dongle.',
       );
     }
   }
@@ -1252,7 +1248,8 @@ class PsfHomeScreenController extends GetxController {
         .createEolSession(
       esnId: lane.esnRecordId,
       dongleId: lane.dongleDbId,
-      datasetType: lane.resolvedDatasetId,
+      datasetType: lane.resolvedDatasetType,
+      datafileName: lane.resolvedDatasetFileName,
       startDate: startTime,
       endDate: endTime,
       continutyStatus: continutyPassed ? 'Pass' : 'Fail',
@@ -1950,15 +1947,17 @@ class _IdentifiedEcu {
   final int? vehicleModelId;
   final int? subModelId;
   final String? flashFileUrl;
-  final int? resolvedDatasetId;
+  final String? resolvedDatasetType;
   final int? esnRecordId;
+  final String? variantCode;
 
   _IdentifiedEcu({
     required this.ecuEntry,
     required this.vehicleModelId,
     required this.subModelId,
     this.flashFileUrl,
-    this.resolvedDatasetId,
+    this.resolvedDatasetType,
     this.esnRecordId,
+    this.variantCode,
   });
 }
