@@ -39,7 +39,7 @@ class LoginScreen extends StatelessWidget {
                 Center(
                   child: Image.asset(
                     'asset/images/ic_sidialogo1.png',
-                    width: 400,
+                    width: 300,
                     errorBuilder: (context, error, stackTrace) {
                       debugPrint(
                           "🔴 [LoginScreen] Failed to load ic_sidialogo1.png: $error");

@@ -396,7 +396,8 @@ class AuthService {
   Future<void> createTestBedSession({
     required int? esnId,
     required int? dongleId,
-    required int? datasetType,
+    required String? datasetType,
+    required String? datafileName,
     required DateTime startDate,
     required DateTime endDate,
     required String flashStatus,
@@ -412,7 +413,8 @@ class AuthService {
       final formData = FormData.fromMap({
         "esn_id": esnId?.toString() ?? '',
         "dongle_id": dongleId?.toString() ?? '',
-        "dataset_type": datasetType?.toString() ?? '',
+        "dataset_type": datasetType ?? '',
+        "datafile_name": datafileName ?? '',
         "start_date": startDate.toIso8601String(),
         "end_date": endDate.toIso8601String(),
         "flash_status": flashStatus,
@@ -423,7 +425,6 @@ class AuthService {
           filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
         ),
       });
-
       debugPrint("🔵 [TestBedSessionService] POST ${ApiUrls.createTestBedSession}");
       debugPrint(
           "🔵 [TestBedSessionService] esn_id=$esnId dongle_id=$dongleId dataset_type=$datasetType "
@@ -449,10 +450,11 @@ class AuthService {
   
 
   //=================================eol session apis-----------------------------
-  Future<void> createEolSession({
+ Future<void> createEolSession({
     required int? esnId,
     required int? dongleId,
-    required int? datasetType,
+    required String? datasetType,
+    required String? datafileName,
     required DateTime startDate,
     required DateTime endDate,
     required String continutyStatus,
@@ -469,7 +471,8 @@ class AuthService {
       final formData = FormData.fromMap({
         "esn_id": esnId?.toString() ?? '',
         "dongle_id": dongleId?.toString() ?? '',
-        "dataset_type": datasetType?.toString() ?? '',
+        "dataset_type": datasetType ?? '',
+        "datafile_name": datafileName ?? '',
         "start_date": startDate.toIso8601String(),
         "end_date": endDate.toIso8601String(),
         "continuty_status": continutyStatus,

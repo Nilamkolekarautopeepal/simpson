@@ -705,10 +705,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:simpson/themes/app_colors.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
 import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 import 'package:simpson/views/screens/psf_homeScreen/views/psf_session_history_screen.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+
 
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
@@ -938,18 +942,6 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               ],
             ),
             const SizedBox(height: 18),
-            // _scanField(
-            //   context: context,
-            //   label: 'ESN NUMBER',
-            //   textController: lane.esnController,
-            //   focusNode: lane.esnFocusNode,
-            //   isLoading: lane.isLookingUpEsn,
-            //   isResolved: lane.esn,
-            //   error: lane.esnError,
-            //   hint: 'e.g. 111111111111111',
-            //   onChanged: () => controller.onEsnFieldChanged(laneIndex),
-            //   onSubmit: () => controller.onScanEsnForLane(laneIndex),
-            // ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -979,8 +971,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       onTap: () =>
                           Get.to(() => PsfSessionHistoryScreen(lane: lane)),
                       child: Container(
-                        height: 44,
-                        width: 44,
+                        height: 35,
+                        width: 35,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: _StationColors.tealBg,
@@ -999,7 +991,45 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 }),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 10),
+            Obx(() => lane.listNumber.value.isEmpty
+                ? const SizedBox.shrink()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('LIST NUMBER',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.grey,
+                              letterSpacing: 0.5)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        readOnly: true,
+                        controller: TextEditingController(text: lane.listNumber.value),
+                        style: const TextStyle(fontSize: 13, color: Colors.black87),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          filled: true,
+                          fillColor: Colors.green.withOpacity(0.06),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.themeColor),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.themeColor),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide(color: AppColors.themeColor, width: 1.5),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 11),
+                    ],
+                  )),
             const Text('IQA NUMBERS',
                 style: TextStyle(
                     fontSize: 11,
@@ -1010,128 +1040,77 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             Column(
               children: List.generate(lane.iqaControllers.length, (i) {
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: lane.iqaControllers[i],
-                    builder: (context, value, _) {
-                      final filled = value.text.trim().length == 7;
-                      final borderColor = filled
-                          ? _StationColors.green
-                          : _StationColors.slateBorder;
-                      return Row(
-                        children: [
-                          SizedBox(
-                            width: 88,
-                            height: 44,
-                            child: Container(
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                border: Border.all(
-                                    color: borderColor,
-                                    width: filled ? 1.6 : 1),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (filled) ...[
-                                    const Icon(Icons.check_circle,
-                                        size: 13,
-                                        color: _StationColors.greenDark),
-                                    const SizedBox(width: 5),
-                                  ],
-                                  Text(
-                                    'INJ ${i + 1}',
-                                    style: TextStyle(
-                                        fontSize: 11.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: filled
-                                            ? _StationColors.greenDark
-                                            : _StationColors.charcoal),
-                                  ),
-                                ],
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(lane.iqaLabelFor(i),
+                          style: TextStyle(
+                              fontSize: 11, color: Colors.grey.shade600)),
+                      const SizedBox(height: 2),
+                      SizedBox(
+                        height: 44,
+                        child: Focus(
+                          onKeyEvent: (node, event) {
+                            if (event is KeyDownEvent &&
+                                event.logicalKey == LogicalKeyboardKey.tab) {
+                              if (i < lane.iqaFocusNodes.length - 1) {
+                                lane.iqaFocusNodes[i + 1].requestFocus();
+                              }
+                              return KeyEventResult.handled;
+                            }
+                            return KeyEventResult.ignored;
+                          },
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              textSelectionTheme: TextSelectionThemeData(
+                                selectionColor: Colors.blueAccent[100],
+                                selectionHandleColor: AppColors.themeColor,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: SizedBox(
-                              height: 44,
-                              child: Focus(
-                                onKeyEvent: (node, event) {
-                                  if (event is KeyDownEvent &&
-                                      (event.logicalKey ==
-                                              LogicalKeyboardKey.tab ||
-                                          event.logicalKey ==
-                                              LogicalKeyboardKey.enter)) {
-                                    if (i < lane.iqaFocusNodes.length - 1) {
-                                      lane.iqaFocusNodes[i + 1].requestFocus();
-                                    }
-                                    return KeyEventResult.handled;
-                                  }
-                                  return KeyEventResult.ignored;
-                                },
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    border: Border.all(
-                                        color: borderColor,
-                                        width: filled ? 1.6 : 1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Theme(
-                                    data: Theme.of(context).copyWith(
-                                      textSelectionTheme:
-                                          TextSelectionThemeData(
-                                        selectionColor:
-                                            Colors.grey.withOpacity(0.4),
-                                        selectionHandleColor:
-                                            _StationColors.teal,
-                                      ),
-                                    ),
-                                    child: TextField(
-                                      controller: lane.iqaControllers[i],
-                                      focusNode: lane.iqaFocusNodes[i],
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: filled
-                                              ? _StationColors.greenDark
-                                              : Colors.black87),
-                                      decoration: InputDecoration(
-                                        hintText: lane.iqaLabelFor(i),
-                                        hintStyle: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.normal),
-                                        isDense: true,
-                                        filled: false,
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                vertical: 12),
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                      ),
-                                      onChanged: (_) => controller
-                                          .onIqaFieldChanged(laneIndex, i),
-                                      onSubmitted: (_) {
-                                        if (i < lane.iqaFocusNodes.length - 1) {
-                                          lane.iqaFocusNodes[i + 1]
-                                              .requestFocus();
-                                        }
-                                      },
-                                    ),
-                                  ),
+                            child: TextField(
+                              cursorColor: AppColors.themeColor,
+                              controller: lane.iqaControllers[i],
+                              focusNode: lane.iqaFocusNodes[i],
+                              enabled: true,
+                              maxLength: 7,
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                filled: true,
+                                fillColor: Colors.white,
+                                counterText: '',
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 12),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide:
+                                      BorderSide(color: Colors.grey.shade200),
                                 ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide:
+                                      BorderSide(color: AppColors.themeColor),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(
+                                      color: AppColors.themeColor, width: 1.5),
+                                ),
+                                hintText: 'Scan ${lane.iqaLabelFor(i)}',
                               ),
+                              onChanged: (_) =>
+                                  controller.onIqaFieldChanged(laneIndex, i),
+                              onSubmitted: (_) {
+                                if (i < lane.iqaFocusNodes.length - 1) {
+                                  lane.iqaFocusNodes[i + 1].requestFocus();
+                                }
+                              },
                             ),
                           ),
-                        ],
-                      );
-                    },
+                        ),
+                      ),
+                    ],
                   ),
                 );
               }),
@@ -1152,6 +1131,48 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
+// Widget _buildResolvedInfoTile() {
+//     return Padding(
+//       padding: EdgeInsets.zero,
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Row(
+//             children: [
+//               Icon(Icons.check_circle, size: 16, color: _StationColors.teal),
+//               SizedBox(width: 6),
+//               Text(
+//                 'Resolved from ESN',
+//                 style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 13),
+//               ),
+//             ],
+//           ),
+//           const SizedBox(height: 8),
+//           _readOnlyInfoRow('List No.', lane.listNumber.value),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _readOnlyInfoRow(String label, String value) {
+//     return Container(
+//       width: double.infinity,
+//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//       decoration: BoxDecoration(
+//         color: _StationColors.tealBg,
+//         borderRadius: BorderRadius.circular(6),
+//         border: Border.all(color: _StationColors.teal.withOpacity(0.25)),
+//       ),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Text(label, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+//           const SizedBox(height: 2),
+//           Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+//         ],
+//       ),
+//     );
+//   }
   Widget _scanField({
     required BuildContext context,
     required String label,
@@ -1171,21 +1192,17 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: _StationColors.slate,
+                color: Colors.grey,
                 letterSpacing: 0.5)),
         const SizedBox(height: 6),
         Obx(() {
           final resolved = isResolved.value.isNotEmpty;
-          return Container(
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: resolved
-                      ? _StationColors.green
-                      : _StationColors.slateBorder,
-                  width: resolved ? 1.6 : 1),
+          return Theme(
+            data: Theme.of(context).copyWith(
+              textSelectionTheme: TextSelectionThemeData(
+                selectionColor: Colors.blueAccent[100],
+                selectionHandleColor: AppColors.themeColor,
+              ),
             ),
             child: Focus(
               onKeyEvent: (node, event) {
@@ -1197,41 +1214,45 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 }
                 return KeyEventResult.ignored;
               },
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  textSelectionTheme: TextSelectionThemeData(
-                    selectionColor: Colors.grey.withOpacity(0.4),
-                    selectionHandleColor: _StationColors.teal,
+              child: TextField(
+                cursorColor: AppColors.themeColor,
+                controller: textController,
+                focusNode: focusNode,
+                enabled: !isLoading.value,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor:
+                      resolved ? Colors.green.withOpacity(0.06) : Colors.white,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  suffixIcon: isLoading.value
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                        )
+                      : null,
+                  hintText: hint,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.themeColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide:
+                        BorderSide(color: AppColors.themeColor, width: 1.5),
                   ),
                 ),
-                child: TextField(
-                  controller: textController,
-                  focusNode: focusNode,
-                  enabled: !isLoading.value,
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: hint,
-                    isDense: true,
-                    filled: false,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    suffixIcon: isLoading.value
-                        ? const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2)),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                  ),
-                  onChanged: (_) => onChanged(),
-                  onSubmitted: (_) => onSubmit(),
-                ),
+                onChanged: (_) => onChanged(),
+                onSubmitted: (_) => onSubmit(),
               ),
             ),
           );
@@ -1241,70 +1262,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             : Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(error.value,
-                    style: const TextStyle(
-                        fontSize: 11, color: _StationColors.red)),
+                    style: const TextStyle(fontSize: 11, color: Colors.red)),
               )),
-      ],
-    );
-  }
-
-  // ── RIGHT: Flash File / DTC / PID / Activity Log ────────────────
-
-  Widget _mainArea(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-            child: Obx(() {
-              if (!lane.iqaAllFilled.value) {
-                return SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.6,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: const BoxDecoration(
-                              color: _StationColors.tealBg,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.checklist_rtl_rounded,
-                              color: _StationColors.teal, size: 34),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text('Waiting for scan',
-                            style: TextStyle(
-                                color: _StationColors.charcoal,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Complete ESN and all\nIQA fields to continue.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: _StationColors.slate, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _flashSection(),
-                  const SizedBox(height: 14),
-                  _dtcSection(),
-                  const SizedBox(height: 14),
-                  _pidSection(),
-                ],
-              );
-            }),
-          ),
-        ),
-        _activityLogSection(),
       ],
     );
   }
@@ -2061,7 +2020,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+         Row(
             children: [
               const Text('Activity',
                   style: TextStyle(
@@ -2072,8 +2031,44 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               IconButton(
                   icon: const Icon(Icons.fullscreen, size: 20),
                   color: _StationColors.teal,
+                  tooltip: 'Open full screen',
                   visualDensity: VisualDensity.compact,
                   onPressed: _showActivityFullScreen),
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.save_alt, size: 18),
+                    tooltip: 'Save Activity Log',
+                    color: _StationColors.teal,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: lane.activityLog.isEmpty
+                        ? null
+                        : () async {
+                            try {
+                              final dir = await getApplicationDocumentsDirectory();
+                              final file = File('${dir.path}/activity_log_lane_${lane.laneNumber}_${DateTime.now().millisecondsSinceEpoch}.txt');
+                              await file.writeAsString(lane.activityLog.join('\n'));
+                              Get.snackbar(
+                                'Saved',
+                                'Activity log saved successfully.',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            } catch (e) {
+                              Get.snackbar(
+                                'Error',
+                                'Failed to save activity log.',
+                                snackPosition: SnackPosition.BOTTOM,
+                              );
+                            }
+                          },
+                  )),
+              Obx(() => IconButton(
+                    icon: const Icon(Icons.copy, size: 18),
+                    tooltip: 'Copy all activity log',
+                    color: _StationColors.teal,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: lane.activityLog.isEmpty
+                        ? null
+                        : () => _copyActivityLog(),
+                  )),
             ],
           ),
           const SizedBox(height: 6),
@@ -2143,6 +2138,21 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       ),
     );
   }
+
+void _copyActivityLog() {
+    final text = lane.activityLog.join('\n');
+    Clipboard.setData(ClipboardData(text: text));
+    Get.snackbar(
+      'Copied',
+      '${lane.activityLog.length} log line${lane.activityLog.length == 1 ? '' : 's'} copied to clipboard',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: _StationColors.teal,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+  }
+  
+
 
   // void _showActivityFullScreen() {
   //   Get.dialog(
@@ -2279,6 +2289,65 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         ),
       ),
       barrierDismissible: true,
+    );
+  }
+
+  Widget _mainArea(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+            child: Obx(() {
+              if (!lane.iqaAllFilled.value) {
+                return SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.6,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: const BoxDecoration(
+                              color: _StationColors.tealBg,
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.checklist_rtl_rounded,
+                              color: _StationColors.teal, size: 34),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text('Waiting for scan',
+                            style: TextStyle(
+                                color: _StationColors.charcoal,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Complete ESN and all\nIQA fields to continue.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: _StationColors.slate, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _flashSection(),
+                  const SizedBox(height: 14),
+                  _dtcSection(),
+                  const SizedBox(height: 14),
+                  _pidSection(),
+                ],
+              );
+            }),
+          ),
+        ),
+        _activityLogSection(),
+      ],
     );
   }
 }

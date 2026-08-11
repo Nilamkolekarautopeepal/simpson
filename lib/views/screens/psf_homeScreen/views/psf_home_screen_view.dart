@@ -89,29 +89,29 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
               ),
             ),
           ),
-          Obx(
-            () => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _statusPill(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _glowDot(controller.isDongleConnectedAnywhere
-                        ? _LaneColors.green
-                        : _LaneColors.red),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Dongle',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          // Obx(
+          //   () => Padding(
+          //     padding: const EdgeInsets.symmetric(horizontal: 6),
+          //     child: _statusPill(
+          //       child: Row(
+          //         mainAxisSize: MainAxisSize.min,
+          //         children: [
+          //           _glowDot(controller.isDongleConnectedAnywhere
+          //               ? _LaneColors.green
+          //               : _LaneColors.red),
+          //           const SizedBox(width: 8),
+          //           const Text(
+          //             'Dongle',
+          //             style: TextStyle(
+          //                 color: Colors.white,
+          //                 fontSize: 12.5,
+          //                 fontWeight: FontWeight.w600),
+          //           ),
+          //         ],
+          //       ),
+          //     ),
+          //   ),
+          // ),
           const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),

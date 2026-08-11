@@ -366,7 +366,6 @@ class _LaneColors {
   static const red = Color(0xFFD64545);
   static const redBg = Color(0xFFFDEDED);
   static const slate = Color(0xFF7C8698);
-  static const slateBorder = Color(0xFFDDE1E9);
   static const slateBg = Color(0xFFF7F8FA);
 }
 

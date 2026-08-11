@@ -98,8 +98,9 @@ class HomePageController extends GetxController {
 
   Timer? _plcRetryTimer;
   Timer? _plcHeartbeatTimer;
-  int? _esnRecordId;
-  int? _resolvedDatasetId;
+ int? _esnRecordId;
+  String? _resolvedDatasetType;
+  String? _resolvedDatasetFileName;
   int? _dongleDbId;
   DateTime? _flashCycleStartTime;
   bool _lastDtcReadSucceeded = true;
@@ -2349,19 +2350,18 @@ class HomePageController extends GetxController {
                     d.isActive == true &&
                     d.isLatest == true,
               );
-          if (variantEcu == null) {
+        if (variantEcu == null) {
             throw Exception(
                 "Active D-dataset ECU entry not found for selected file");
           }
 
-          _resolvedDatasetId = variantEcu.id;
-          final isFromTDataset =
-              (variant.tDatasetEcu ?? []).any((t) => t.id == variantEcu.id);
+          final isFromTDataset = (variant.tDatasetEcu ?? []).any((t) => t.id == variantEcu.id);
+          _resolvedDatasetType = isFromTDataset ? 'T Dataset' : 'D Dataset';
+          _resolvedDatasetFileName = variantEcu.dataFile?.split('/').last;
+
           print("🟣 [DatasetTracking] Selected file: $fileName");
           print(
-              "🟣 [DatasetTracking] variantEcu.id (this becomes dataset_type sent to server): ${variantEcu.id}");
-          print(
-              "🟣 [DatasetTracking] Source: ${isFromTDataset ? 'T-dataset' : 'D-dataset'}");
+              "🟣 [DatasetTracking] variantEcu.id: ${variantEcu.id}  →  dataset_type sent: $_resolvedDatasetType");
           print(
               "🟣 [DatasetTracking] variantEcu.dataFile: ${variantEcu.dataFile}");
           final models = await _ensureModels();
@@ -2544,14 +2544,14 @@ class HomePageController extends GetxController {
         final endTime = DateTime.now();
 
         print(
-            "🟣 [DatasetTracking] About to send — esnId=$_esnRecordId dongleId=$_dongleDbId datasetType=$_resolvedDatasetId");
+          "🟣 [DatasetTracking] About to send — esnId=$_esnRecordId dongleId=$_dongleDbId datasetType=$_resolvedDatasetType");
         _log('Sending test-bed session report to server...');
 
-        unawaited(_authService
-            .createTestBedSession(
+      unawaited(_authService.createTestBedSession(
           esnId: _esnRecordId,
           dongleId: _dongleDbId,
-          datasetType: _resolvedDatasetId,
+          datasetType: _resolvedDatasetType,
+          datafileName: _resolvedDatasetFileName,
           startDate: startTime,
           endDate: endTime,
           flashStatus: flashPassed ? 'Pass' : 'Fail',
