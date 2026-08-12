@@ -200,7 +200,7 @@
 //             ),
 //             const SizedBox(height: 18),
 //             Obx(() => lane.esn.value.isEmpty
-//                 ? const SizedBox.shrink()
+//  /               ? const SizedBox.shrink()
 //                 : _scanField(
 //                     label: 'LIST NUMBER',
 //                     textController: _listNumberController,
@@ -339,7 +339,7 @@
 //                 filled: false,
 //                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
 //                 suffixIcon: isLoading.value
-//                     ? const Padding(
+//    /                 ? const Padding(
 //                         padding: EdgeInsets.all(10),
 //                         child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
 //                       )
@@ -362,7 +362,7 @@
 //           );
 //         }),
 //         Obx(() => error.value.isEmpty
-//             ? const SizedBox.shrink()
+//   /          ? const SizedBox.shrink()
 //             : Padding(
 //                 padding: const EdgeInsets.only(top: 4),
 //                 child: Text(error.value, style: const TextStyle(fontSize: 11, color: _StationColors.red)),
@@ -473,7 +473,7 @@
 //             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
 //           ),
 //           child: lane.isFlashing.value
-//               ? Row(
+//    /           ? Row(
 //                   mainAxisAlignment: MainAxisAlignment.center,
 //                   children: [
 //                     const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
@@ -713,10 +713,8 @@ import 'package:simpson/views/screens/psf_homeScreen/views/psf_session_history_s
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
-
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
-  static const tealLight = Color(0xFF1B9494);
   static const tealBg = Color(0xFFE8F5F5);
   static const charcoal = Color(0xFF1E2A32);
   static const green = Color(0xFF2ECC71);
@@ -731,18 +729,7 @@ class _StationColors {
   static const slateBg = Color(0xFFF7F8FA);
 }
 
-/// One lane's full detail view. Binds DIRECTLY to the lane's own
-/// TextEditingControllers/FocusNodes/RxValues — NEVER local copies.
-/// Local controllers seeded once in initState() only reflect
-/// whichever lane was first shown, and Flutter reuses the same State
-/// object when switching lanes unless given a distinct key — that
-/// combination is exactly what caused every lane to show the same
-/// ESN/IQA data. Direct binding has nothing to go stale.
-///
-/// IMPORTANT: wherever this widget is constructed (in
-/// psf_home_screen_view.dart), it must be given
-/// key: ValueKey(laneIndex) so switching lanes creates a genuinely
-/// fresh widget instance.
+
 class PsfLaneFullScreenView extends StatefulWidget {
   const PsfLaneFullScreenView({
     super.key,
@@ -783,57 +770,55 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     // one would never actually reflect real progress.
     ever(lane.flashStatus, (String status) {
       if (status == 'Flash Completed') {
-        _showFlashSuccessPopup();
+       // _showFlashSuccessPopup();
       }
     });
   }
 
-  void _showFlashSuccessPopup() {
-    Get.dialog(
-      Obx(() => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: _StationColors.greenDark),
-                SizedBox(width: 10),
-                Text('Flashing Successful'),
-              ],
-            ),
-            content: lane.isPostFlashProcessing.value
-                ? const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: _StationColors.teal)),
-                      SizedBox(width: 12),
-                      Expanded(
-                          child: Text(
-                              'Reading DTC and writing IQA — please wait…')),
-                    ],
-                  )
-                : const Text('DTC read and IQA write complete.'),
-            actions: lane.isPostFlashProcessing.value
-                ? []
-                : [
-                    TextButton(
-                      onPressed: () => Get.back(),
-                      child: const Text('OK'),
-                    ),
-                  ],
-          )),
-      barrierDismissible: false,
-    );
+  // void _showFlashSuccessPopup() {
+  //   Get.dialog(
+  //     Obx(() => AlertDialog(
+  //           title: const Row(
+  //             children: [
+  //               Icon(Icons.check_circle, color: _StationColors.greenDark),
+  //               SizedBox(width: 10),
+  //               Text('Flashing Successful'),
+  //             ],
+  //           ),
+  //           content: lane.isPostFlashProcessing.value
+  //  /             ? const Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     SizedBox(
+  //                         width: 18,
+  //                         height: 18,
+  //                         child: CircularProgressIndicator(
+  //                             strokeWidth: 2, color: _StationColors.teal)),
+  //                     SizedBox(width: 12),
+  //                     Expanded(child: Text('writing IQA — please wait…')),
+  //                   ],
+  //                 )
+  //               : const Text('DTC read and IQA write complete.'),
+  //           actions: lane.isPostFlashProcessing.value
+  //     /          ? []
+  //               : [
+  //                   TextButton(
+  //                     onPressed: () => Get.back(),
+  //                     child: const Text('OK'),
+  //                   ),
+  //                 ],
+  //         )),
+  //     barrierDismissible: false,
+  //   );
 
-    ever(lane.isPostFlashProcessing, (bool processing) {
-      if (!processing && Get.isDialogOpen == true) {
-        Future.delayed(const Duration(seconds: 2), () {
-          if (Get.isDialogOpen == true) Get.back();
-        });
-      }
-    });
-  }
+  //   ever(lane.isPostFlashProcessing, (bool processing) {
+  //     if (!processing && Get.isDialogOpen == true) {
+  //       Future.delayed(const Duration(seconds: 2), () {
+  //         if (Get.isDialogOpen == true) Get.back();
+  //       });
+  //     }
+  //   });
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -882,9 +867,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: selected ? color : color.withOpacity(0.1),
+          color: selected ? color : color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color.withOpacity(0.5)),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
         child: Text(
           tag,
@@ -978,7 +963,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           color: _StationColors.tealBg,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                              color: _StationColors.teal.withOpacity(0.3)),
+                              color: _StationColors.teal.withValues(alpha: 0.3)),
                         ),
                         child: const Icon(
                           Icons.history_rounded,
@@ -1006,13 +991,16 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       const SizedBox(height: 6),
                       TextField(
                         readOnly: true,
-                        controller: TextEditingController(text: lane.listNumber.value),
-                        style: const TextStyle(fontSize: 13, color: Colors.black87),
+                        controller:
+                            TextEditingController(text: lane.listNumber.value),
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.black87),
                         decoration: InputDecoration(
                           isDense: true,
                           filled: true,
-                          fillColor: Colors.green.withOpacity(0.06),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          fillColor: Colors.green.withValues(alpha: 0.06),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
                             borderSide: BorderSide(color: AppColors.themeColor),
@@ -1023,7 +1011,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppColors.themeColor, width: 1.5),
+                            borderSide: BorderSide(
+                                color: AppColors.themeColor, width: 1.5),
                           ),
                         ),
                       ),
@@ -1224,7 +1213,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   isDense: true,
                   filled: true,
                   fillColor:
-                      resolved ? Colors.green.withOpacity(0.06) : Colors.white,
+                      resolved ? Colors.green.withValues(alpha: 0.06) : Colors.white,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   suffixIcon: isLoading.value
@@ -1598,7 +1587,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   color: _StationColors.amberBg,
                   borderRadius: BorderRadius.circular(6),
                   border:
-                      Border.all(color: _StationColors.amber.withOpacity(0.4))),
+                      Border.all(color: _StationColors.amber.withValues(alpha: 0.4))),
               child: Row(children: [
                 const Icon(Icons.info_outline,
                     size: 16, color: _StationColors.amber),
@@ -1811,9 +1800,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-                color: badgeColor.withOpacity(0.1),
+                color: badgeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: badgeColor.withOpacity(0.4))),
+                border: Border.all(color: badgeColor.withValues(alpha: 0.4))),
             child: Text(badgeLabel,
                 style: TextStyle(
                     fontSize: 10.5,
@@ -1906,7 +1895,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     Divider(
                         height: 1,
                         thickness: 1,
-                        color: _StationColors.slateBorder.withOpacity(0.6)),
+                        color: _StationColors.slateBorder.withValues(alpha: 0.6)),
                 ],
               );
             });
@@ -1930,7 +1919,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
+                            color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 12,
                             offset: const Offset(0, 4))
                       ]),
@@ -1943,7 +1932,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     Text('Reading live parameters...',
                         style: TextStyle(
                             fontSize: 12,
-                            color: _StationColors.slate.withOpacity(0.9),
+                            color: _StationColors.slate.withValues(alpha: 0.9),
                             fontWeight: FontWeight.w600)),
                   ]),
                 ),
@@ -2012,7 +2001,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         border: Border.all(color: _StationColors.slateBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, -2))
         ],
@@ -2020,7 +2009,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-         Row(
+          Row(
             children: [
               const Text('Activity',
                   style: TextStyle(
@@ -2043,9 +2032,12 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         ? null
                         : () async {
                             try {
-                              final dir = await getApplicationDocumentsDirectory();
-                              final file = File('${dir.path}/activity_log_lane_${lane.laneNumber}_${DateTime.now().millisecondsSinceEpoch}.txt');
-                              await file.writeAsString(lane.activityLog.join('\n'));
+                              final dir =
+                                  await getApplicationDocumentsDirectory();
+                              final file = File(
+                                  '${dir.path}/activity_log_lane_${lane.laneNumber}_${DateTime.now().millisecondsSinceEpoch}.txt');
+                              await file
+                                  .writeAsString(lane.activityLog.join('\n'));
                               Get.snackbar(
                                 'Saved',
                                 'Activity log saved successfully.',
@@ -2139,7 +2131,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-void _copyActivityLog() {
+  void _copyActivityLog() {
     final text = lane.activityLog.join('\n');
     Clipboard.setData(ClipboardData(text: text));
     Get.snackbar(
@@ -2151,8 +2143,6 @@ void _copyActivityLog() {
       duration: const Duration(seconds: 2),
     );
   }
-  
-
 
   // void _showActivityFullScreen() {
   //   Get.dialog(

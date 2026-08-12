@@ -321,6 +321,9 @@ class PsfLane {
 
   final RxBool isFlashing = false.obs;
   final RxBool isPostFlashProcessing = false.obs;
+
+  final RxBool isReconnectingAfterFlash = false.obs;
+
   final RxDouble flashProgress = 0.0.obs;
 
   final RxInt flashElapsedSeconds = 0.obs;
