@@ -3027,24 +3027,24 @@ class HomePageController extends GetxController {
         return;
       }
 
-      Get.dialog(
-        const Center(
-          child: Card(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text("Reconnecting..."),
-                ],
-              ),
-            ),
-          ),
-        ),
-        barrierDismissible: false,
-      );
+      // Get.dialog(
+      //   const Center(
+      //     child: Card(
+      //       child: Padding(
+      //         padding: EdgeInsets.all(24),
+      //         child: Column(
+      //           mainAxisSize: MainAxisSize.min,
+      //           children: [
+      //             CircularProgressIndicator(),
+      //             SizedBox(height: 16),
+      //             Text("Reconnecting..."),
+      //           ],
+      //         ),
+      //       ),
+      //     ),
+      //   ),
+      //   barrierDismissible: false,
+      // );
 
       try {
         final channelParts = StaticData.ecuInfo.first.channelId?.split('-');

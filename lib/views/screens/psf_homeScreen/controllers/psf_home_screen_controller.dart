@@ -885,24 +885,24 @@ class PsfHomeScreenController extends GetxController {
 
     if (lane.dongleConnected.value) return; // already fine, nothing to do
 
-    Get.dialog(
-      const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text("Reconnecting..."),
-              ],
-            ),
-          ),
-        ),
-      ),
-      barrierDismissible: false,
-    );
+    // Get.dialog(
+    //   const Center(
+    //     child: Card(
+    //       child: Padding(
+    //         padding: EdgeInsets.all(24),
+    //         child: Column(
+    //           mainAxisSize: MainAxisSize.min,
+    //           children: [
+    //             CircularProgressIndicator(),
+    //             SizedBox(height: 16),
+    //             Text("Reconnecting..."),
+    //           ],
+    //         ),
+    //       ),
+    //     ),
+    //   ),
+    //   barrierDismissible: false,
+    // );
 
     await connectDongleForLane(laneIndex);
 
@@ -1179,6 +1179,8 @@ class PsfHomeScreenController extends GetxController {
     // lane.isDongleBusy = true;
 
     //------------------------------------------------
+    lane.isReconnectingAfterFlash.value = true;
+
     await Future.delayed(const Duration(seconds: 5));
     lane.isDongleBusy = false;
 
@@ -1188,17 +1190,15 @@ class PsfHomeScreenController extends GetxController {
       attempt++;
       await connectDongleForLane(index);
       if (lane.dongleConnected.value && lane.dllFunctions != null) {
-        print(
-            '   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+        print('   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
         break;
       }
-      print(
-          '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+      print('   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
       await Future.delayed(const Duration(seconds: 5));
     }
 
     lane.isDongleBusy = true;
-
+    lane.isReconnectingAfterFlash.value = false;
     //---------------------------------------------
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print(

@@ -5,8 +5,6 @@ import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
   static const tealLight = Color(0xFF1B9494);
-  // ignore: unused_field
-  static const tealBg = Color(0xFFE8F5F5);
   static const charcoal = Color.fromRGBO(3, 60, 98, 1);
   static const green = Color(0xFF2ECC71);
   static const red = Color(0xFFD64545);
@@ -70,22 +68,34 @@ class PsfTopLaneStatusBar extends StatelessWidget {
       final failed = lane.flashStatus.value.startsWith('Flash Failed');
       final completed = lane.flashStatus.value == 'Flash Completed';
 
-      final Color dotColor =
-          (lane.dongleConnected.value || lane.isFlashing.value)
-              ? _StationColors.green
-              : _StationColors.red;
+      final reconnecting = lane.isReconnectingAfterFlash.value;
+
+      // The dot is purely this lane's OWN dongle connection state —
+      // green if connected (or actively flashing/reconnecting right
+      // after a flash — both are expected, not real failures), red
+      // only for a genuine unexpected disconnect.
+      final Color dotColor = (lane.dongleConnected.value || flashing || reconnecting) ? _StationColors.green : _StationColors.red;
 
       String subLabel;
-      if (flashing) {
+      Color subLabelColor;
+      if (reconnecting) {
+        subLabel = 'Finishing up...';
+        subLabelColor = Colors.white;
+      } else if (flashing) {
         subLabel = 'Flashing... ${(lane.flashProgress.value * 100).round()}%';
+        subLabelColor = Colors.white;
       } else if (failed) {
         subLabel = 'Failed';
+        subLabelColor = Colors.white;
       } else if (completed) {
         subLabel = 'Flash Successful';
+        subLabelColor = Colors.white;
       } else if (lane.dongleConnected.value) {
         subLabel = lane.esn.value.isEmpty ? 'Ready' : 'Idle';
+        subLabelColor = Colors.white;
       } else {
         subLabel = 'Offline';
+        subLabelColor = Colors.white;
       }
 
       return Material(
