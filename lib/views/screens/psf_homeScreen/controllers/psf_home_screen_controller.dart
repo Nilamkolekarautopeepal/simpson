@@ -1917,7 +1917,7 @@ class PsfHomeScreenController extends GetxController {
     lanes[index].isLedOn.toggle();
   }
 
-  void logout() {
+ void logout() {
     final flashingLanes = lanes.where((l) => l.isFlashing.value).toList();
     if (flashingLanes.isNotEmpty) {
       final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');
@@ -1936,9 +1936,14 @@ class PsfHomeScreenController extends GetxController {
       );
       return;
     }
-    Get.offAllNamed(
-      "/login",
-    );
+
+    Get.offAllNamed("/login");
+
+    // Force this controller (and every lane's timers inside it) to
+    // actually be destroyed after navigating away — without this,
+    // GetX keeps it alive in memory, and old lanes' retry timers keep
+    // firing indefinitely into whatever new session starts next.
+    Get.delete<PsfHomeScreenController>(force: true);
   }
 }
 
