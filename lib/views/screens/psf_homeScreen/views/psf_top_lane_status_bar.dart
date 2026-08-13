@@ -81,21 +81,27 @@ class PsfTopLaneStatusBar extends StatelessWidget {
       if (reconnecting) {
         subLabel = 'Finishing up...';
         subLabelColor = Colors.white;
+        print(  'Lane $index is reconnecting after flash, showing "Finishing up..."');
       } else if (flashing) {
         subLabel = 'Flashing... ${(lane.flashProgress.value * 100).round()}%';
         subLabelColor = Colors.white;
+        print(  'Lane $index is flashing, showing progress: ${subLabel}');
       } else if (failed) {
         subLabel = 'Failed';
         subLabelColor = Colors.white;
+        print(  'Lane $index has failed, showing "Failed"');
       } else if (completed) {
         subLabel = 'Flash Successful';
         subLabelColor = Colors.white;
+        print(  'Lane $index has completed successfully, showing "Flash Successful"');
       } else if (lane.dongleConnected.value) {
         subLabel = lane.esn.value.isEmpty ? 'Ready' : 'Idle';
         subLabelColor = Colors.white;
+        print(  'Lane $index is connected and idle, showing "${subLabel}"');
       } else {
         subLabel = 'Offline';
         subLabelColor = Colors.white;
+        print(  'Lane $index is offline, showing "Offline"');
       }
 
       return Material(
