@@ -2282,90 +2282,106 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //   );
   // }
 
-  void _showActivityFullScreen() {
+ void _showActivityFullScreen() {
+    String? fullScreenFilter = _activityFilter;
+
     Get.dialog(
       Dialog.fullscreen(
-        child: Scaffold(
-          appBar: AppBar(
-            iconTheme: const IconThemeData(color: Colors.white),
-            backgroundColor: _StationColors.teal,
-            foregroundColor: Colors.white,
-            title: Text('Activity Log — Lane ${lane.laneNumber}'),
-          ),
-          backgroundColor: _StationColors.slateBg,
-          body: StatefulBuilder(
-            builder: (context, setDialogState) {
-              return SafeArea(
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Scaffold(
+              appBar: AppBar(
+                iconTheme: const IconThemeData(color: Colors.white),
+                backgroundColor: _StationColors.teal,
+                foregroundColor: Colors.white,
+                title: Text('Activity Log — Lane ${lane.laneNumber}'),
+                actions: [
+                  Obx(() => IconButton(
+                        icon: const Icon(Icons.save_alt, color: Colors.white),
+                        tooltip: 'Save Activity Log',
+                        onPressed: lane.activityLog.isEmpty
+                            ? null
+                            : () async {
+                                final ok = await lane.saveActivityLog();
+                                Get.snackbar(
+                                  ok ? 'Saved' : 'Error',
+                                  ok
+                                      ? 'Activity log saved successfully.'
+                                      : 'Failed to save activity log.',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                );
+                              },
+                      )),
+                  Obx(() => IconButton(
+                        icon: const Icon(Icons.copy, color: Colors.white),
+                        tooltip: 'Copy all activity log',
+                        onPressed: lane.activityLog.isEmpty
+                            ? null
+                            : () => _copyActivityLog(),
+                      )),
+                ],
+              ),
+              backgroundColor: _StationColors.slateBg,
+              body: Padding(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: SizedBox(
-                        height: 30,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: ActivityLogTag.allTags.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 6),
-                          itemBuilder: (context, i) {
-                            final tag = ActivityLogTag.allTags[i];
+                    SizedBox(
+                      height: 28,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: ActivityLogTag.allTags.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(width: 6),
+                        itemBuilder: (context, i) {
+                          if (i == 0) {
                             return _tagChip(
-                              tag,
-                              selected: _activityFilter == tag,
-                              onTap: () => setDialogState(() =>
-                                  _activityFilter =
-                                      _activityFilter == tag ? null : tag),
+                              'All',
+                              selected: fullScreenFilter == null,
+                              onTap: () => setDialogState(() => fullScreenFilter = null),
                             );
-                          },
-                        ),
+                          }
+                          final tag = ActivityLogTag.allTags[i - 1];
+                          return _tagChip(
+                            tag,
+                            selected: fullScreenFilter == tag,
+                            onTap: () => setDialogState(() => fullScreenFilter = fullScreenFilter == tag ? null : tag),
+                          );
+                        },
                       ),
                     ),
-                    const Divider(height: 1),
+                    const SizedBox(height: 12),
                     Expanded(
                       child: Obx(() {
                         final entries = lane.activityLog.where((e) {
-                          if (_activityFilter == null) return true;
-                          return _parseLogEntry(e)['tag'] == _activityFilter;
+                          if (fullScreenFilter == null) return true;
+                          return _parseLogEntry(e)['tag'] == fullScreenFilter;
                         }).toList();
 
                         if (entries.isEmpty) {
                           return Center(
                             child: Text(
-                              _activityFilter == null
-                                  ? 'No activity yet'
-                                  : 'No "$_activityFilter" entries yet',
-                              style:
-                                  const TextStyle(color: _StationColors.slate),
+                              fullScreenFilter == null ? 'No activity yet' : 'No "$fullScreenFilter" entries yet',
+                              style: const TextStyle(color: _StationColors.slate),
                             ),
                           );
                         }
 
                         return ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           itemCount: entries.length,
                           itemBuilder: (context, i) {
                             final parsed = _parseLogEntry(entries[i]);
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                    color: _StationColors.slateBorder),
-                              ),
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 5),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _tagChip(parsed['tag']!),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: SelectableText(
                                       '[${parsed['time']}] ${parsed['message']}',
-                                      style: TextStyle(
-                                          fontSize: 13,
-                                          color: _activityLogColor(entries[i])),
+                                      style: TextStyle(fontSize: 13, color: _activityLogColor(entries[i])),
                                     ),
                                   ),
                                 ],
@@ -2377,9 +2393,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     ),
                   ],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
       barrierDismissible: true,

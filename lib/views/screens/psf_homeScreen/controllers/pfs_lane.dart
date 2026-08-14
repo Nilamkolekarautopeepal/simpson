@@ -143,6 +143,30 @@ class PsfLane {
     }
   }
 
+Future<bool> saveActivityLog() async {
+    try {
+      if (activityLog.isEmpty) return false;
+
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final activityDir = Directory('${documentsDir.path}/ActivityLog');
+
+      if (!await activityDir.exists()) {
+        await activityDir.create(recursive: true);
+      }
+
+      final fileName =
+          'Lane${laneNumber}_ActivityLog_${DateTime.now().toIso8601String().replaceAll(':', '-').replaceAll('.', '-')}.txt';
+
+      final file = File('${activityDir.path}/$fileName');
+      await file.writeAsString(activityLog.join('\n'));
+
+      print('Activity log saved: ${file.path}');
+      return true;
+    } catch (e) {
+      print('Failed to save activity log: $e');
+      return false;
+    }
+  }
   /// Auto-scan debounce — no SCAN button anymore; typing pauses for
   /// 2s then submits automatically.
   Timer? esnIdleTimer;
