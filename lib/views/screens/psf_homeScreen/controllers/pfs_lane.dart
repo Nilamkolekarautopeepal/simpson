@@ -122,6 +122,7 @@ class PsfLane {
   final RxBool isLookingUpEsn = false.obs;
 
   final RxString esnError = "".obs;
+  final RxBool isClearingDtc = false.obs;
 
   final RxList<String> activityLog = <String>[].obs;
 
@@ -311,6 +312,8 @@ class PsfLane {
   // ===============================
   // FLASH
   // ===============================
+
+  
 
   final RxBool flashFilesLoading = false.obs;
   final RxString flashFilesError = "".obs;

@@ -712,6 +712,7 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
 import 'package:simpson/views/screens/psf_homeScreen/views/psf_session_history_screen.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 
 class _StationColors {
   static const teal = Color(0xFF0E6E6E);
@@ -890,48 +891,49 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   Widget _leftSidebar(BuildContext context) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.all(20),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(
-                    () => Text(
-                      lane.ecuModelName.value.isEmpty
-                          ? "ECU MODEL NAME"
-                          : lane.ecuModelName.value,
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: _StationColors.charcoal),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Obx(
+                          () => Text(
+                            lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      Obx(() => lane.esn.value.isEmpty
+                          ? const SizedBox.shrink()
+                          : IconButton(
+                              icon: const Icon(Icons.history, color: _StationColors.teal, size: 20),
+                              onPressed: () => PsfSessionHistoryScreen.show(lane),
+                              tooltip: 'View session history',
+                              visualDensity: VisualDensity.compact,
+                            )),
+                      Container(
+                        decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
+                        child: IconButton(
+                          icon: const Icon(Icons.refresh, color: _StationColors.teal, size: 18),
+                          onPressed: () => controller.resetLane(laneIndex),
+                          tooltip: 'Reset lane for next engine',
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.all(6),
+                          constraints: const BoxConstraints(),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                Container(
-                  decoration: const BoxDecoration(
-                      color: _StationColors.tealBg, shape: BoxShape.circle),
-                  child: IconButton(
-                    icon: const Icon(Icons.refresh,
-                        color: _StationColors.teal, size: 18),
-                    onPressed: () => controller.resetLane(laneIndex),
-                    tooltip: 'Reset lane for next engine',
-                    visualDensity: VisualDensity.compact,
-                    padding: const EdgeInsets.all(6),
-                    constraints: const BoxConstraints(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _scanField(
+                  const SizedBox(height: 18),
+                  _scanField(
                     context: context,
                     label: 'ESN NUMBER',
                     textController: lane.esnController,
@@ -943,183 +945,303 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     onChanged: () => controller.onEsnFieldChanged(laneIndex),
                     onSubmit: () => controller.onScanEsnForLane(laneIndex),
                   ),
-                ),
-                Obx(() {
-                  if (lane.esn.value.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    // Nudge down so it lines up with the input box, not the label above it.
-                    padding: const EdgeInsets.only(left: 8, top: 22),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(10),
-                      onTap: () =>
-                          Get.to(() => PsfSessionHistoryScreen(lane: lane)),
-                      child: Container(
-                        height: 35,
-                        width: 35,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: _StationColors.tealBg,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                              color: _StationColors.teal.withValues(alpha: 0.3)),
-                        ),
-                        child: const Icon(
-                          Icons.history_rounded,
-                          size: 18,
-                          color: _StationColors.teal,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Obx(() => lane.listNumber.value.isEmpty
-                ? const SizedBox.shrink()
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('LIST NUMBER',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.grey,
-                              letterSpacing: 0.5)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        readOnly: true,
-                        controller:
-                            TextEditingController(text: lane.listNumber.value),
-                        style: const TextStyle(
-                            fontSize: 13, color: Colors.black87),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          filled: true,
-                          fillColor: Colors.green.withValues(alpha: 0.06),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppColors.themeColor),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(color: AppColors.themeColor),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(6),
-                            borderSide: BorderSide(
-                                color: AppColors.themeColor, width: 1.5),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 11),
-                    ],
-                  )),
-            const Text('IQA NUMBERS',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: _StationColors.slate,
-                    letterSpacing: 0.5)),
-            const SizedBox(height: 10),
-            Column(
-              children: List.generate(lane.iqaControllers.length, (i) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(lane.iqaLabelFor(i),
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade600)),
-                      const SizedBox(height: 2),
-                      SizedBox(
-                        height: 44,
-                        child: Focus(
-                          onKeyEvent: (node, event) {
-                            if (event is KeyDownEvent &&
-                                event.logicalKey == LogicalKeyboardKey.tab) {
-                              if (i < lane.iqaFocusNodes.length - 1) {
-                                lane.iqaFocusNodes[i + 1].requestFocus();
-                              }
-                              return KeyEventResult.handled;
-                            }
-                            return KeyEventResult.ignored;
-                          },
-                          child: Theme(
-                            data: Theme.of(context).copyWith(
-                              textSelectionTheme: TextSelectionThemeData(
-                                selectionColor: Colors.blueAccent[100],
-                                selectionHandleColor: AppColors.themeColor,
-                              ),
-                            ),
-                            child: TextField(
-                              cursorColor: AppColors.themeColor,
-                              controller: lane.iqaControllers[i],
-                              focusNode: lane.iqaFocusNodes[i],
-                              enabled: true,
-                              maxLength: 7,
-                              style: const TextStyle(fontSize: 13),
+                  const SizedBox(height: 16),
+                  Obx(() => Visibility(
+                        visible: lane.listNumber.value.isNotEmpty,
+                        maintainState: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('LIST NUMBER',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.grey,
+                                    letterSpacing: 0.5)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              readOnly: true,
+                              controller: TextEditingController(text: lane.listNumber.value),
+                              style: const TextStyle(fontSize: 13, color: Colors.black87),
                               decoration: InputDecoration(
                                 isDense: true,
                                 filled: true,
-                                fillColor: Colors.white,
-                                counterText: '',
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 12),
+                                fillColor: Colors.green.withOpacity(0.06),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide:
-                                      BorderSide(color: Colors.grey.shade200),
+                                  borderSide: BorderSide(color: AppColors.themeColor),
                                 ),
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide:
-                                      BorderSide(color: AppColors.themeColor),
+                                  borderSide: BorderSide(color: AppColors.themeColor),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(
-                                      color: AppColors.themeColor, width: 1.5),
+                                  borderSide: BorderSide(color: AppColors.themeColor, width: 1.5),
                                 ),
-                                hintText: 'Scan ${lane.iqaLabelFor(i)}',
                               ),
-                              onChanged: (_) =>
-                                  controller.onIqaFieldChanged(laneIndex, i),
-                              onSubmitted: (_) {
-                                if (i < lane.iqaFocusNodes.length - 1) {
-                                  lane.iqaFocusNodes[i + 1].requestFocus();
-                                }
-                              },
                             ),
-                          ),
+                            const SizedBox(height: 11),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 6),
-            Obx(
-              () => Text(
-                'IQA STATUS  ${lane.filledIqaCount.value} / ${lane.iqaControllers.length} scanned',
-                style: const TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold,
-                    color: _StationColors.teal),
+                      )),
+                  Obx(() => Visibility(
+                        visible: lane.listNumber.value.isNotEmpty,
+                        maintainState: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('IQA NUMBERS',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                    color: _StationColors.slate,
+                                    letterSpacing: 0.5)),
+                            const SizedBox(height: 10),
+                            Column(
+                              children: List.generate(lane.iqaControllers.length, (i) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(lane.iqaLabelFor(i), style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                      const SizedBox(height: 2),
+                                      SizedBox(
+                                        height: 44,
+                                        child: Focus(
+                                          onKeyEvent: (node, event) {
+                                            if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.tab) {
+                                              if (i < lane.iqaFocusNodes.length - 1) {
+                                                lane.iqaFocusNodes[i + 1].requestFocus();
+                                              }
+                                              return KeyEventResult.handled;
+                                            }
+                                            return KeyEventResult.ignored;
+                                          },
+                                          child: Theme(
+                                            data: Theme.of(context).copyWith(
+                                              textSelectionTheme: TextSelectionThemeData(
+                                                selectionColor: Colors.blueAccent[100],
+                                                selectionHandleColor: AppColors.themeColor,
+                                              ),
+                                            ),
+                                            child: TextField(
+                                              cursorColor: AppColors.themeColor,
+                                              controller: lane.iqaControllers[i],
+                                              focusNode: lane.iqaFocusNodes[i],
+                                              enabled: true,
+                                              maxLength: 7,
+                                              style: const TextStyle(fontSize: 13),
+                                              decoration: InputDecoration(
+                                                isDense: true,
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                                counterText: '',
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  borderSide: BorderSide(color: Colors.grey.shade200),
+                                                ),
+                                                enabledBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  borderSide: BorderSide(color: AppColors.themeColor),
+                                                ),
+                                                focusedBorder: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  borderSide: BorderSide(color: AppColors.themeColor, width: 1.5),
+                                                ),
+                                                hintText: 'Scan ${lane.iqaLabelFor(i)}',
+                                              ),
+                                              onChanged: (_) => controller.onIqaFieldChanged(laneIndex, i),
+                                              onSubmitted: (_) {
+                                                if (i < lane.iqaFocusNodes.length - 1) {
+                                                  lane.iqaFocusNodes[i + 1].requestFocus();
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ),
+                            const SizedBox(height: 6),
+                            Obx(
+                              () => Text(
+                                'IQA STATUS  ${lane.filledIqaCount.value} / ${lane.iqaControllers.length} scanned',
+                                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: _StationColors.teal),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
               ),
             ),
-          ],
+          ),
+          const Divider(height: 1),
+          InkWell(
+            onTap: () => _showRecipeDialog(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Icon(Icons.list_alt, size: 18, color: Colors.grey.shade700),
+                  const SizedBox(width: 10),
+                  Text(
+                    'HIL Setup',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.grey.shade700),
+                  ),
+                  const Spacer(),
+                  Obx(
+                    () => controller.harnessReceipes.isEmpty
+                        ? const SizedBox.shrink()
+                        : Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _StationColors.teal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${controller.harnessReceipes.length}',
+                              style: const TextStyle(fontSize: 11, color: _StationColors.teal),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRecipeDialog() {
+    Get.dialog(
+      Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: SizedBox(
+          width: 860,
+          height: 520,
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    const Text('Recipe', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: 10),
+                    Obx(() => Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(color: _StationColors.teal.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                          child: Text(
+                            '${controller.harnessReceipes.length} sensor${controller.harnessReceipes.length == 1 ? '' : 's'}',
+                            style: const TextStyle(fontSize: 12, color: _StationColors.teal),
+                          ),
+                        )),
+                    const Spacer(),
+                    Obx(() => Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: controller.isReadingPlcValues.value || controller.isWritingAllSensors.value
+                                  ? null
+                                  : controller.readAllSensorValues,
+                              icon: controller.isReadingPlcValues.value
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.download, size: 16),
+                              label: Text(controller.isReadingPlcValues.value ? 'Reading…' : 'Read Current value'),
+                              style: ElevatedButton.styleFrom(backgroundColor: _StationColors.teal, foregroundColor: Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: controller.isWritingAllSensors.value || controller.isReadingPlcValues.value
+                                  ? null
+                                  : controller.writeAllSensorValues,
+                              icon: controller.isWritingAllSensors.value
+                                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                  : const Icon(Icons.upload, size: 16),
+                              label: Text(controller.isWritingAllSensors.value ? 'Writing…' : 'Write'),
+                              style: ElevatedButton.styleFrom(backgroundColor: _StationColors.teal, foregroundColor: Colors.white),
+                            ),
+                          ],
+                        )),
+                    const SizedBox(width: 8),
+                    IconButton(icon: const Icon(Icons.close, size: 20, color: Colors.grey), onPressed: () => Get.back()),
+                  ],
+                ),
+                const Divider(height: 24),
+                Expanded(
+                  child: Obx(() => controller.harnessReceipes.isEmpty
+                      ? const Center(child: Text('No recipe data yet — scan ESN first.', style: TextStyle(color: _StationColors.slate)))
+                      : SingleChildScrollView(child: _recipeTable())),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
+  Widget _recipeTable() {
+    final rows = controller.harnessReceipes;
+    return Container(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: Border.all(color: _StationColors.slateBorder)),
+      clipBehavior: Clip.antiAlias,
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(3),
+          1: FlexColumnWidth(2),
+          2: FlexColumnWidth(2),
+          3: FlexColumnWidth(2),
+          4: FlexColumnWidth(2),
+        },
+        border: TableBorder(horizontalInside: BorderSide(color: _StationColors.slateBorder), verticalInside: BorderSide(color: _StationColors.slateBorder)),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: _StationColors.tealBg),
+            children: const [
+              Padding(padding: EdgeInsets.all(10), child: Text('SENSOR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _StationColors.teal))),
+              Padding(padding: EdgeInsets.all(10), child: Text('REG', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _StationColors.teal))),
+              Padding(padding: EdgeInsets.all(10), child: Text('TYPE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _StationColors.teal))),
+              Padding(padding: EdgeInsets.all(10), child: Text('VALUE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _StationColors.teal))),
+              Padding(padding: EdgeInsets.all(10), child: Text('WRITE', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _StationColors.teal))),
+            ],
+          ),
+          for (final s in rows)
+            TableRow(children: [
+              Padding(padding: const EdgeInsets.all(10), child: Text(s.sensorName ?? '-', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600))),
+              Padding(padding: const EdgeInsets.all(10), child: Text('${s.regAddress ?? '-'}', style: const TextStyle(fontSize: 12))),
+              Padding(padding: const EdgeInsets.all(10), child: Text(s.type ?? '-', style: const TextStyle(fontSize: 12))),
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Obx(() {
+                  final live = s.id != null ? controller.livePlcValues[s.id] : null;
+                  return Text(
+                    live ?? '-',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: live == 'ERR' ? _StationColors.red : _StationColors.teal),
+                  );
+                }),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(6),
+                child: _SensorWriteAction(sensor: s, controller: controller),
+              ),
+            ]),
+        ],
+      ),
+    );
+  }
+
+
+  
 // Widget _buildResolvedInfoTile() {
 //     return Padding(
 //       padding: EdgeInsets.zero,
@@ -1647,46 +1769,21 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 InkWell(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(20),
                   onTap: canRead
                       ? () => controller.readLiveDtcForLane(laneIndex)
                       : null,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                            color: canRead
-                                ? _StationColors.teal
-                                : _StationColors.slateBorder)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (busy)
-                        const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 1.6))
-                      else
-                        Icon(Icons.search,
-                            size: 14,
-                            color: canRead
-                                ? _StationColors.teal
-                                : _StationColors.slate),
-                      const SizedBox(width: 5),
-                      Text(busy ? 'Reading…' : 'Read DTCs',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: canRead
-                                  ? _StationColors.teal
-                                  : _StationColors.slate)),
-                    ]),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: busy
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 1.6))
+                        : Icon(Icons.refresh, size: 18, color: canRead ? _StationColors.teal : _StationColors.slate),
                   ),
                 ),
-                const SizedBox(width: 8),
-                InkWell(
+                const SizedBox(width: 4),
+               InkWell(
                   borderRadius: BorderRadius.circular(6),
-                  onTap: canClear ? () => _confirmClearDtc() : null,
+                  onTap: canClear ? () => controller.clearDtcForLane(laneIndex) : null,
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1723,21 +1820,21 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         ));
   }
 
-  void _confirmClearDtc() {
-    Get.defaultDialog(
-      title: 'Clear DTC?',
-      middleText:
-          'This will clear all fault codes stored on Lane ${lane.laneNumber}\'s ECU.',
-      textConfirm: 'Clear',
-      textCancel: 'Cancel',
-      confirmTextColor: Colors.white,
-      buttonColor: _StationColors.red,
-      onConfirm: () {
-        Get.back();
-        controller.clearDtcForLane(laneIndex);
-      },
-    );
-  }
+  // void _confirmClearDtc() {
+  //   Get.defaultDialog(
+  //     title: 'Clear DTC?',
+  //     middleText:
+  //         'This will clear all fault codes stored on Lane ${lane.laneNumber}\'s ECU.',
+  //     textConfirm: 'Clear',
+  //     textCancel: 'Cancel',
+  //     confirmTextColor: Colors.white,
+  //     buttonColor: _StationColors.red,
+  //     onConfirm: () {
+  //       Get.back();
+  //       controller.clearDtcForLane(laneIndex);
+  //     },
+  //   );
+  // }
 
   Widget _dtcTile(String raw) {
     final splitIndex = raw.indexOf(' - ');
@@ -2068,10 +2165,17 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             height: 24,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              itemCount: ActivityLogTag.allTags.length,
+              itemCount: ActivityLogTag.allTags.length + 1,
               separatorBuilder: (_, __) => const SizedBox(width: 6),
               itemBuilder: (context, i) {
-                final tag = ActivityLogTag.allTags[i];
+                if (i == 0) {
+                  return _tagChip(
+                    'All',
+                    selected: _activityFilter == null,
+                    onTap: () => setState(() => _activityFilter = null),
+                  );
+                }
+                final tag = ActivityLogTag.allTags[i - 1];
                 return _tagChip(
                   tag,
                   selected: _activityFilter == tag,
@@ -2339,5 +2443,67 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         _activityLogSection(),
       ],
     );
+  }
+  
+}
+class _SensorWriteAction extends StatefulWidget {
+  const _SensorWriteAction({required this.sensor, required this.controller});
+
+  final list_ds.Receipe sensor;
+  final PsfHomeScreenController controller;
+
+  @override
+  State<_SensorWriteAction> createState() => _SensorWriteActionState();
+}
+
+class _SensorWriteActionState extends State<_SensorWriteAction> {
+  late final TextEditingController _valueController;
+
+  @override
+  void initState() {
+    super.initState();
+    _valueController = TextEditingController(text: widget.sensor.value?.toString() ?? '');
+  }
+
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
+  }
+
+  void _submit() async {
+    final value = int.tryParse(_valueController.text.trim());
+    if (value == null) return;
+    await widget.controller.writeSensorValue(widget.sensor, value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final id = widget.sensor.id;
+      final isBusy = id != null && widget.controller.writeInFlightSensorIds.contains(id);
+
+      return SizedBox(
+        width: 90,
+        height: 34,
+        child: TextField(
+          controller: _valueController,
+          enabled: !isBusy,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            filled: true,
+            fillColor: _StationColors.slateBg,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide.none),
+            hintText: 'value',
+            hintStyle: const TextStyle(fontSize: 11),
+          ),
+          onSubmitted: (_) => _submit(),
+        ),
+      );
+    });
   }
 }

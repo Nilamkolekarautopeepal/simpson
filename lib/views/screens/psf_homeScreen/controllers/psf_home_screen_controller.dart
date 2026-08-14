@@ -151,6 +151,13 @@ class PsfHomeScreenController extends GetxController {
   RxBool get isPlcConnecting => plcService.isConnecting;
   RxString get plcStatus => plcService.status;
 
+  final RxList<list_ds.Receipe> harnessReceipes = <list_ds.Receipe>[].obs;
+  final RxMap<int, String> livePlcValues = <int, String>{}.obs;
+  final RxBool isReadingPlcValues = false.obs;
+  final RxBool isWritingAllSensors = false.obs;
+  final Rx<int?> currentWritingSensorId = Rx<int?>(null);
+  final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -472,6 +479,7 @@ class PsfHomeScreenController extends GetxController {
       resolvedDatasetType: resolvedDatasetType,
       esnRecordId: match.id,
       variantCode: variant.variantCode,
+      harnesses: variant.prodbudVariantHarness,
     );
   }
   Future<void> applyLane(
@@ -493,9 +501,18 @@ class PsfHomeScreenController extends GetxController {
     lane.matchedEcu = ecuEntry;
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
-    lane.esnRecordId = identified.esnRecordId;
+lane.esnRecordId = identified.esnRecordId;
     lane.resolvedDatasetType = identified.resolvedDatasetType;
     lane.listNumber.value = identified.variantCode ?? '';
+
+    final activeHarness = (identified.harnesses ?? []).firstWhereOrNull(
+      (h) => h.isActive == true && (h.stationType ?? '').trim().toLowerCase() == 'pfs',
+    );
+    harnessReceipes.assignAll(activeHarness?.receipes ?? []);
+    if (activeHarness != null) {
+      lane.logActivity('Harness resolved: "${activeHarness.name}" (${harnessReceipes.length} recipe sensor(s))');
+    }
+
     lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
     lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
@@ -549,6 +566,80 @@ class PsfHomeScreenController extends GetxController {
           );
         },
       );
+    }
+  }
+  double _applySensorFormula(String? type, int raw) => raw.toDouble();
+
+  Future<void> writeSensorValue(list_ds.Receipe sensor, int value) async {
+    final id = sensor.id;
+    final reg = sensor.regAddress;
+    if (id == null || reg == null) return;
+    if (!plcService.isConnected.value) return;
+
+    writeInFlightSensorIds.add(id);
+    try {
+      final confirmed = await plcService.writeRegister(reg, value);
+      if (!confirmed) return;
+      final raw = await plcService.readRegister(reg);
+      livePlcValues[id] = _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
+    } catch (_) {
+      // leave as-is on failure; UI shows last-known value
+    } finally {
+      writeInFlightSensorIds.remove(id);
+    }
+  }
+
+  Future<void> readSensorValue(list_ds.Receipe sensor) async {
+    final id = sensor.id;
+    final reg = sensor.regAddress;
+    if (id == null || reg == null) return;
+    if (!plcService.isConnected.value) return;
+
+    writeInFlightSensorIds.add(id);
+    try {
+      int raw;
+      try {
+        raw = await plcService.readRegister(reg);
+      } catch (_) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        raw = await plcService.readRegister(reg);
+      }
+      livePlcValues[id] = _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
+    } catch (_) {
+      livePlcValues[id] = 'ERR';
+    } finally {
+      writeInFlightSensorIds.remove(id);
+    }
+  }
+
+  Future<void> readAllSensorValues() async {
+    if (harnessReceipes.isEmpty || !plcService.isConnected.value) return;
+    isReadingPlcValues.value = true;
+    try {
+      for (final sensor in harnessReceipes) {
+        await readSensorValue(sensor);
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    } finally {
+      isReadingPlcValues.value = false;
+    }
+  }
+
+  Future<void> writeAllSensorValues() async {
+    if (isWritingAllSensors.value || harnessReceipes.isEmpty) return;
+    isWritingAllSensors.value = true;
+    try {
+      for (final sensor in harnessReceipes) {
+        if (sensor.value == null) continue;
+        final value = int.tryParse(sensor.value.toString());
+        if (value == null) continue;
+        currentWritingSensorId.value = sensor.id;
+        await writeSensorValue(sensor, value);
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+    } finally {
+      currentWritingSensorId.value = null;
+      isWritingAllSensors.value = false;
     }
   }
 
@@ -1412,9 +1503,8 @@ class PsfHomeScreenController extends GetxController {
       return;
     }
 
-    lane.isReadingDtc.value = true;
+  lane.isClearingDtc.value = true;
     lane.dtcError.value = '';
-
     try {
       // Make sure the dataset catalog (for descriptions) is loaded.
       if (lane.dtcCodes.isEmpty) {
@@ -1955,6 +2045,7 @@ class _IdentifiedEcu {
   final String? resolvedDatasetType;
   final int? esnRecordId;
   final String? variantCode;
+  final List<esn_ds.ProdbudVariantHarness>? harnesses;
 
   _IdentifiedEcu({
     required this.ecuEntry,
@@ -1964,5 +2055,6 @@ class _IdentifiedEcu {
     this.resolvedDatasetType,
     this.esnRecordId,
     this.variantCode,
+    this.harnesses,
   });
 }
