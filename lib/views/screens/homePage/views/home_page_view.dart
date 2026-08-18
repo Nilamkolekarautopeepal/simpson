@@ -1434,52 +1434,52 @@ class HomePageView extends GetView<HomePageController> {
         itemBuilder: _buildDtcCard,
         onRefresh: controller.refreshDtcResults,
         onClear: controller.clearDTC,
-        extraAction: Obx(() {
-          final busy = controller.isReadingDtcManually.value;
-          final canRead = controller.dongleConnected.value && !busy;
-          return InkWell(
-            borderRadius: BorderRadius.circular(6),
-            onTap: canRead ? controller.readDtcsManually : null,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              margin: const EdgeInsets.only(right: 8),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: canRead ? AppColors.themeColor : Colors.grey.shade300,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (busy)
-                    const SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 1.6),
-                    )
-                  else
-                    Icon(
-                      Icons.search,
-                      size: 14,
-                      color:
-                          canRead ? AppColors.themeColor : Colors.grey.shade400,
-                    ),
-                  const SizedBox(width: 5),
-                  Text(
-                    busy ? 'Reading…' : 'Read DTCs',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color:
-                          canRead ? AppColors.themeColor : Colors.grey.shade400,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
+        // extraAction: Obx(() {
+        //   final busy = controller.isReadingDtcManually.value;
+        //   final canRead = controller.dongleConnected.value && !busy;
+        //   return InkWell(
+        //     borderRadius: BorderRadius.circular(6),
+        //     onTap: canRead ? controller.readDtcsManually : null,
+        //     child: Container(
+        //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        //       margin: const EdgeInsets.only(right: 8),
+        //       decoration: BoxDecoration(
+        //         borderRadius: BorderRadius.circular(6),
+        //         border: Border.all(
+        //           color: canRead ? AppColors.themeColor : Colors.grey.shade300,
+        //         ),
+        //       ),
+        //       child: Row(
+        //         mainAxisSize: MainAxisSize.min,
+        //         children: [
+        //           if (busy)
+        //             const SizedBox(
+        //               width: 12,
+        //               height: 12,
+        //               child: CircularProgressIndicator(strokeWidth: 1.6),
+        //             )
+        //           else
+        //             Icon(
+        //               Icons.search,
+        //               size: 14,
+        //               color:
+        //                   canRead ? AppColors.themeColor : Colors.grey.shade400,
+        //             ),
+        //           const SizedBox(width: 5),
+        //           Text(
+        //             busy ? 'Reading…' : 'Read DTCs',
+        //             style: TextStyle(
+        //               fontSize: 11.5,
+        //               fontWeight: FontWeight.w600,
+        //               color:
+        //                   canRead ? AppColors.themeColor : Colors.grey.shade400,
+        //             ),
+        //           ),
+        //         ],
+        //       ),
+        //     ),
+        //   );
+        // }),
       ),
     );
   }
@@ -1619,7 +1619,6 @@ class HomePageView extends GetView<HomePageController> {
       badgeColor = Colors.green.shade600;
       badgeLabel = status.isNotEmpty ? 'History' : '-';
     }
-
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 6),
@@ -1655,7 +1654,7 @@ class HomePageView extends GetView<HomePageController> {
                 // ✅ Register row — placeholder for now, colored like the status text
                 const SizedBox(height: 4),
                 Text(
-                  'Register: $register',
+                  'Related Sensor: $register',
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
@@ -2062,11 +2061,11 @@ class HomePageView extends GetView<HomePageController> {
     if (legacy != null) {
       return {
         'time': legacy.group(1)!,
-        'tag': 'GENERAL',
+        'tag': 'All',
         'message': legacy.group(2)!,
       };
     }
-    return {'time': '', 'tag': 'GENERAL', 'message': raw};
+    return {'time': '', 'tag': 'All', 'message': raw};
   }
 
   Color _tagColor(String tag) {
@@ -2120,6 +2119,7 @@ class HomePageView extends GetView<HomePageController> {
   }
 
   static const _allTags = [
+    'All',
     'ESN',
     'PLC',
     'DONGLE',
@@ -2278,10 +2278,13 @@ class HomePageView extends GetView<HomePageController> {
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
                 itemBuilder: (context, i) {
                   final tag = _allTags[i];
+                  final isAllChip = tag == 'All';
                   return _tagChip(
                     tag,
-                    selected: active == tag,
-                    onTap: () => controller.setActivityLogFilter(tag),
+                    selected: isAllChip ? active == null : active == tag,
+                    onTap: () => controller.setActivityLogFilter(
+                      isAllChip ? null : tag,
+                    ),
                   );
                 },
               ),
@@ -2338,80 +2341,6 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
-  // void _showActivityFullScreen() {
-  //   Get.dialog(
-  //     Dialog.fullscreen(
-  //       child: Scaffold(
-  //         appBar: AppBar(
-  //           iconTheme: const IconThemeData(
-  //             color: Colors.white, // Back arrow color
-  //           ),
-  //           backgroundColor: AppColors.themeColor,
-  //           foregroundColor: Colors.white,
-  //           title: const Text('Activity Log'),
-  //           actions: [
-  //             Obx(() => IconButton(
-  //                   icon: const Icon(Icons.save_alt, color: Colors.white),
-  //                   tooltip: 'Save Activity Log',
-  //                   onPressed: controller.activityLog.isEmpty
-  //                       ? null
-  //                       : () async {
-  //                           await controller.saveActivityLog();
-  //                         },
-  //                 )),
-  //             Obx(() => IconButton(
-  //                   icon: const Icon(Icons.copy, color: Colors.white),
-  //                   tooltip: 'Copy all activity log',
-  //                   onPressed: controller.activityLog.isEmpty
-  //                       ? null
-  //                       : () => _copyActivityLog(),
-  //                 )),
-  //           ],
-  //         ),
-  //         backgroundColor: const Color(0xFFF4F5F7),
-  //         body: Padding(
-  //           padding: const EdgeInsets.all(16),
-  //           child: Obx(() {
-  //             if (controller.activityLog.isEmpty) {
-  //               return Center(
-  //                 child: Text(
-  //                   'No activity yet',
-  //                   style: TextStyle(color: Colors.grey.shade500),
-  //                 ),
-  //               );
-  //             }
-  //             return Container(
-  //               width: double.infinity,
-  //               padding: const EdgeInsets.all(16),
-  //               decoration: BoxDecoration(
-  //                 color: Colors.white,
-  //                 borderRadius: BorderRadius.circular(10),
-  //                 border: Border.all(color: Colors.white),
-  //               ),
-  //               child: ListView.builder(
-  //                 itemCount: controller.activityLog.length,
-  //                 itemBuilder: (context, index) {
-  //                   final entry = controller.activityLog[index];
-  //                   return Padding(
-  //                     padding: const EdgeInsets.symmetric(vertical: 5),
-  //                     child: SelectableText(
-  //                       entry,
-  //                       style: TextStyle(
-  //                         fontSize: 13.5,
-  //                         color: _activityLogColor(entry),
-  //                       ),
-  //                     ),
-  //                   );
-  //                 },
-  //               ),
-  //             );
-  //           }),
-  //         ),
-  //       ),
-  //     ),
-  //     barrierDismissible: true,
-  //   );
-  // }
   void _showActivityFullScreen() {
     Get.dialog(
       Dialog.fullscreen(
@@ -2458,10 +2387,14 @@ class HomePageView extends GetView<HomePageController> {
                         separatorBuilder: (_, __) => const SizedBox(width: 6),
                         itemBuilder: (context, i) {
                           final tag = _allTags[i];
+                          final isAllChip = tag == 'All';
                           return _tagChip(
                             tag,
-                            selected: active == tag,
-                            onTap: () => controller.setActivityLogFilter(tag),
+                            selected:
+                                isAllChip ? active == null : active == tag,
+                            onTap: () => controller.setActivityLogFilter(
+                              isAllChip ? null : tag,
+                            ),
                           );
                         },
                       ),
