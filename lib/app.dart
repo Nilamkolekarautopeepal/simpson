@@ -4,6 +4,7 @@ import 'package:simpson/api/app_envirments.dart';
 import 'package:simpson/common_widgets/app_error_widget.dart';
 import 'package:simpson/services/api_log_service.dart'; // ← new import
 import 'package:simpson/services/error_handler/error_handler_service.dart';
+import 'package:simpson/services/pending_session_storage.dart';
 import 'package:simpson/themes/app_theme.dart';
 import 'package:simpson/utils/app_logs.dart';
 import 'package:simpson/routes/app_pages.dart';
@@ -60,23 +61,49 @@ class App {
         WidgetsFlutterBinding.ensureInitialized();
 
         // ── GetStorage (Windows safe) ─────────────────────────
+        // try {
+        //   if (Platform.isWindows) {
+        //     await windowManager.ensureInitialized();
+
+        //     WindowOptions windowOptions = const WindowOptions(
+        //       center: true,
+
+        //       titleBarStyle: TitleBarStyle.normal,
+
+        //       // This sets the window to full screen at startup
+        //     );
+
+        //     // windowManager.waitUntilReadyToShow(windowOptions, () async {
+        //     //   await windowManager.maximize();
+        //     //   await windowManager.show();
+        //     //   await windowManager.focus();
+        //     // });
+        //     await windowManager.waitUntilReadyToShow(windowOptions, () async {
+        //       await windowManager.show();
+        //       await Future.delayed(const Duration(milliseconds: 300));
+        //       await windowManager.maximize();
+        //       await windowManager.focus();
+        //     });
+        //   }
+        //   await GetStorage.init();
+        //   await PendingSessionStorage.init();
+        //   print('✅ GetStorage initialized');
+        // } catch (e) {
+        //   print('⚠️ GetStorage error: $e');
+        // }
         try {
           if (Platform.isWindows) {
             await windowManager.ensureInitialized();
 
+            // ✅ Intercept close button, flush pending data before exit
+
+            await windowManager.setPreventClose(true);
+
             WindowOptions windowOptions = const WindowOptions(
               center: true,
-
               titleBarStyle: TitleBarStyle.normal,
-
-              // This sets the window to full screen at startup
             );
 
-            // windowManager.waitUntilReadyToShow(windowOptions, () async {
-            //   await windowManager.maximize();
-            //   await windowManager.show();
-            //   await windowManager.focus();
-            // });
             await windowManager.waitUntilReadyToShow(windowOptions, () async {
               await windowManager.show();
               await Future.delayed(const Duration(milliseconds: 300));
@@ -85,6 +112,7 @@ class App {
             });
           }
           await GetStorage.init();
+          await PendingSessionStorage.init();
           print('✅ GetStorage initialized');
         } catch (e) {
           print('⚠️ GetStorage error: $e');

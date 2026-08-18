@@ -15,8 +15,6 @@ class _StationColors {
   static const slateBg = Color(0xFFF7F8FA);
 }
 
-/// Full-screen history view for the currently scanned ESN — testbed
-/// sessions only. Mirrors the PFS lane history screen's design.
 class HomeSessionHistoryScreen extends StatelessWidget {
   const HomeSessionHistoryScreen({super.key, required this.controller});
 
@@ -85,7 +83,10 @@ class HomeSessionHistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _emptyState({required IconData icon, required String title, required String subtitle}) {
+  Widget _emptyState(
+      {required IconData icon,
+      required String title,
+      required String subtitle}) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -93,11 +94,16 @@ class HomeSessionHistoryScreen extends StatelessWidget {
           Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(color: _StationColors.tealBg, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: _StationColors.tealBg, shape: BoxShape.circle),
             child: Icon(icon, color: _StationColors.teal, size: 34),
           ),
           const SizedBox(height: 20),
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _StationColors.charcoal)),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: _StationColors.charcoal)),
           const SizedBox(height: 8),
           Text(
             subtitle,
@@ -112,12 +118,23 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   Widget _sectionHeader(String title, int count) {
     return Row(
       children: [
-        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: _StationColors.slate, letterSpacing: 0.5)),
+        Text(title,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: _StationColors.slate,
+                letterSpacing: 0.5)),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          decoration: BoxDecoration(color: _StationColors.tealBg, borderRadius: BorderRadius.circular(12)),
-          child: Text('$count', style: const TextStyle(fontSize: 11.5, color: _StationColors.teal, fontWeight: FontWeight.bold)),
+          decoration: BoxDecoration(
+              color: _StationColors.tealBg,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text('$count',
+              style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _StationColors.teal,
+                  fontWeight: FontWeight.bold)),
         ),
       ],
     );
@@ -126,7 +143,6 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   Widget _sessionCard(Map<String, dynamic> session) {
     final startDate = _parseDate(session['start_date']);
     final endDate = _parseDate(session['end_date']);
-    final duration = (startDate != null && endDate != null) ? endDate.difference(startDate) : null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -135,7 +151,12 @@ class HomeSessionHistoryScreen extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _StationColors.slateBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 3))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,12 +170,16 @@ class HomeSessionHistoryScreen extends StatelessWidget {
                   children: [
                     Text(
                       '${session['model'] ?? '—'} — ${session['sub_model'] ?? '—'}',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _StationColors.charcoal),
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: _StationColors.charcoal),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'List No. ${session['list_no'] ?? '—'}',
-                      style: const TextStyle(fontSize: 12, color: _StationColors.slate),
+                      style: const TextStyle(
+                          fontSize: 12, color: _StationColors.slate),
                     ),
                   ],
                 ),
@@ -163,14 +188,20 @@ class HomeSessionHistoryScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    startDate != null ? _formatDate(startDate) : '—',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _StationColors.charcoal),
+                    'Start: ${startDate != null ? _formatDate(startDate) : '—'}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _StationColors.charcoal),
                   ),
-                  if (duration != null)
-                    Text(
-                      'Duration: ${_formatDuration(duration)}',
-                      style: const TextStyle(fontSize: 11, color: _StationColors.slate),
-                    ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'End: ${endDate != null ? _formatDate(endDate) : '—'}',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: _StationColors.charcoal),
+                  ),
                 ],
               ),
             ],
@@ -178,16 +209,15 @@ class HomeSessionHistoryScreen extends StatelessWidget {
           const SizedBox(height: 12),
           const Divider(height: 1),
           const SizedBox(height: 12),
-
           _infoRow('Station', session['station_id']?.toString()),
           _infoRow('Dongle', session['dongle_id']?.toString()),
-          _infoRow('Harness', '${session['harness_name'] ?? '—'} (${session['harness_type'] ?? '—'})'),
-          _infoRow('Dataset', '${session['dataset_type'] ?? '—'} — ${session['datafile_name'] ?? '—'}'),
-
+          _infoRow('Harness',
+              '${session['harness_name'] ?? '—'} (${session['harness_type'] ?? '—'})'),
+          _infoRow('Dataset',
+              '${session['dataset_type'] ?? '—'} — ${session['datafile_name'] ?? '—'}'),
           const SizedBox(height: 12),
           const Divider(height: 1),
           const SizedBox(height: 12),
-
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -197,24 +227,29 @@ class HomeSessionHistoryScreen extends StatelessWidget {
               _statusBadge('DTC', session['dtc_status']?.toString()),
             ],
           ),
-
           if (session['activity_report'] != null) ...[
             const SizedBox(height: 10),
             InkWell(
-              onTap: () => _openActivityReport(session['activity_report'].toString()),
+              onTap: () =>
+                  _openActivityReport(session['activity_report'].toString()),
               borderRadius: BorderRadius.circular(6),
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined, size: 14, color: _StationColors.teal),
+                  const Icon(Icons.description_outlined,
+                      size: 14, color: _StationColors.teal),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       session['activity_report'].toString(),
-                      style: const TextStyle(fontSize: 11, color: _StationColors.teal, decoration: TextDecoration.underline),
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: _StationColors.teal,
+                          decoration: TextDecoration.underline),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Icon(Icons.open_in_new, size: 12, color: _StationColors.teal),
+                  const Icon(Icons.open_in_new,
+                      size: 12, color: _StationColors.teal),
                 ],
               ),
             ),
@@ -231,10 +266,17 @@ class HomeSessionHistoryScreen extends StatelessWidget {
         children: [
           SizedBox(
             width: 70,
-            child: Text(label, style: const TextStyle(fontSize: 11.5, color: _StationColors.slate, fontWeight: FontWeight.w600)),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 11.5,
+                    color: _StationColors.slate,
+                    fontWeight: FontWeight.w600)),
           ),
           Expanded(
-            child: Text(value ?? '—', style: const TextStyle(fontSize: 12.5, color: _StationColors.charcoal), overflow: TextOverflow.ellipsis),
+            child: Text(value ?? '—',
+                style: const TextStyle(
+                    fontSize: 12.5, color: _StationColors.charcoal),
+                overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -244,18 +286,32 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   Widget _statusBadge(String label, String? status) {
     final isPass = (status ?? '').toLowerCase() == 'pass';
     final isFail = (status ?? '').toLowerCase() == 'fail';
-    final color = isPass ? _StationColors.greenDark : (isFail ? _StationColors.red : _StationColors.slate);
-    final bg = isPass ? const Color(0xFFEAFAF1) : (isFail ? _StationColors.redBg : _StationColors.slateBg);
+    final color = isPass
+        ? _StationColors.greenDark
+        : (isFail ? _StationColors.red : _StationColors.slate);
+    final bg = isPass
+        ? const Color(0xFFEAFAF1)
+        : (isFail ? _StationColors.redBg : _StationColors.slateBg);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, border: Border.all(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(
+          color: bg,
+          border: Border.all(color: color.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(isPass ? Icons.check_circle : (isFail ? Icons.cancel : Icons.help_outline), size: 13, color: color),
+          Icon(
+              isPass
+                  ? Icons.check_circle
+                  : (isFail ? Icons.cancel : Icons.help_outline),
+              size: 13,
+              color: color),
           const SizedBox(width: 5),
-          Text('$label: ${status ?? "—"}', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: color)),
+          Text('$label: ${status ?? "—"}',
+              style: TextStyle(
+                  fontSize: 11.5, fontWeight: FontWeight.bold, color: color)),
         ],
       ),
     );
@@ -267,13 +323,6 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   }
 
   String _formatDate(DateTime d) {
-    return '${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year} '
-        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-  }
-
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return '${m}m ${s}s';
+    return '${d.day.toString().padLeft(2, '0')}-${d.month.toString().padLeft(2, '0')}-${d.year}';
   }
 }
