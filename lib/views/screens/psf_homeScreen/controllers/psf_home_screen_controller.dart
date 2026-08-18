@@ -21,6 +21,7 @@ import 'package:simpson/modals/pidDataset.model.dart' show Code;
 import 'package:simpson/services/apiServices.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
+import 'package:simpson/services/pending_session_storage.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/pfs_isolate_flash.dart';
 import 'pfs_lane.dart' hide psfLaneRegisterMap;
@@ -30,9 +31,34 @@ String _decodeLatin1Isolate(Uint8List bytes) {
 }
 
 class PsfHomeScreenController extends GetxController {
-  static final HttpClient _sharedHttpClient = HttpClient()
-    ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
-    ..connectionTimeout = const Duration(seconds: 15);
+
+// bypass new code
+
+  // static final HttpClient _sharedHttpClient = HttpClient()
+  //   ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
+  //   ..connectionTimeout = const Duration(seconds: 15);
+
+static final HttpClient _sharedHttpClient = HttpClient()
+    ..maxConnectionsPerHost = 8
+    ..connectionTimeout = const Duration(seconds: 15)
+    ..badCertificateCallback = (cert, host, port) => true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
+
+  Future<String> _downloadAsRawStringFast(String url) async {
+    final request = await _sharedHttpClient.getUrl(Uri.parse(url));
+    final response = await request.close();
+
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      builder.add(chunk);
+    }
+    final bytes = builder.takeBytes();
+
+    return await compute(_decodeLatin1Isolate, bytes);
+  }
+
+  //bypass new code 
+   
+   
   static const int _dongleFlashPort = 6888;
 
   final RxnInt expandedLaneIndex = RxnInt(0);
@@ -50,6 +76,112 @@ class PsfHomeScreenController extends GetxController {
     activityLog.add('[$timestamp] $entry');
     if (activityLog.length > 300) {
       activityLog.removeAt(0);
+    }
+  }
+  Future<void> _resendPendingSessions() async {
+    final drafts = PendingSessionStorage.getAllDrafts();
+    // Only resend drafts that belong to THIS app (PFS), not Test Station's.
+    final pfsDrafts = drafts.where((d) => (d['sessionKey'] as String? ?? '').startsWith('pfs_')).toList();
+    if (pfsDrafts.isEmpty) return;
+
+    print('Found ${pfsDrafts.length} unsent PFS session report(s) from a previous run — resending...');
+
+    const validStatuses = {'Pass', 'Fail'};
+    String sanitizeStatus(dynamic raw) {
+      final value = raw as String?;
+      return validStatuses.contains(value) ? value! : 'Fail';
+    }
+
+    for (final draft in pfsDrafts) {
+      final key = draft['sessionKey'] as String?;
+      if (key == null) continue;
+
+      final datasetType = draft['datasetType'] as String?;
+      final datafileName = draft['datafileName'] as String?;
+      if (datasetType == null || datasetType.isEmpty || datafileName == null || datafileName.isEmpty) {
+        await PendingSessionStorage.removeDraft(key);
+        continue;
+      }
+
+      try {
+        await _authService.createEolSession(
+          esnId: draft['esnId'] as int?,
+          dongleId: draft['dongleId'] as int?,
+          datasetType: datasetType,
+          datafileName: datafileName,
+          startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ?? DateTime.now(),
+          endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ?? DateTime.now(),
+          continutyStatus: sanitizeStatus(draft['continutyStatus']),
+          flashStatus: sanitizeStatus(draft['flashStatus']),
+          iqaStatus: sanitizeStatus(draft['iqaStatus']),
+          dtcStatus: sanitizeStatus(draft['dtcStatus']),
+          activityLog: List<String>.from(draft['activityLog'] as List? ?? []),
+          accessToken: _accessToken,
+        );
+        await PendingSessionStorage.removeDraft(key);
+        print('✅ Resent previously unsent PFS session report ($key)');
+      } catch (e) {
+        print('❌ Failed to resend PFS session report ($key): $e — will retry next launch');
+      }
+    }
+  }
+
+  Future<void> _persistSessionDraft(int laneIndex) async {
+    final lane = lanes[laneIndex];
+    final key = lane.currentSessionKey;
+    if (key == null) return;
+    if (lane.sessionReportSent) return;
+    if (lane.resolvedDatasetType == null || lane.resolvedDatasetFileName == null) return;
+
+    await PendingSessionStorage.saveDraft(key, {
+      'sessionKey': key,
+      'esnId': lane.esnRecordId,
+      'dongleId': lane.dongleDbId,
+      'datasetType': lane.resolvedDatasetType,
+      'datafileName': lane.resolvedDatasetFileName,
+      'startDate': (lane.flashCycleStartTime ?? DateTime.now()).toIso8601String(),
+      'endDate': DateTime.now().toIso8601String(),
+      'continutyStatus': lane.isHarnessConnected.value ? 'Pass' : 'Fail',
+      'flashStatus': lane.draftFlashStatus ?? 'Fail',
+      'iqaStatus': lane.draftIqaStatus ?? 'Fail',
+      'dtcStatus': lane.draftDtcStatus ?? 'Fail',
+      'activityLog': lane.activityLog.toList(),
+    });
+  }
+
+  Future<void> _sendPartialSessionReport(int laneIndex, String reason) async {
+    final lane = lanes[laneIndex];
+    final key = lane.currentSessionKey;
+    if (key == null) return;
+    if (lane.sessionReportSent) return;
+
+    if (lane.resolvedDatasetType == null || lane.resolvedDatasetType!.isEmpty || lane.resolvedDatasetFileName == null || lane.resolvedDatasetFileName!.isEmpty) {
+      return;
+    }
+    lane.sessionReportSent = true;
+
+    lane.logActivity('Sending session report to server ($reason)...');
+
+    try {
+      await _authService.createEolSession(
+        esnId: lane.esnRecordId,
+        dongleId: lane.dongleDbId,
+        datasetType: lane.resolvedDatasetType,
+        datafileName: lane.resolvedDatasetFileName,
+        startDate: lane.flashCycleStartTime ?? DateTime.now(),
+        endDate: DateTime.now(),
+        continutyStatus: lane.isHarnessConnected.value ? 'Pass' : 'Fail',
+        flashStatus: lane.draftFlashStatus ?? 'Fail',
+        iqaStatus: lane.draftIqaStatus ?? 'Fail',
+        dtcStatus: lane.draftDtcStatus ?? 'Fail',
+        activityLog: lane.activityLog.toList(),
+        accessToken: _accessToken,
+      );
+      lane.logActivity('✅ Session report sent successfully ($reason)');
+      await PendingSessionStorage.removeDraft(key);
+    } catch (e) {
+      lane.sessionReportSent = false;
+      lane.logActivity('❌ Failed to send session report ($reason): $e — will retry later');
     }
   }
 
@@ -169,6 +301,12 @@ class PsfHomeScreenController extends GetxController {
     debugPrint(
       "PFS Controller Loaded",
     );
+    @override
+  void onInit() {
+    super.onInit();
+    // ... existing init code ...
+    PendingSessionStorage.init().then((_) => _resendPendingSessions());
+  }
   }
 
   Future<void> _loadLanesFromDongleList() async {
@@ -517,6 +655,8 @@ lane.esnRecordId = identified.esnRecordId;
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
     lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
     lane.flashCycleStartTime = DateTime.now();
+    lane.currentSessionKey = 'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
+    lane.sessionReportSent = false;
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
@@ -845,7 +985,7 @@ lane.esnRecordId = identified.esnRecordId;
     if (ecu == null) {
       print('   ❌ no ECU resolved yet — scan ESN first');
       print('══════════════════════════════════════════');
-      lane.dongleError.value = 'Scan ESN first — no ECU config resolved yet.';
+      lane.dongleError.value = 'Scan ESN first —.';
       return;
     }
 
@@ -1311,7 +1451,7 @@ lane.esnRecordId = identified.esnRecordId;
     await Future.delayed(const Duration(milliseconds: 300));
     await loadPidForLane(index);
 
-    lane.isPostFlashProcessing.value = false;
+   lane.isPostFlashProcessing.value = false;
     final flashPassed = result == 'NOERROR';
     final iqaPassed =
         lane.iqaWriteStatus.value.toLowerCase().contains('successful');
@@ -1335,43 +1475,44 @@ lane.esnRecordId = identified.esnRecordId;
       'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
     );
 
-    lane.logActivity('Sending session report to server...');
+    // Save the draft locally FIRST — this is what makes the report
+    // crash-safe: even if the app closes right after this line, the
+    // full result is already on disk and will auto-resend next launch.
+    lane.draftFlashStatus = flashPassed ? 'Pass' : 'Fail';
+    lane.draftIqaStatus = iqaPassed ? 'Pass' : 'Fail';
+    lane.draftDtcStatus = dtcPassed ? 'Pass' : 'Fail';
+    await _persistSessionDraft(index);
 
-    unawaited(_authService
-        .createEolSession(
-      esnId: lane.esnRecordId,
-      dongleId: lane.dongleDbId,
-      datasetType: lane.resolvedDatasetType,
-      datafileName: lane.resolvedDatasetFileName,
-      startDate: startTime,
-      endDate: endTime,
-      continutyStatus: continutyPassed ? 'Pass' : 'Fail',
-      flashStatus: flashPassed ? 'Pass' : 'Fail',
-      iqaStatus: iqaPassed ? 'Pass' : 'Fail',
-      dtcStatus: dtcPassed ? 'Pass' : 'Fail',
-      activityLog: lane.activityLog.toList(),
-      accessToken: _accessToken,
-    )
-        .then((_) {
-      lane.logActivity('✅ Session report sent to server successfully');
-    }).catchError((e) {
-      lane.logActivity('❌ Session report failed to send: $e');
-    }));
+    await _sendPartialSessionReport(index, 'flash cycle completed');
 
     lane.isDongleBusy = false;
   }
 
-  Future<String> _downloadAsRawStringFast(String url) async {
-    final request = await _sharedHttpClient.getUrl(Uri.parse(url));
+
+// bypass due to cetfide error
+
+  // Future<String> _downloadAsRawStringFast(String url) async {
+  //   final request = await _sharedHttpClient.getUrl(Uri.parse(url));
+  //   final response = await request.close();
+
+  //   final builder = BytesBuilder(copy: false);
+  //   await for (final chunk in response) {
+  //     builder.add(chunk);
+  //   }
+  //   final bytes = builder.takeBytes();
+
+  //   return await compute(_decodeLatin1Isolate, bytes);
+  // }
+
+  Future<String> _downloadAsRawString(String url) async {
+    final client = HttpClient()
+      ..badCertificateCallback = (cert, host, port) => true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
+    final request = await client.getUrl(Uri.parse(url));
     final response = await request.close();
-
-    final builder = BytesBuilder(copy: false);
-    await for (final chunk in response) {
-      builder.add(chunk);
-    }
-    final bytes = builder.takeBytes();
-
-    return await compute(_decodeLatin1Isolate, bytes);
+    final bytes =
+        await response.fold<List<int>>(<int>[], (p, c) => p..addAll(c));
+    client.close();
+    return latin1.decode(bytes);
   }
 
   List<all_ds.EcuMapFile> _parseEcuMapFilesFromSequence(

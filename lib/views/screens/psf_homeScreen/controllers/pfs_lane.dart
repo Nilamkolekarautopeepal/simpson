@@ -14,7 +14,7 @@ import 'package:simpson/modals/pidDataset.model.dart'
     show Code, MessageType, PiCodeVariables;
 import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 
-class PsfLane {
+ class PsfLane {
   PsfLane(
     this.laneNumber, {
     this.dongleIpFromLogin,
@@ -103,6 +103,12 @@ class PsfLane {
   final String? dongleIpFromLogin;
   final int? expectedEcuId;
   final String? macIdFromLogin;
+
+  String? currentSessionKey;
+  bool sessionReportSent = false;
+  String? draftFlashStatus;
+  String? draftIqaStatus;
+  String? draftDtcStatus;
 
   // ===============================
   // LANE NUMBER
@@ -473,6 +479,12 @@ Future<bool> saveActivityLog() async {
     dllFunctions = null;
     isDongleBusy = false;
 
+    currentSessionKey = null;
+    sessionReportSent = false;
+    draftFlashStatus = null;
+    draftIqaStatus = null;
+    draftDtcStatus = null;
+
     //ecuModelName.value = "ECU MODEL NAME";
 
     matchedEcu = null;
@@ -505,6 +517,7 @@ Future<bool> saveActivityLog() async {
 
     dtcCodes.clear();
     dtcReadResults.clear();
+    activityLog.clear();
     isReadingDtc.value = false;
 
     liveParameterCodes.clear();

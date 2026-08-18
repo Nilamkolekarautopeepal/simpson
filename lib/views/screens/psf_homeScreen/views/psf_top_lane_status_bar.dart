@@ -88,10 +88,12 @@ class PsfTopLaneStatusBar extends StatelessWidget {
         print(  'Lane $index is flashing, showing progress: ${subLabel}');
       } else if (failed) {
         subLabel = 'Failed';
+        print('Failed lane ${lane.laneNumber}');
         subLabelColor = Colors.white;
         print(  'Lane $index has failed, showing "Failed"');
       } else if (completed) {
         subLabel = 'Flash Successful';
+        print('Completed lane ${lane.laneNumber}');
         subLabelColor = Colors.white;
         print(  'Lane $index has completed successfully, showing "Flash Successful"');
       } else if (lane.dongleConnected.value) {

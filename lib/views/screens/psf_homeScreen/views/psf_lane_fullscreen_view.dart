@@ -1279,104 +1279,173 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-  Widget _recipeTable() {
+ Widget _recipeTable() {
     final rows = controller.harnessReceipes;
+
     return Container(
       decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: _StationColors.slateBorder)),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _StationColors.slateBorder),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Table(
         columnWidths: const {
-          0: FlexColumnWidth(3),
-          1: FlexColumnWidth(2),
-          2: FlexColumnWidth(2),
-          3: FlexColumnWidth(2),
-          4: FlexColumnWidth(2),
+          0: FlexColumnWidth(3), // Sensor Name
+          1: FlexColumnWidth(2), // Reg Address
+          2: FlexColumnWidth(2), // Type
+          3: FlexColumnWidth(1.4), // Pin No
+          4: FlexColumnWidth(2), // Current Value
+          5: FlexColumnWidth(1), // Unit
+          6: FlexColumnWidth(2), // Write
         },
         border: TableBorder(
-            horizontalInside: BorderSide(color: _StationColors.slateBorder),
-            verticalInside: BorderSide(color: _StationColors.slateBorder)),
+          horizontalInside: BorderSide(color: _StationColors.slateBorder, width: 1),
+          verticalInside: BorderSide(color: _StationColors.slateBorder, width: 1),
+        ),
         children: [
           TableRow(
             decoration: BoxDecoration(color: _StationColors.tealBg),
-            children: const [
-              Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('SENSOR',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: _StationColors.teal))),
-              Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('REG',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: _StationColors.teal))),
-              Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('TYPE',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: _StationColors.teal))),
-              Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('VALUE',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: _StationColors.teal))),
-              Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Text('WRITE',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          color: _StationColors.teal))),
+            children: [
+              _headerCell('SENSOR NAME'),
+              _headerCell('REG. ADDRESS'),
+              _headerCell('TYPE'),
+              _headerCell('PIN NO'),
+              _headerCell('CURRENT VALUE'),
+              _headerCell('UNIT'),
+              _headerCell('WRITE'),
             ],
           ),
-          for (final s in rows)
-            TableRow(children: [
-              Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(s.sensorName ?? '-',
-                      style: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w600))),
-              Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text('${s.regAddress ?? '-'}',
-                      style: const TextStyle(fontSize: 12))),
-              Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(s.type ?? '-',
-                      style: const TextStyle(fontSize: 12))),
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Obx(() {
-                  final live =
-                      s.id != null ? controller.livePlcValues[s.id] : null;
-                  return Text(
-                    live ?? '-',
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
-                        color: live == 'ERR'
-                            ? _StationColors.red
-                            : _StationColors.teal),
-                  );
-                }),
+          for (int i = 0; i < rows.length; i++)
+            TableRow(
+              decoration: BoxDecoration(
+                color: i.isEven ? Colors.white : const Color(0xFFFAFBFC),
               ),
-              Padding(
-                padding: const EdgeInsets.all(6),
-                child: _SensorWriteAction(sensor: s, controller: controller),
-              ),
-            ]),
+              children: _recipeRowCells(rows[i]),
+            ),
         ],
       ),
     );
+  }
+
+  Widget _headerCell(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            color: _StationColors.teal,
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _recipeRowCells(list_ds.Receipe sensor) {
+    return [
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(
+              sensor.sensorName ?? '-',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text('${sensor.regAddress ?? '-'}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+          ),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              // padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              // decoration: BoxDecoration(
+              //   color: _StationColors.slateBg,
+              //   borderRadius: BorderRadius.circular(6),
+              //   border: Border.all(color: _StationColors.slateBorder),
+              // ),
+              child: Center(
+                child: Text(sensor.type ?? '-', style: const TextStyle(fontSize: 11, color: _StationColors.charcoal)),
+              ),
+            ),
+          ),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text('${sensor.pinNo ?? '-'}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+          ),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Obx(() {
+            final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+            final display = live ?? '-';
+            final isLive = live != null && live != 'ERR';
+            final isError = live == 'ERR';
+
+            return Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isError ? _StationColors.redBg : (isLive ? _StationColors.tealBg : Colors.transparent),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  display,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: isError ? _StationColors.red : (isLive ? _StationColors.teal : _StationColors.slate),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Center(
+            child: Text(sensor.unit ?? '-', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+          ),
+        ),
+      ),
+      TableCell(
+        verticalAlignment: TableCellVerticalAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Center(
+            child: _SensorWriteAction(sensor: sensor, controller: controller),
+          ),
+        ),
+      ),
+    ];
   }
 
 // Widget _buildResolvedInfoTile() {
@@ -2434,106 +2503,90 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //   );
   // }
 
- void _showActivityFullScreen() {
-    String? fullScreenFilter = _activityFilter;
-
+  void _showActivityFullScreen() {
     Get.dialog(
       Dialog.fullscreen(
-        child: StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Scaffold(
-              appBar: AppBar(
-                iconTheme: const IconThemeData(color: Colors.white),
-                backgroundColor: _StationColors.teal,
-                foregroundColor: Colors.white,
-                title: Text('Activity Log — Lane ${lane.laneNumber}'),
-                actions: [
-                  Obx(() => IconButton(
-                        icon: const Icon(Icons.save_alt, color: Colors.white),
-                        tooltip: 'Save Activity Log',
-                        onPressed: lane.activityLog.isEmpty
-                            ? null
-                            : () async {
-                                final ok = await lane.saveActivityLog();
-                                Get.snackbar(
-                                  ok ? 'Saved' : 'Error',
-                                  ok
-                                      ? 'Activity log saved successfully.'
-                                      : 'Failed to save activity log.',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                );
-                              },
-                      )),
-                  Obx(() => IconButton(
-                        icon: const Icon(Icons.copy, color: Colors.white),
-                        tooltip: 'Copy all activity log',
-                        onPressed: lane.activityLog.isEmpty
-                            ? null
-                            : () => _copyActivityLog(),
-                      )),
-                ],
-              ),
-              backgroundColor: _StationColors.slateBg,
-              body: Padding(
-                padding: const EdgeInsets.all(16),
+        child: Scaffold(
+          appBar: AppBar(
+            iconTheme: const IconThemeData(color: Colors.white),
+            backgroundColor: _StationColors.teal,
+            foregroundColor: Colors.white,
+            title: Text('Activity Log — Lane ${lane.laneNumber}'),
+          ),
+          backgroundColor: _StationColors.slateBg,
+          body: StatefulBuilder(
+            builder: (context, setDialogState) {
+              return SafeArea(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      height: 28,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: ActivityLogTag.allTags.length + 1,
-                        separatorBuilder: (_, __) => const SizedBox(width: 6),
-                        itemBuilder: (context, i) {
-                          if (i == 0) {
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                      child: SizedBox(
+                        height: 30,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: ActivityLogTag.allTags.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 6),
+                          itemBuilder: (context, i) {
+                            final tag = ActivityLogTag.allTags[i];
                             return _tagChip(
-                              'All',
-                              selected: fullScreenFilter == null,
-                              onTap: () => setDialogState(() => fullScreenFilter = null),
+                              tag,
+                              selected: _activityFilter == tag,
+                              onTap: () => setDialogState(() =>
+                                  _activityFilter =
+                                      _activityFilter == tag ? null : tag),
                             );
-                          }
-                          final tag = ActivityLogTag.allTags[i - 1];
-                          return _tagChip(
-                            tag,
-                            selected: fullScreenFilter == tag,
-                            onTap: () => setDialogState(() => fullScreenFilter = fullScreenFilter == tag ? null : tag),
-                          );
-                        },
+                          },
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const Divider(height: 1),
                     Expanded(
                       child: Obx(() {
                         final entries = lane.activityLog.where((e) {
-                          if (fullScreenFilter == null) return true;
-                          return _parseLogEntry(e)['tag'] == fullScreenFilter;
+                          if (_activityFilter == null) return true;
+                          return _parseLogEntry(e)['tag'] == _activityFilter;
                         }).toList();
 
                         if (entries.isEmpty) {
                           return Center(
                             child: Text(
-                              fullScreenFilter == null ? 'No activity yet' : 'No "$fullScreenFilter" entries yet',
-                              style: const TextStyle(color: _StationColors.slate),
+                              _activityFilter == null
+                                  ? 'No activity yet'
+                                  : 'No "$_activityFilter" entries yet',
+                              style:
+                                  const TextStyle(color: _StationColors.slate),
                             ),
                           );
                         }
 
                         return ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           itemCount: entries.length,
                           itemBuilder: (context, i) {
                             final parsed = _parseLogEntry(entries[i]);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 5),
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: _StationColors.slateBorder),
+                              ),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   _tagChip(parsed['tag']!),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: SelectableText(
                                       '[${parsed['time']}] ${parsed['message']}',
-                                      style: TextStyle(fontSize: 13, color: _activityLogColor(entries[i])),
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: _activityLogColor(entries[i])),
                                     ),
                                   ),
                                 ],
@@ -2545,9 +2598,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     ),
                   ],
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
       barrierDismissible: true,
