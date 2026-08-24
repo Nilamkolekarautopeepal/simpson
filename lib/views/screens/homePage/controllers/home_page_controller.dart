@@ -18,11 +18,14 @@ import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 import 'package:simpson/modals/pidDataset.model.dart' as pid_ds;
 import 'package:simpson/routes/app_pages.dart';
 import 'package:simpson/services/apiServices.dart';
+import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/plc/plc_service.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:simpson/services/pending_session_storage.dart';
+
+import '../../../../services/connectionWifiService.dart';
 
 enum StepType { single, iqaGroup }
 

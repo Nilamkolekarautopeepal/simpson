@@ -31,17 +31,17 @@ String _decodeLatin1Isolate(Uint8List bytes) {
 }
 
 class PsfHomeScreenController extends GetxController {
-
 // bypass new code
 
   // static final HttpClient _sharedHttpClient = HttpClient()
   //   ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
   //   ..connectionTimeout = const Duration(seconds: 15);
 
-static final HttpClient _sharedHttpClient = HttpClient()
+  static final HttpClient _sharedHttpClient = HttpClient()
     ..maxConnectionsPerHost = 8
     ..connectionTimeout = const Duration(seconds: 15)
-    ..badCertificateCallback = (cert, host, port) => true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
+    ..badCertificateCallback = (cert, host, port) =>
+        true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
 
   Future<String> _downloadAsRawStringFast(String url) async {
     final request = await _sharedHttpClient.getUrl(Uri.parse(url));
@@ -56,10 +56,10 @@ static final HttpClient _sharedHttpClient = HttpClient()
     return await compute(_decodeLatin1Isolate, bytes);
   }
 
-  //bypass new code 
-   
-   
+  //bypass new code
+
   static const int _dongleFlashPort = 6888;
+  bool get _anyOtherLaneFlashing => lanes.any((l) => l.isFlashing.value);
 
   final RxnInt expandedLaneIndex = RxnInt(0);
 
@@ -78,13 +78,17 @@ static final HttpClient _sharedHttpClient = HttpClient()
       activityLog.removeAt(0);
     }
   }
+
   Future<void> _resendPendingSessions() async {
     final drafts = PendingSessionStorage.getAllDrafts();
     // Only resend drafts that belong to THIS app (PFS), not Test Station's.
-    final pfsDrafts = drafts.where((d) => (d['sessionKey'] as String? ?? '').startsWith('pfs_')).toList();
+    final pfsDrafts = drafts
+        .where((d) => (d['sessionKey'] as String? ?? '').startsWith('pfs_'))
+        .toList();
     if (pfsDrafts.isEmpty) return;
 
-    print('Found ${pfsDrafts.length} unsent PFS session report(s) from a previous run — resending...');
+    print(
+        'Found ${pfsDrafts.length} unsent PFS session report(s) from a previous run — resending...');
 
     const validStatuses = {'Pass', 'Fail'};
     String sanitizeStatus(dynamic raw) {
@@ -98,7 +102,10 @@ static final HttpClient _sharedHttpClient = HttpClient()
 
       final datasetType = draft['datasetType'] as String?;
       final datafileName = draft['datafileName'] as String?;
-      if (datasetType == null || datasetType.isEmpty || datafileName == null || datafileName.isEmpty) {
+      if (datasetType == null ||
+          datasetType.isEmpty ||
+          datafileName == null ||
+          datafileName.isEmpty) {
         await PendingSessionStorage.removeDraft(key);
         continue;
       }
@@ -109,8 +116,10 @@ static final HttpClient _sharedHttpClient = HttpClient()
           dongleId: draft['dongleId'] as int?,
           datasetType: datasetType,
           datafileName: datafileName,
-          startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ?? DateTime.now(),
-          endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ?? DateTime.now(),
+          startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ??
+              DateTime.now(),
+          endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ??
+              DateTime.now(),
           continutyStatus: sanitizeStatus(draft['continutyStatus']),
           flashStatus: sanitizeStatus(draft['flashStatus']),
           iqaStatus: sanitizeStatus(draft['iqaStatus']),
@@ -121,7 +130,8 @@ static final HttpClient _sharedHttpClient = HttpClient()
         await PendingSessionStorage.removeDraft(key);
         print('✅ Resent previously unsent PFS session report ($key)');
       } catch (e) {
-        print('❌ Failed to resend PFS session report ($key): $e — will retry next launch');
+        print(
+            '❌ Failed to resend PFS session report ($key): $e — will retry next launch');
       }
     }
   }
@@ -131,7 +141,8 @@ static final HttpClient _sharedHttpClient = HttpClient()
     final key = lane.currentSessionKey;
     if (key == null) return;
     if (lane.sessionReportSent) return;
-    if (lane.resolvedDatasetType == null || lane.resolvedDatasetFileName == null) return;
+    if (lane.resolvedDatasetType == null ||
+        lane.resolvedDatasetFileName == null) return;
 
     await PendingSessionStorage.saveDraft(key, {
       'sessionKey': key,
@@ -139,7 +150,8 @@ static final HttpClient _sharedHttpClient = HttpClient()
       'dongleId': lane.dongleDbId,
       'datasetType': lane.resolvedDatasetType,
       'datafileName': lane.resolvedDatasetFileName,
-      'startDate': (lane.flashCycleStartTime ?? DateTime.now()).toIso8601String(),
+      'startDate':
+          (lane.flashCycleStartTime ?? DateTime.now()).toIso8601String(),
       'endDate': DateTime.now().toIso8601String(),
       'continutyStatus': lane.isHarnessConnected.value ? 'Pass' : 'Fail',
       'flashStatus': lane.draftFlashStatus ?? 'Fail',
@@ -155,7 +167,10 @@ static final HttpClient _sharedHttpClient = HttpClient()
     if (key == null) return;
     if (lane.sessionReportSent) return;
 
-    if (lane.resolvedDatasetType == null || lane.resolvedDatasetType!.isEmpty || lane.resolvedDatasetFileName == null || lane.resolvedDatasetFileName!.isEmpty) {
+    if (lane.resolvedDatasetType == null ||
+        lane.resolvedDatasetType!.isEmpty ||
+        lane.resolvedDatasetFileName == null ||
+        lane.resolvedDatasetFileName!.isEmpty) {
       return;
     }
     lane.sessionReportSent = true;
@@ -181,7 +196,8 @@ static final HttpClient _sharedHttpClient = HttpClient()
       await PendingSessionStorage.removeDraft(key);
     } catch (e) {
       lane.sessionReportSent = false;
-      lane.logActivity('❌ Failed to send session report ($reason): $e — will retry later');
+      lane.logActivity(
+          '❌ Failed to send session report ($reason): $e — will retry later');
     }
   }
 
@@ -213,6 +229,8 @@ static final HttpClient _sharedHttpClient = HttpClient()
     _lastIsolateFlashStart = DateTime.now();
   }
 
+   final Set<String> _activeFlashProtocols = {};
+
   Future<String?> _runFlashInIsolate({
     required int laneNumber,
     required String host,
@@ -227,6 +245,20 @@ static final HttpClient _sharedHttpClient = HttpClient()
     required void Function(double percent) onProgress,
   }) async {
     await _staggerIsolateFlashStart();
+
+    // Isolates share the same native process-level state underneath
+    // ap_dongle_comm, even though they're separate Dart isolates —
+    // that's why controller-level sequencing never fixed this. Two
+    // isolates with IDENTICAL protocol/header config are safe (same
+    // values, no visible corruption even if overwritten); two with
+    // DIFFERENT config genuinely corrupt each other at that shared
+    // native layer. So: only serialize when the config truly differs.
+    final signature = '$protocolHex|$txHeader|$rxHeader';
+    while (_activeFlashProtocols.isNotEmpty && !_activeFlashProtocols.contains(signature)) {
+      print('   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    _activeFlashProtocols.add(signature);
 
     final receivePort = ReceivePort();
     Isolate? isolate;
@@ -270,10 +302,11 @@ static final HttpClient _sharedHttpClient = HttpClient()
     } catch (e) {
       print('   ❌ [Lane $laneNumber] isolate spawn/run failed: $e');
       return e.toString();
-    } finally {
+        } finally {
       await sub.cancel();
       receivePort.close();
-      isolate?.kill(priority: Isolate.immediate);
+      isolate?.kill(priority: Isolate.beforeNextEvent);
+      _activeFlashProtocols.remove(signature);
     }
   }
 
@@ -302,11 +335,11 @@ static final HttpClient _sharedHttpClient = HttpClient()
       "PFS Controller Loaded",
     );
     @override
-  void onInit() {
-    super.onInit();
-    // ... existing init code ...
-    PendingSessionStorage.init().then((_) => _resendPendingSessions());
-  }
+    void onInit() {
+      super.onInit();
+      // ... existing init code ...
+      PendingSessionStorage.init().then((_) => _resendPendingSessions());
+    }
   }
 
   Future<void> _loadLanesFromDongleList() async {
@@ -620,6 +653,7 @@ static final HttpClient _sharedHttpClient = HttpClient()
       harnesses: variant.prodbudVariantHarness,
     );
   }
+
   Future<void> applyLane(
     String esn,
     int laneIndex,
@@ -639,23 +673,27 @@ static final HttpClient _sharedHttpClient = HttpClient()
     lane.matchedEcu = ecuEntry;
     lane.matchedVehicleModelId = identified.vehicleModelId;
     lane.matchedSubModelId = identified.subModelId;
-lane.esnRecordId = identified.esnRecordId;
+    lane.esnRecordId = identified.esnRecordId;
     lane.resolvedDatasetType = identified.resolvedDatasetType;
     lane.listNumber.value = identified.variantCode ?? '';
 
     final activeHarness = (identified.harnesses ?? []).firstWhereOrNull(
-      (h) => h.isActive == true && (h.stationType ?? '').trim().toLowerCase() == 'pfs',
+      (h) =>
+          h.isActive == true &&
+          (h.stationType ?? '').trim().toLowerCase() == 'pfs',
     );
     harnessReceipes.assignAll(activeHarness?.receipes ?? []);
     if (activeHarness != null) {
-      lane.logActivity('Harness resolved: "${activeHarness.name}" (${harnessReceipes.length} recipe sensor(s))');
+      lane.logActivity(
+          'Harness resolved: "${activeHarness.name}" (${harnessReceipes.length} recipe sensor(s))');
     }
 
     lane.resolvedFlashFileUrl.value = identified.flashFileUrl;
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
     lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
     lane.flashCycleStartTime = DateTime.now();
-    lane.currentSessionKey = 'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
+    lane.currentSessionKey =
+        'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
     lane.sessionReportSent = false;
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
@@ -708,6 +746,7 @@ lane.esnRecordId = identified.esnRecordId;
       );
     }
   }
+
   double _applySensorFormula(String? type, int raw) => raw.toDouble();
 
   Future<void> writeSensorValue(list_ds.Receipe sensor, int value) async {
@@ -721,7 +760,8 @@ lane.esnRecordId = identified.esnRecordId;
       final confirmed = await plcService.writeRegister(reg, value);
       if (!confirmed) return;
       final raw = await plcService.readRegister(reg);
-      livePlcValues[id] = _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
+      livePlcValues[id] =
+          _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
     } catch (_) {
       // leave as-is on failure; UI shows last-known value
     } finally {
@@ -744,7 +784,8 @@ lane.esnRecordId = identified.esnRecordId;
         await Future.delayed(const Duration(milliseconds: 200));
         raw = await plcService.readRegister(reg);
       }
-      livePlcValues[id] = _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
+      livePlcValues[id] =
+          _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
     } catch (_) {
       livePlcValues[id] = 'ERR';
     } finally {
@@ -941,8 +982,6 @@ lane.esnRecordId = identified.esnRecordId;
     }
   }
 
-  
-
   Future<void> connectDongleForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
     _dongleRetryAttempts[laneIndex] =
@@ -1111,8 +1150,6 @@ lane.esnRecordId = identified.esnRecordId;
     }
   }
 
-  
-
   Future<void> reconnectDongleWithFeedback(int laneIndex) async {
     final lane = lanes[laneIndex];
 
@@ -1260,7 +1297,7 @@ lane.esnRecordId = identified.esnRecordId;
       return;
     }
 
-    if (lane.isDongleBusy) {
+        if (lane.isDongleBusy) {
       print(
           '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
       print('══════════════════════════════════════════');
@@ -1276,6 +1313,25 @@ lane.esnRecordId = identified.esnRecordId;
       );
       return;
     }
+
+        if (lane.isDongleBusy) {
+      print(
+          '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
+      print('══════════════════════════════════════════');
+      if (Get.isDialogOpen == true) Get.back();
+      Get.dialog(
+        CustomPopup(
+          title: 'Flash',
+          message:
+              'This lane\'s dongle is busy — wait for the current operation to finish.',
+          confirmText: 'OK',
+        ),
+        barrierDismissible: true,
+      );
+      return;
+    }
+    lane.isDongleBusy = true;
+
     lane.isDongleBusy = true;
 
     final ip = lane.dongleIpFromLogin;
@@ -1377,44 +1433,51 @@ lane.esnRecordId = identified.esnRecordId;
 
       print('══════════════════════════════════════════');
       lane.flashStatus.value = "Flash Failed: $result";
+      lane.logActivity(
+          'SESSION SUMMARY — Flash: Fail ($result)  |  IQA: Fail  |  DTC: Fail');
+
+      // A failed flash never reaches IQA/DTC — report it as a failed
+      // cycle anyway, so the server has a record of every attempt,
+      // not just the successful ones.
+      lane.draftFlashStatus = 'Fail';
+      lane.draftIqaStatus = 'Fail';
+      lane.draftDtcStatus = 'Fail';
+      await _persistSessionDraft(index);
+      await _sendPartialSessionReport(index, 'flash failed: $result');
+
       lane.isDongleBusy = false;
       return;
     }
-    //----------------------------
-    // print(
-    //     '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — reconnecting to read DTC/PID, write IQA…');
-    // print('══════════════════════════════════════════');
-    // lane.flashProgress.value = 1;
-    // lane.flashStatus.value = "Flash Completed";
-    // lane.isDongleBusy = false;
-    // await connectDongleForLane(index);
-    // lane.isDongleBusy = true;
 
-    //------------------------------------------------------
     print(
         '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — letting dongle settle before reconnecting…');
     print('══════════════════════════════════════════');
     lane.flashProgress.value = 1;
     lane.flashStatus.value = "Flash Completed";
 
-    //----------------------------------
-
-    // await Future.delayed(const Duration(seconds: 3));
-    // lane.isDongleBusy = false;
-    // await connectDongleForLane(index);
-    // if (!lane.dongleConnected.value || lane.dllFunctions == null) {
-    //   print(
-    //       '   ⚠️ [Lane ${lane.laneNumber}] first reconnect attempt failed — waiting longer and trying once more...');
-    //   await Future.delayed(const Duration(seconds: 3));
-    //   await connectDongleForLane(index);
-    // }
-
-    // lane.isDongleBusy = true;
-
-    //------------------------------------------------
+    // Show "processing" feedback from the moment flashing finishes —
+    // covers reconnect + IQA + DTC as one continuous, visible step,
+    // instead of a silent gap before any indicator appears.
+    lane.isPostFlashProcessing.value = true;
     lane.isReconnectingAfterFlash.value = true;
 
+    // If another lane is still mid-flash, hold off on this lane's own
+    // reconnect/IQA/DTC burst of WiFi traffic — a real flash takes
+    // several minutes, so there's no safe fixed cap to wait here.
+    // Just wait for as long as any other lane genuinely IS flashing;
+    // it will always eventually finish (succeed or fail) on its own.
+    int waitedSeconds = 0;
+    while (_anyOtherLaneFlashing) {
+      await Future.delayed(const Duration(seconds: 1));
+      waitedSeconds++;
+    }
+    if (waitedSeconds > 0) {
+      print(
+          '   ⏳ [Lane ${lane.laneNumber}] waited ${waitedSeconds}s for other lane(s) to finish flashing before reconnecting/IQA/DTC');
+    }
+
     await Future.delayed(const Duration(seconds: 5));
+
     lane.isDongleBusy = false;
 
     int attempt = 0;
@@ -1423,26 +1486,32 @@ lane.esnRecordId = identified.esnRecordId;
       attempt++;
       await connectDongleForLane(index);
       if (lane.dongleConnected.value && lane.dllFunctions != null) {
-        print('   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+        print(
+            '   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
         break;
       }
-      print('   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+      print(
+          '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
       await Future.delayed(const Duration(seconds: 5));
     }
 
     lane.isDongleBusy = true;
     lane.isReconnectingAfterFlash.value = false;
-    //---------------------------------------------
+
     if (!lane.dongleConnected.value || lane.dllFunctions == null) {
       print(
           '   ⚠️ [Lane ${lane.laneNumber}] could not reconnect after flash — skipping DTC/PID/IQA steps');
       lane.flashStatus.value = "Flash Completed (reconnect failed)";
+      lane.isPostFlashProcessing.value = false;
       lane.isDongleBusy = false;
       return;
     }
 
-    lane.isPostFlashProcessing.value = true;
-
+    // One more check right before the actual write — a new lane could
+    // have started flashing during the reconnect delay above.
+    while (_anyOtherLaneFlashing) {
+      await Future.delayed(const Duration(seconds: 1));
+    }
     lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
 
     await Future.delayed(const Duration(milliseconds: 500));
@@ -1451,7 +1520,7 @@ lane.esnRecordId = identified.esnRecordId;
     await Future.delayed(const Duration(milliseconds: 300));
     await loadPidForLane(index);
 
-   lane.isPostFlashProcessing.value = false;
+    lane.isPostFlashProcessing.value = false;
     final flashPassed = result == 'NOERROR';
     final iqaPassed =
         lane.iqaWriteStatus.value.toLowerCase().contains('successful');
@@ -1487,8 +1556,6 @@ lane.esnRecordId = identified.esnRecordId;
 
     lane.isDongleBusy = false;
   }
-
-
 // bypass due to cetfide error
 
   // Future<String> _downloadAsRawStringFast(String url) async {
@@ -1506,7 +1573,8 @@ lane.esnRecordId = identified.esnRecordId;
 
   Future<String> _downloadAsRawString(String url) async {
     final client = HttpClient()
-      ..badCertificateCallback = (cert, host, port) => true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
+      ..badCertificateCallback = (cert, host, port) =>
+          true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
     final request = await client.getUrl(Uri.parse(url));
     final response = await request.close();
     final bytes =
@@ -1646,7 +1714,7 @@ lane.esnRecordId = identified.esnRecordId;
       return;
     }
 
-  lane.isClearingDtc.value = true;
+    lane.isClearingDtc.value = true;
     lane.dtcError.value = '';
     try {
       // Make sure the dataset catalog (for descriptions) is loaded.
@@ -2150,7 +2218,7 @@ lane.esnRecordId = identified.esnRecordId;
     lanes[index].isLedOn.toggle();
   }
 
- void logout() {
+  void logout() {
     final flashingLanes = lanes.where((l) => l.isFlashing.value).toList();
     if (flashingLanes.isNotEmpty) {
       final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');

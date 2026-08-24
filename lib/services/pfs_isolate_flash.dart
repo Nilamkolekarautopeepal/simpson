@@ -146,8 +146,8 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
 
     final flashConfig = FlashConfig(seedKeyIndex: seedkeyindx);
 
-    progressTimer = Timer.periodic(
-      const Duration(milliseconds: 500),
+       progressTimer = Timer.periodic(
+      const Duration(seconds: 2),
       (_) async {
         final pct = await uds!.getRuntimeFlashPercent();
         mainSendPort.send(PfsFlashMessage.progress(pct));
@@ -155,7 +155,7 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
     );
     ;
 
-    print('🚀 [Lane ${args.laneNumber} isolate] calling flashInterpreter2...');
+        print('🚀 [Lane ${args.laneNumber} isolate] calling flashInterpreter2...');
     final result = await uds.flashInterpreter(
       flashConfig,
       jsonData.noOfSectors ?? 0,
@@ -163,10 +163,16 @@ void pfsFlashIsolateEntry(List<dynamic> initialMessage) async {
       args.interpreter,
     );
 
-    progressTimer.cancel();
+       progressTimer.cancel();
     print('🏁 [Lane ${args.laneNumber} isolate] result: $result');
+    // Deliberately NOT calling comm.disconnect() here — for protocols
+    // like this, a "graceful" disconnect can itself transmit one more
+    // real command over the wire, which may be the actual disruptive
+    // event hitting another lane's live transfer. Let the isolate just
+    // end without sending any extra network traffic.
     mainSendPort.send(PfsFlashMessage.done(result));
-  } catch (e, stack) {
+  } 
+  catch (e, stack) {
     progressTimer?.cancel();
     print('❌ [Lane ${args.laneNumber} isolate] exception: $e');
     print(stack);
