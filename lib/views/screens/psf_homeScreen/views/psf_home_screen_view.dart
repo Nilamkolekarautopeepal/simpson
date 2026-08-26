@@ -6,10 +6,16 @@ import 'psf_top_lane_status_bar.dart';
 import 'psf_lane_fullscreen_view.dart';
 import '../controllers/psf_home_screen_controller.dart';
 
+/// Same palette as the login screen — deep teal for chrome/accent
+/// surfaces, keeping the whole app reading as one consistent brand,
+/// with a light neutral background for the actual working area.
 class _LaneColors {
+  static const navy = Color(0xFF16232C);   // top app bar — near-black navy
+  static const teal = Color(0xFF1F4D59);   // sidebar/status-bar strip
+  static const tealLight = Color(0xFF2C6478); // lighter accent variant
   static const green = Color(0xFF2ECC71);
   static const red = Color(0xFFD64545);
-  static const slateBg = Color(0xFFF7F8FA);
+  static const slateBg = Color(0xFF2E6D82); // main working-area background
 }
 
 Widget _glowDot(Color core, {double size = 10}) {
@@ -31,13 +37,29 @@ Widget _glowDot(Color core, {double size = 10}) {
   );
 }
 
+/// Same glassy pill treatment as the login screen's input fields —
+/// soft teal-tinted gradient fill, subtle border, gentle shadow.
 Widget _statusPill({required Widget child}) {
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.08),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          const Color(0xFF3D7887).withOpacity(0.55),
+          const Color(0xFF2A6272).withOpacity(0.45),
+        ],
+      ),
       border: Border.all(color: Colors.white.withOpacity(0.14)),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.12),
+          blurRadius: 6,
+          offset: const Offset(0, 2),
+        ),
+      ],
     ),
     child: child,
   );
@@ -57,7 +79,7 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
               padding: const EdgeInsets.symmetric(horizontal: 6),
               child: InkWell(
                 onTap: controller.onPlcButtonTapped,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(22),
                 child: _statusPill(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -89,29 +111,6 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
               ),
             ),
           ),
-          // Obx(
-          //   () => Padding(
-          //     padding: const EdgeInsets.symmetric(horizontal: 6),
-          //     child: _statusPill(
-          //       child: Row(
-          //         mainAxisSize: MainAxisSize.min,
-          //         children: [
-          //           _glowDot(controller.isDongleConnectedAnywhere
-          //               ? _LaneColors.green
-          //               : _LaneColors.red),
-          //           const SizedBox(width: 8),
-          //           const Text(
-          //             'Dongle',
-          //             style: TextStyle(
-          //                 color: Colors.white,
-          //                 fontSize: 12.5,
-          //                 fontWeight: FontWeight.w600),
-          //           ),
-          //         ],
-          //       ),
-          //     ),
-          //   ),
-          // ),
           const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
@@ -124,13 +123,33 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          PsfTopLaneStatusBar(controller: controller),
-         Expanded(
+          // Same teal gradient as the login screen's background, used
+          // here as the lane status bar's backdrop for visual continuity.
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _LaneColors.teal,
+                  _LaneColors.tealLight,
+                ],
+              ),
+            ),
+            child: PsfTopLaneStatusBar(controller: controller),
+          ),
+          Expanded(
             child: Obx(() {
               if (controller.lanes.isEmpty) {
-                return const Center(child: Text('No dongles found for this station from login data.', style: TextStyle(color: Colors.grey)));
+                return const Center(
+                  child: Text(
+                    'No dongles found for this station from login data.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                );
               }
-              final expanded = (controller.expandedLaneIndex.value ?? 0).clamp(0, controller.lanes.length - 1);
+              final expanded = (controller.expandedLaneIndex.value ?? 0)
+                  .clamp(0, controller.lanes.length - 1);
               return PsfLaneFullScreenView(
                 laneIndex: expanded,
                 lane: controller.lanes[expanded],
@@ -142,7 +161,6 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
       ),
     );
   }
-
 
   // ignore: unused_element
   Widget _buildLaneGrid() {

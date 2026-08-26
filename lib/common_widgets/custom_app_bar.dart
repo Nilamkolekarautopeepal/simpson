@@ -300,7 +300,7 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: AppColors.themeColor,
+      backgroundColor: const Color.fromARGB(0xFF, 0x16, 0x23, 0x2C),
       elevation: 2,
       centerTitle: false,
       automaticallyImplyLeading: false,
@@ -321,12 +321,12 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+               // color: Colors.white.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Image.asset(
-                'asset/images/ic_sidialogo1.png',
-                height: 24,
+                'asset/images/simpsons_logo.png',
+                height: 50,
                 errorBuilder: (context, error, stackTrace) =>
                     const SizedBox.shrink(),
               ),

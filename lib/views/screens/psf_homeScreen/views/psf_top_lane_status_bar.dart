@@ -3,9 +3,9 @@ import 'package:get/get.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
 
 class _StationColors {
-  static const teal = Color(0xFF0E6E6E);
-  static const tealLight = Color(0xFF1B9494);
-  static const charcoal = Color.fromRGBO(3, 60, 98, 1);
+  static const teal = Color(0xFF1F4D59);
+  static const tealLight = Color(0xFF2C6478);
+  static const charcoal = Color(0xFF16232C);
   static const green = Color(0xFF2ECC71);
   static const red = Color(0xFFD64545);
 }

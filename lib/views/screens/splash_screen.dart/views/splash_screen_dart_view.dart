@@ -13,16 +13,16 @@ class SplashScreenDartView extends GetView<SplashScreenDartController> {
         children: [
           Positioned.fill(
             child: Container(
-              color: const Color(0xFF0A1F44),
+              color: const Color.fromARGB(255, 251, 252, 252),
             ),
           ),
           Center(
             child: Image.asset(
-              'asset/images/ic_sidialogo1.png',
-              width: 280,
+              'asset/images/simpsons_logo.png',
+              width: 380,
               errorBuilder: (context, error, stackTrace) {
                 debugPrint(
-                    "🔴 [SplashScreen] Failed to load ic_sidialogo1.png: $error");
+                    "🔴 [SplashScreen] Failed to load simpsons_logo.png: $error");
                 return const Text(
                   'Logo not found',
                   style: TextStyle(color: Colors.red),

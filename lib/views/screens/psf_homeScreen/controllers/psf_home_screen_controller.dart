@@ -245,14 +245,6 @@ class PsfHomeScreenController extends GetxController {
     required void Function(double percent) onProgress,
   }) async {
     await _staggerIsolateFlashStart();
-
-    // Isolates share the same native process-level state underneath
-    // ap_dongle_comm, even though they're separate Dart isolates —
-    // that's why controller-level sequencing never fixed this. Two
-    // isolates with IDENTICAL protocol/header config are safe (same
-    // values, no visible corruption even if overwritten); two with
-    // DIFFERENT config genuinely corrupt each other at that shared
-    // native layer. So: only serialize when the config truly differs.
     final signature = '$protocolHex|$txHeader|$rxHeader';
     while (_activeFlashProtocols.isNotEmpty && !_activeFlashProtocols.contains(signature)) {
       print('   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');

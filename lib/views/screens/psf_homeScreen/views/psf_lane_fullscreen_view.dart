@@ -716,19 +716,22 @@ import 'package:path_provider/path_provider.dart';
 import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 
 class _StationColors {
-  static const teal = Color(0xFF0E6E6E);
-  static const tealBg = Color(0xFFE8F5F5);
-  static const charcoal = Color(0xFF1E2A32);
+  static const navy = Color(0xFF16232C); // outer background, matches app bar
+  static const teal = Color(0xFF1F4D59); // cards / panels
+  static const tealLight = Color(0xFF2C6478); // borders / highlights
+  static const tealBg = Color(0xFF264F5C); // soft badge/chip fill
+  static const charcoal = Color(0xFFFFFFFF); // primary text — now white
   static const green = Color(0xFF2ECC71);
-  static const greenDark = Color(0xFF1B7A3E);
-  static const greenBg = Color(0xFFEAFAF1);
-  static const amber = Color(0xFFB9770E);
-  static const amberBg = Color(0xFFFEF6E7);
-  static const red = Color(0xFFD64545);
-  static const redBg = Color(0xFFFDEDED);
-  static const slate = Color(0xFF7C8698);
-  static const slateBorder = Color(0xFFDDE1E9);
-  static const slateBg = Color(0xFFF7F8FA);
+  static const greenDark = Color(0xFF3ADB80);
+  static const greenBg = Color(0xFF1E4A33);
+  static const amber = Color(0xFFE0A63E);
+  static const amberBg = Color(0xFF4A3B1A);
+  static const red = Color(0xFFFF6B6B);
+  static const redBg = Color(0xFF4A2626);
+  static const slate = Color(0xFFA9BAC2); // secondary text — light grey-blue
+  static const slateBorder = Color(0xFF345A66);
+  static const slateBg = Color(0xFF1B333D);
+  static const brightGreen = Color(0xFF00E676); // vivid, energetic green — matches "Run" button feel// scroll-area / field fill
 }
 
 class PsfLaneFullScreenView extends StatefulWidget {
@@ -860,7 +863,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     return {'time': '', 'tag': 'GENERAL', 'message': raw};
   }
 
-  Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
+    Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
     final color = Color(ActivityLogTag.colorValue(tag));
     return InkWell(
       onTap: onTap,
@@ -868,16 +871,18 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: selected ? color : color.withValues(alpha: 0.1),
+          color: selected ? color : Colors.transparent,
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: color.withValues(alpha: 0.5)),
+          border: Border.all(
+            color: selected ? color : Colors.white.withOpacity(0.35),
+          ),
         ),
         child: Text(
           tag,
           style: TextStyle(
             fontSize: 9.5,
             fontWeight: FontWeight.bold,
-            color: selected ? Colors.white : color,
+            color: selected ? Colors.white : Colors.white.withOpacity(0.75),
             letterSpacing: 0.3,
           ),
         ),
@@ -888,9 +893,36 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   // ── LEFT: ESN / IQA — bound directly to lane's real controllers,
   // border-only design (no background tint), consistent alignment ──
 
-  Widget _leftSidebar(BuildContext context) {
+    InputDecoration _fieldDecoration({required String hint, required bool validated}) {
+    return InputDecoration(
+      isDense: true,
+      filled: true,
+      fillColor: Colors.white.withOpacity(0.06),
+      counterText: '',
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      hintText: hint,
+      hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+      suffixIcon: validated
+          ? const Icon(Icons.check_circle, color: Color.fromARGB(255, 243, 244, 243), size: 18)
+          : null,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: BorderSide(color: validated ? const Color.fromARGB(255, 252, 252, 252) : Colors.white.withOpacity(0.2)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(6),
+        borderSide: const BorderSide(color: Color.fromARGB(255, 255, 255, 255), width: 1.5),
+      ),
+    );
+  }
+
+   Widget _leftSidebar(BuildContext context) {
     return Container(
-      color: Colors.white,
+      color: _StationColors.teal,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -905,13 +937,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       Expanded(
                         child: Obx(
                           () => Text(
-                            lane.ecuModelName.value.isEmpty
-                                ? "ECU MODEL NAME"
-                                : lane.ecuModelName.value,
-                            style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                color: _StationColors.charcoal),
+                            lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -919,20 +946,15 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       Obx(() => lane.esn.value.isEmpty
                           ? const SizedBox.shrink()
                           : IconButton(
-                              icon: const Icon(Icons.history,
-                                  color: _StationColors.teal, size: 20),
-                              onPressed: () =>
-                                  PsfSessionHistoryScreen.show(lane),
+                              icon: const Icon(Icons.history, color: Colors.white, size: 20),
+                              onPressed: () => PsfSessionHistoryScreen.show(lane),
                               tooltip: 'View session history',
                               visualDensity: VisualDensity.compact,
                             )),
                       Container(
-                        decoration: const BoxDecoration(
-                            color: _StationColors.tealBg,
-                            shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle),
                         child: IconButton(
-                          icon: const Icon(Icons.refresh,
-                              color: _StationColors.teal, size: 18),
+                          icon: const Icon(Icons.refresh, color: Colors.white, size: 20),
                           onPressed: () => controller.resetLane(laneIndex),
                           tooltip: 'Reset lane for next engine',
                           visualDensity: VisualDensity.compact,
@@ -943,180 +965,131 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _scanField(
-                    context: context,
-                    label: 'ESN NUMBER',
-                    textController: lane.esnController,
-                    focusNode: lane.esnFocusNode,
-                    isLoading: lane.isLookingUpEsn,
-                    isResolved: lane.esn,
-                    error: lane.esnError,
-                    hint: 'e.g. 111111111111111',
-                    onChanged: () => controller.onEsnFieldChanged(laneIndex),
-                    onSubmit: () => controller.onScanEsnForLane(laneIndex),
-                  ),
+
+                  // ── ESN ──
+                  Text('ESN NUMBER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
+                  const SizedBox(height: 6),
+                  Obx(() {
+                    final resolved = lane.esn.value.isNotEmpty;
+                    return Theme(
+                      data: Theme.of(context).copyWith(
+                        textSelectionTheme: TextSelectionThemeData(
+                          selectionColor: const Color.fromARGB(255, 248, 249, 248).withOpacity(0.4),
+                          selectionHandleColor: const Color.fromARGB(255, 251, 252, 251),
+                        ),
+                      ),
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent &&
+                              (event.logicalKey == LogicalKeyboardKey.tab || event.logicalKey == LogicalKeyboardKey.enter)) {
+                            controller.onScanEsnForLane(laneIndex);
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: TextField(
+                          cursorColor: const Color.fromARGB(255, 255, 255, 255),
+                          controller: lane.esnController,
+                          focusNode: lane.esnFocusNode,
+                          enabled: !lane.isLookingUpEsn.value,
+                          style: const TextStyle(fontSize: 13, color: Colors.white),
+                          decoration: _fieldDecoration(hint: 'e.g. 111111111111111', validated: resolved),
+                          onChanged: (_) => controller.onEsnFieldChanged(laneIndex),
+                          onSubmitted: (_) => controller.onScanEsnForLane(laneIndex),
+                        ),
+                      ),
+                    );
+                  }),
+                  Obx(() => lane.esnError.value.isEmpty
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(lane.esnError.value, style: const TextStyle(fontSize: 11, color: _StationColors.red)),
+                        )),
                   const SizedBox(height: 16),
+
+                  // ── LIST NUMBER (read-only, same style) ──
                   Obx(() => Visibility(
                         visible: lane.listNumber.value.isNotEmpty,
                         maintainState: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('LIST NUMBER',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.grey,
-                                    letterSpacing: 0.5)),
+                            Text('LIST NUMBER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
                             const SizedBox(height: 6),
                             TextField(
                               readOnly: true,
-                              controller: TextEditingController(
-                                  text: lane.listNumber.value),
-                              style: const TextStyle(
-                                  fontSize: 13, color: Colors.black87),
-                              decoration: InputDecoration(
-                                isDense: true,
-                                filled: true,
-                                fillColor: Colors.green.withOpacity(0.06),
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 12),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide:
-                                      BorderSide(color: AppColors.themeColor),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide:
-                                      BorderSide(color: AppColors.themeColor),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(
-                                      color: AppColors.themeColor, width: 1.5),
-                                ),
-                              ),
+                              controller: TextEditingController(text: lane.listNumber.value),
+                              style: const TextStyle(fontSize: 13, color: Colors.white),
+                              decoration: _fieldDecoration(hint: '', validated: true),
                             ),
-                            const SizedBox(height: 11),
+                            const SizedBox(height: 16),
                           ],
                         ),
                       )),
+
+                  // ── IQA (same style, same per-field checkmark) ──
                   Obx(() => Visibility(
                         visible: lane.listNumber.value.isNotEmpty,
                         maintainState: true,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('IQA NUMBERS',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: _StationColors.slate,
-                                    letterSpacing: 0.5)),
+                            Text('IQA NUMBERS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
                             const SizedBox(height: 10),
                             Column(
-                              children: List.generate(
-                                  lane.iqaControllers.length, (i) {
+                              children: List.generate(lane.iqaControllers.length, (i) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(lane.iqaLabelFor(i),
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.grey.shade600)),
-                                      const SizedBox(height: 2),
-                                      SizedBox(
-                                        height: 44,
-                                        child: Focus(
-                                          onKeyEvent: (node, event) {
-                                            if (event is KeyDownEvent &&
-                                                event.logicalKey ==
-                                                    LogicalKeyboardKey.tab) {
-                                              if (i <
-                                                  lane.iqaFocusNodes.length -
-                                                      1) {
-                                                lane.iqaFocusNodes[i + 1]
-                                                    .requestFocus();
-                                              }
-                                              return KeyEventResult.handled;
-                                            }
-                                            return KeyEventResult.ignored;
-                                          },
-                                          child: Theme(
-                                            data: Theme.of(context).copyWith(
-                                              textSelectionTheme:
-                                                  TextSelectionThemeData(
-                                                selectionColor:
-                                                    Colors.blueAccent[100],
-                                                selectionHandleColor:
-                                                    AppColors.themeColor,
-                                              ),
-                                            ),
-                                            child: TextField(
-                                              cursorColor: AppColors.themeColor,
-                                              controller:
-                                                  lane.iqaControllers[i],
-                                              focusNode: lane.iqaFocusNodes[i],
-                                              enabled: true,
-                                              maxLength: 7,
-                                              style:
-                                                  const TextStyle(fontSize: 13),
-                                              decoration: InputDecoration(
-                                                isDense: true,
-                                                filled: true,
-                                                fillColor: Colors.white,
-                                                counterText: '',
-                                                contentPadding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 12),
-                                                border: OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  borderSide: BorderSide(
-                                                      color:
-                                                          Colors.grey.shade200),
-                                                ),
-                                                enabledBorder:
-                                                    OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  borderSide: BorderSide(
-                                                      color:
-                                                          AppColors.themeColor),
-                                                ),
-                                                focusedBorder:
-                                                    OutlineInputBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  borderSide: BorderSide(
-                                                      color:
-                                                          AppColors.themeColor,
-                                                      width: 1.5),
-                                                ),
-                                                hintText:
-                                                    'Scan ${lane.iqaLabelFor(i)}',
-                                              ),
-                                              onChanged: (_) =>
-                                                  controller.onIqaFieldChanged(
-                                                      laneIndex, i),
-                                              onSubmitted: (_) {
-                                                if (i <
-                                                    lane.iqaFocusNodes.length -
-                                                        1) {
-                                                  lane.iqaFocusNodes[i + 1]
-                                                      .requestFocus();
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: lane.iqaControllers[i],
+                                    builder: (context, value, _) {
+                                      final filled = value.text.trim().length == 7;
+                                      return Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(lane.iqaLabelFor(i), style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.45))),
+                                          const SizedBox(height: 2),
+                                          SizedBox(
+                                            height: 44,
+                                            child: Focus(
+                                              onKeyEvent: (node, event) {
+                                                if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.tab) {
+                                                  if (i < lane.iqaFocusNodes.length - 1) {
+                                                    lane.iqaFocusNodes[i + 1].requestFocus();
+                                                  }
+                                                  return KeyEventResult.handled;
                                                 }
+                                                return KeyEventResult.ignored;
                                               },
+                                              child: Theme(
+                                                data: Theme.of(context).copyWith(
+                                                  textSelectionTheme: TextSelectionThemeData(
+                                                    selectionColor: const Color.fromARGB(255, 246, 247, 246).withOpacity(0.4),
+                                                    selectionHandleColor: const Color.fromARGB(255, 255, 255, 255),
+                                                  ),
+                                                ),
+                                                child: TextField(
+                                                  cursorColor: const Color.fromARGB(255, 245, 247, 245),
+                                                  controller: lane.iqaControllers[i],
+                                                  focusNode: lane.iqaFocusNodes[i],
+                                                  enabled: true,
+                                                  maxLength: 7,
+                                                  style: const TextStyle(fontSize: 13, color: Colors.white),
+                                                  decoration: _fieldDecoration(hint: 'Scan ${lane.iqaLabelFor(i)}', validated: filled),
+                                                  onChanged: (_) => controller.onIqaFieldChanged(laneIndex, i),
+                                                  onSubmitted: (_) {
+                                                    if (i < lane.iqaFocusNodes.length - 1) {
+                                                      lane.iqaFocusNodes[i + 1].requestFocus();
+                                                    }
+                                                  },
+                                                ),
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                    ],
+                                        ],
+                                      );
+                                    },
                                   ),
                                 );
                               }),
@@ -1125,10 +1098,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                             Obx(
                               () => Text(
                                 'IQA STATUS  ${lane.filledIqaCount.value} / ${lane.iqaControllers.length} scanned',
-                                style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _StationColors.teal),
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.9)),
                               ),
                             ),
                           ],
@@ -1138,38 +1108,24 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               ),
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, color: Colors.white.withOpacity(0.1)),
           InkWell(
             onTap: () => _showRecipeDialog(),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  Icon(Icons.list_alt, size: 18, color: Colors.grey.shade700),
+                  const Icon(Icons.list_alt, size: 18, color: Colors.white),
                   const SizedBox(width: 10),
-                  Text(
-                    'HIL Setup',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700),
-                  ),
+                  const Text('HIL Setup', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white)),
                   const Spacer(),
                   Obx(
                     () => controller.harnessReceipes.isEmpty
                         ? const SizedBox.shrink()
                         : Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _StationColors.teal.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              '${controller.harnessReceipes.length}',
-                              style: const TextStyle(
-                                  fontSize: 11, color: _StationColors.teal),
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+                            child: Text('${controller.harnessReceipes.length}', style: const TextStyle(fontSize: 11, color: Colors.white)),
                           ),
                   ),
                 ],
@@ -1226,7 +1182,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                       height: 14,
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2, color: Colors.white))
-                                  : const Icon(Icons.download, size: 16),
+                                  : const Icon(Icons.download, size: 16,color: Colors.white,),
                               label: Text(controller.isReadingPlcValues.value
                                   ? 'Reading…'
                                   : 'Read Current value'),
@@ -1246,7 +1202,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                       height: 14,
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2, color: Colors.white))
-                                  : const Icon(Icons.upload, size: 16),
+                                  : const Icon(Icons.upload, size: 16,color: Colors.white,),
                               label: Text(controller.isWritingAllSensors.value
                                   ? 'Writing…'
                                   : 'Write'),
@@ -1259,7 +1215,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     const SizedBox(width: 8),
                     IconButton(
                         icon: const Icon(Icons.close,
-                            size: 20, color: Colors.grey),
+                            size: 20, color: Color.fromARGB(255, 61, 60, 60)),
                         onPressed: () => Get.back()),
                   ],
                 ),
@@ -1279,7 +1235,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
- Widget _recipeTable() {
+  Widget _recipeTable() {
     final rows = controller.harnessReceipes;
 
     return Container(
@@ -1299,12 +1255,14 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
           6: FlexColumnWidth(2), // Write
         },
         border: TableBorder(
-          horizontalInside: BorderSide(color: _StationColors.slateBorder, width: 1),
-          verticalInside: BorderSide(color: _StationColors.slateBorder, width: 1),
+          horizontalInside:
+              BorderSide(color: _StationColors.slateBorder, width: 1),
+          verticalInside:
+              BorderSide(color: _StationColors.slateBorder, width: 1),
         ),
         children: [
-          TableRow(
-            decoration: BoxDecoration(color: _StationColors.tealBg),
+                    TableRow(
+            decoration: BoxDecoration(color: _StationColors.navy),
             children: [
               _headerCell('SENSOR NAME'),
               _headerCell('REG. ADDRESS'),
@@ -1315,10 +1273,10 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               _headerCell('WRITE'),
             ],
           ),
-          for (int i = 0; i < rows.length; i++)
+                 for (int i = 0; i < rows.length; i++)
             TableRow(
               decoration: BoxDecoration(
-                color: i.isEven ? Colors.white : const Color(0xFFFAFBFC),
+                color: i.isEven ? _StationColors.teal : _StationColors.navy,
               ),
               children: _recipeRowCells(rows[i]),
             ),
@@ -1327,7 +1285,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-  Widget _headerCell(String text) {
+    Widget _headerCell(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       child: Center(
@@ -1337,7 +1295,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             fontSize: 11,
             fontWeight: FontWeight.w700,
             letterSpacing: 0.3,
-            color: _StationColors.teal,
+            color: Colors.white,
           ),
         ),
       ),
@@ -1351,9 +1309,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Center(
-            child: Text(
+                        child: Text(
               sensor.sensorName ?? '-',
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Colors.white),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -1364,7 +1322,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Center(
-            child: Text('${sensor.regAddress ?? '-'}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+            child: Text('${sensor.regAddress ?? '-'}',
+                               style:
+                    TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
           ),
         ),
       ),
@@ -1382,7 +1342,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               //   border: Border.all(color: _StationColors.slateBorder),
               // ),
               child: Center(
-                child: Text(sensor.type ?? '-', style: const TextStyle(fontSize: 11, color: _StationColors.charcoal)),
+                              child: Text(sensor.type ?? '-',
+                    style: const TextStyle(
+                        fontSize: 11, color: Colors.white)),
               ),
             ),
           ),
@@ -1393,7 +1355,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Center(
-            child: Text('${sensor.pinNo ?? '-'}', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+            child: Text('${sensor.pinNo ?? '-'}',
+                                style:
+                    TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
           ),
         ),
       ),
@@ -1402,7 +1366,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Obx(() {
-            final live = sensor.id != null ? controller.livePlcValues[sensor.id] : null;
+            final live =
+                sensor.id != null ? controller.livePlcValues[sensor.id] : null;
             final display = live ?? '-';
             final isLive = live != null && live != 'ERR';
             final isError = live == 'ERR';
@@ -1410,8 +1375,10 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             return Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isError ? _StationColors.redBg : (isLive ? _StationColors.tealBg : Colors.transparent),
+                              decoration: BoxDecoration(
+                  color: isError
+                      ? _StationColors.redBg
+                      : (isLive ? _StationColors.brightGreen.withOpacity(0.18) : Colors.transparent),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
@@ -1419,7 +1386,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.bold,
-                    color: isError ? _StationColors.red : (isLive ? _StationColors.teal : _StationColors.slate),
+                    color: isError
+                        ? _StationColors.red
+                        : (isLive ? _StationColors.brightGreen : Colors.white.withOpacity(0.5)),
                   ),
                 ),
               ),
@@ -1432,7 +1401,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Center(
-            child: Text(sensor.unit ?? '-', style: const TextStyle(fontSize: 12, color: _StationColors.slate)),
+            child: Text(sensor.unit ?? '-',
+                             style:
+                    TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7))),
           ),
         ),
       ),
@@ -1500,7 +1471,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     required RxString error,
     required String hint,
     required VoidCallback onChanged,
-    required VoidCallback onSubmit,
+        required VoidCallback onSubmit,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1509,7 +1480,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                color: Colors.grey,
+                color: Color.fromARGB(255, 255, 254, 254),
                 letterSpacing: 0.5)),
         const SizedBox(height: 6),
         Obx(() {
@@ -1536,13 +1507,13 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 controller: textController,
                 focusNode: focusNode,
                 enabled: !isLoading.value,
-                style: const TextStyle(fontSize: 13),
+                                style: const TextStyle(fontSize: 13, color: Colors.white),
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
                   fillColor: resolved
-                      ? Colors.green.withValues(alpha: 0.06)
-                      : Colors.white,
+                      ? _StationColors.greenBg
+                      : _StationColors.slateBg,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   suffixIcon: isLoading.value
@@ -1596,7 +1567,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _StationColors.teal,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _StationColors.slateBorder),
       ),
@@ -1623,8 +1594,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     extraAction,
                     const SizedBox(width: 6)
                   ],
-                  Icon(expanded ? Icons.expand_less : Icons.expand_more,
-                      color: _StationColors.slate),
+                                   Icon(expanded ? Icons.expand_less : Icons.expand_more,
+                      color: Colors.white),
                 ],
               ),
             ),
@@ -1651,31 +1622,31 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         trailing = Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
+                       Container(
               width: 20,
               height: 20,
               decoration: const BoxDecoration(
-                  color: _StationColors.greenDark, shape: BoxShape.circle),
-              child: const Icon(Icons.check, color: Colors.white, size: 13),
+                  color: _StationColors.brightGreen, shape: BoxShape.circle),
+              child: const Icon(Icons.check, color: Colors.black87, size: 13),
             ),
             const SizedBox(width: 6),
-            const Text('Successful',
+                      const Text('Successful',
                 style: TextStyle(
                     fontSize: 11.5,
-                    color: _StationColors.greenDark,
+                    color: _StationColors.brightGreen,
                     fontWeight: FontWeight.bold)),
           ],
         );
-      } else if (lane.isFlashing.value) {
+               } else if (lane.isFlashing.value) {
         trailing = Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-              color: _StationColors.tealBg,
+              color: _StationColors.brightGreen.withOpacity(0.18),
               borderRadius: BorderRadius.circular(12)),
           child: Text('${(lane.flashProgress.value * 100).toStringAsFixed(0)}%',
               style: const TextStyle(
                   fontSize: 11.5,
-                  color: _StationColors.teal,
+                  color: _StationColors.brightGreen,
                   fontWeight: FontWeight.bold)),
         );
       } else if (failed) {
@@ -1730,17 +1701,20 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 onPressed: lane.dongleConnected.value
                     ? () => controller.onStartFlash(laneIndex)
                     : null,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: _StationColors.teal,
-                    disabledBackgroundColor: _StationColors.slateBorder,
+                               style: ElevatedButton.styleFrom(
+                    backgroundColor: _StationColors.brightGreen,
+                    foregroundColor: Colors.black87,
+                    disabledBackgroundColor: Colors.white.withOpacity(0.15),
+                    disabledForegroundColor: Colors.white38,
+                    elevation: 3,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 40, vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8))),
-                child: const Text('Start Flashing',
+                                child: const Text('Start Flashing',
                     style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w700,
                         fontSize: 13)),
               ),
             ],
@@ -1753,7 +1727,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Obx(() => lane.isPostFlashProcessing.value
+                           Obx(() => lane.isPostFlashProcessing.value
                   ? const Padding(
                       padding: EdgeInsets.only(bottom: 14),
                       child: Column(
@@ -1763,13 +1737,13 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: _StationColors.teal)),
+                                  strokeWidth: 2, color: _StationColors.brightGreen)),
                           SizedBox(height: 8),
                           Text('Reading DTC/IQA — please wait…',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                  color: _StationColors.teal)),
+                                  color: Colors.white)),
                         ],
                       ),
                     )
@@ -1781,13 +1755,13 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                             fontSize: 11.5, color: _StationColors.slate))),
-              Container(
+                           Container(
                 width: 52,
                 height: 52,
                 decoration: const BoxDecoration(
-                    color: _StationColors.teal, shape: BoxShape.circle),
+                    color: _StationColors.brightGreen, shape: BoxShape.circle),
                 child: const Icon(Icons.check_rounded,
-                    color: Colors.white, size: 28),
+                    color: Colors.black87, size: 28),
               ),
               const SizedBox(height: 14),
               const Text('Flashing successful',
@@ -1801,14 +1775,14 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       fontSize: 12, color: _StationColors.slate)),
               if (lane.iqaWriteStatus.value.isNotEmpty) ...[
                 const SizedBox(height: 6),
-                Text(lane.iqaWriteStatus.value,
+                              Text(lane.iqaWriteStatus.value,
                     style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w700,
                         color: lane.iqaWriteStatus.value
                                 .toLowerCase()
                                 .contains('successful')
-                            ? _StationColors.greenDark
+                            ? _StationColors.brightGreen
                             : _StationColors.red)),
               ],
             ],
@@ -1829,32 +1803,35 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                     style: const TextStyle(
                         fontSize: 11.5, color: _StationColors.slate)),
               ),
-            Center(
+                      Center(
               child: Container(
                 width: 52,
                 height: 52,
-                decoration: const BoxDecoration(
-                    color: _StationColors.tealBg, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: _StationColors.amber.withOpacity(0.16),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
                 child: const Padding(
                     padding: EdgeInsets.all(12),
                     child: CircularProgressIndicator(
                         strokeWidth: 3,
                         valueColor:
-                            AlwaysStoppedAnimation(_StationColors.teal))),
+                            AlwaysStoppedAnimation(_StationColors.amber))),
               ),
             ),
-            const SizedBox(height: 14),
+                      const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                  color: _StationColors.tealBg,
-                  borderRadius: BorderRadius.circular(8)),
+                  color: _StationColors.amber.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
               child: Text(lane.flashStatus.value,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: _StationColors.teal)),
+                      color: Colors.white)),
             ),
             const SizedBox(height: 16),
             Row(
@@ -1863,22 +1840,22 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 Text('Elapsed  ${lane.formattedElapsed}',
                     style: const TextStyle(
                         fontSize: 12, color: _StationColors.slate)),
-                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%',
+                                   Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%',
                     style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: _StationColors.teal)),
+                        color: _StationColors.brightGreen)),
               ],
             ),
             const SizedBox(height: 6),
-            ClipRRect(
+                       ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                   value: lane.flashProgress.value.clamp(0.0, 1.0),
                   minHeight: 10,
-                  backgroundColor: _StationColors.slateBg,
+                  backgroundColor: Colors.white.withOpacity(0.08),
                   valueColor:
-                      const AlwaysStoppedAnimation(_StationColors.teal)),
+                      const AlwaysStoppedAnimation(_StationColors.brightGreen)),
             ),
           ],
         );
@@ -1959,14 +1936,14 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
           title: 'DTC',
           expanded: _dtcExpanded,
           onTap: () => setState(() => _dtcExpanded = !_dtcExpanded),
-          trailing: Container(
+                     trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-                color: _StationColors.tealBg,
+                color: _StationColors.brightGreen.withOpacity(0.18),
                 borderRadius: BorderRadius.circular(12)),
             child: Text('Count: ${lane.dtcReadResults.length}',
                 style: const TextStyle(
-                    fontSize: 11.5, color: _StationColors.teal)),
+                    fontSize: 11.5, fontWeight: FontWeight.bold, color: _StationColors.brightGreen)),
           ),
           extraAction: Obx(() {
             final busy = lane.isReadingDtc.value;
@@ -1987,11 +1964,11 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 1.6))
-                        : Icon(Icons.refresh,
+                                               : Icon(Icons.refresh,
                             size: 18,
                             color: canRead
-                                ? _StationColors.teal
-                                : _StationColors.slate),
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.3)),
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -2095,11 +2072,11 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(code,
+                                Text(code,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12.5,
-                        color: Colors.black87)),
+                        color: Colors.white)),
                 if (rest.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(rest,
@@ -2144,9 +2121,9 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               style:
                   const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           style: ElevatedButton.styleFrom(
-            backgroundColor: playing ? _StationColors.red : _StationColors.teal,
+            backgroundColor: playing ? _StationColors.red : _StationColors.green,
             foregroundColor: Colors.white,
-            elevation: 0,
+            elevation: 2,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -2189,7 +2166,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                   fontSize: 13, color: _StationColors.charcoal),
                               overflow: TextOverflow.ellipsis)),
                       const SizedBox(width: 12),
-                      Text(
+                                           Text(
                         liveValue != null
                             ? '$liveValue ${unit.isNotEmpty ? unit : ''}'.trim()
                             : '—',
@@ -2200,7 +2177,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                 ? _StationColors.slate
                                 : (isError
                                     ? _StationColors.red
-                                    : _StationColors.teal)),
+                                    : _StationColors.green)),
                       ),
                     ]),
                   ),
@@ -2225,28 +2202,29 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             if (isPlaying)
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: Container(
+                                child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _StationColors.teal,
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
+                        
                         BoxShadow(
                             color: Colors.black.withValues(alpha: 0.08),
                             blurRadius: 12,
                             offset: const Offset(0, 4))
                       ]),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                    child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const CircularProgressIndicator(
                         strokeWidth: 3,
                         valueColor:
-                            AlwaysStoppedAnimation(_StationColors.teal)),
+                            AlwaysStoppedAnimation(_StationColors.amber)),
                     const SizedBox(height: 10),
-                    Text('Reading live parameters...',
+                    const Text('Reading live parameters...',
                         style: TextStyle(
                             fontSize: 12,
-                            color: _StationColors.slate.withValues(alpha: 0.9),
+                            color: Colors.white,
                             fontWeight: FontWeight.w600)),
                   ]),
                 ),
@@ -2310,7 +2288,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _StationColors.teal,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _StationColors.slateBorder),
         boxShadow: [
@@ -2333,14 +2311,14 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               const Spacer(),
               IconButton(
                   icon: const Icon(Icons.fullscreen, size: 20),
-                  color: _StationColors.teal,
+                  color: const Color.fromARGB(255, 255, 255, 255),
                   tooltip: 'Open full screen',
                   visualDensity: VisualDensity.compact,
                   onPressed: _showActivityFullScreen),
               Obx(() => IconButton(
                     icon: const Icon(Icons.save_alt, size: 18),
                     tooltip: 'Save Activity Log',
-                    color: _StationColors.teal,
+                    color: const Color.fromARGB(255, 255, 255, 255),
                     visualDensity: VisualDensity.compact,
                     onPressed: lane.activityLog.isEmpty
                         ? null
@@ -2373,7 +2351,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               Obx(() => IconButton(
                     icon: const Icon(Icons.copy, size: 18),
                     tooltip: 'Copy all activity log',
-                    color: _StationColors.teal,
+                    color: const Color.fromARGB(255, 255, 255, 255),
                     visualDensity: VisualDensity.compact,
                     onPressed: lane.activityLog.isEmpty
                         ? null
@@ -2628,7 +2606,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                               color: _StationColors.tealBg,
                               shape: BoxShape.circle),
                           child: const Icon(Icons.checklist_rtl_rounded,
-                              color: _StationColors.teal, size: 34),
+                              color: Color.fromARGB(255, 254, 254, 254), size: 34),
                         ),
                         const SizedBox(height: 20),
                         const Text('Waiting for scan',
