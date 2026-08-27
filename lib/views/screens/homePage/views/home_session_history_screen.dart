@@ -4,15 +4,16 @@ import 'package:url_launcher/url_launcher.dart';
 import '../controllers/home_page_controller.dart';
 
 class _StationColors {
-  static const teal = Color(0xFF0E6E6E);
-  static const tealBg = Color(0xFFE8F5F5);
-  static const charcoal = Color(0xFF1E2A32);
-  static const greenDark = Color(0xFF1B7A3E);
-  static const red = Color(0xFFD64545);
-  static const redBg = Color(0xFFFDEDED);
-  static const slate = Color(0xFF7C8698);
-  static const slateBorder = Color(0xFFDDE1E9);
-  static const slateBg = Color(0xFFF7F8FA);
+  static const navy = Color(0xFF16232C);
+  static const teal = Color(0xFF1F4D59);
+  static const tealBg = Color(0xFF264F5C);
+  static const charcoal = Colors.white;
+  static const brightGreen = Color(0xFF00E676);
+  static const red = Color(0xFFFF6B6B);
+  static const redBg = Color(0xFF4A2626);
+  static const slate = Color(0xFFA9BAC2);
+  static const slateBorder = Color(0xFF345A66);
+  static const slateBg = Color(0xFF1B333D);
 }
 
 class HomeSessionHistoryScreen extends StatelessWidget {
@@ -35,9 +36,9 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _StationColors.slateBg,
+        backgroundColor: _StationColors.navy,
       appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 15, 21, 82),
+        backgroundColor: _StationColors.navy,
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
@@ -91,12 +92,12 @@ class HomeSessionHistoryScreen extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+                  Container(
             width: 72,
             height: 72,
-            decoration: const BoxDecoration(
-                color: _StationColors.tealBg, shape: BoxShape.circle),
-            child: Icon(icon, color: _StationColors.teal, size: 34),
+            decoration: BoxDecoration(
+                color: _StationColors.brightGreen.withOpacity(0.15), shape: BoxShape.circle),
+            child: Icon(icon, color: _StationColors.brightGreen, size: 34),
           ),
           const SizedBox(height: 20),
           Text(title,
@@ -125,15 +126,15 @@ class HomeSessionHistoryScreen extends StatelessWidget {
                 color: _StationColors.slate,
                 letterSpacing: 0.5)),
         const SizedBox(width: 8),
-        Container(
+               Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-              color: _StationColors.tealBg,
+              color: _StationColors.brightGreen.withOpacity(0.18),
               borderRadius: BorderRadius.circular(12)),
           child: Text('$count',
               style: const TextStyle(
                   fontSize: 11.5,
-                  color: _StationColors.teal,
+                  color: _StationColors.brightGreen,
                   fontWeight: FontWeight.bold)),
         ),
       ],
@@ -147,13 +148,13 @@ class HomeSessionHistoryScreen extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
+            decoration: BoxDecoration(
+        color: _StationColors.teal,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: _StationColors.slateBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withOpacity(0.2),
               blurRadius: 8,
               offset: const Offset(0, 3))
         ],
@@ -235,21 +236,21 @@ class HomeSessionHistoryScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(6),
               child: Row(
                 children: [
-                  const Icon(Icons.description_outlined,
-                      size: 14, color: _StationColors.teal),
+                                   const Icon(Icons.description_outlined,
+                      size: 14, color: _StationColors.brightGreen),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       session['activity_report'].toString(),
                       style: const TextStyle(
                           fontSize: 11,
-                          color: _StationColors.teal,
+                          color: _StationColors.brightGreen,
                           decoration: TextDecoration.underline),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Icon(Icons.open_in_new,
-                      size: 12, color: _StationColors.teal),
+                      size: 12, color: _StationColors.brightGreen),
                 ],
               ),
             ),
@@ -286,11 +287,11 @@ class HomeSessionHistoryScreen extends StatelessWidget {
   Widget _statusBadge(String label, String? status) {
     final isPass = (status ?? '').toLowerCase() == 'pass';
     final isFail = (status ?? '').toLowerCase() == 'fail';
-    final color = isPass
-        ? _StationColors.greenDark
+        final color = isPass
+        ? _StationColors.brightGreen
         : (isFail ? _StationColors.red : _StationColors.slate);
     final bg = isPass
-        ? const Color(0xFFEAFAF1)
+        ? _StationColors.brightGreen.withOpacity(0.15)
         : (isFail ? _StationColors.redBg : _StationColors.slateBg);
 
     return Container(

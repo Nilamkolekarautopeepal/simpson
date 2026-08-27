@@ -598,22 +598,54 @@ class DLLFunctions {
         seedKeyIndex: seedkeyindx,
       );
 
-      print("ÔÜÖ´©Å [CONFIG] FlashConfig created");
+      // print("ÔÜÖ´©Å [CONFIG] FlashConfig created");
 
 
+  //     print("­ƒÜÇ [FLASH] Calling flashInterpreter...");
+  //     final response = await mUdsDiagnostic.flashInterpreter(
+  //       flashConfig,
+  //       jsonData.noOfSectors ?? 0,
+  //       jsonData.sectorData!,
+  //       interpreter,
+  //     );
+
+  //     print("­ƒôÑ [FLASH RESPONSE]: $response");
+
+  //  ;
+
+  //     print("­ƒÄë [FLASH] ===== COMPLETED SUCCESS =====");
+  print("ÔÜÖ´©Å [CONFIG] FlashConfig created");
+ 
+      //print("­ƒôí [UDS] Starting tester present...");
+
+      await startTesterPresent();
+
+      print("Ô£à [UDS] Tester present started");
+ 
       print("­ƒÜÇ [FLASH] Calling flashInterpreter...");
+
       final response = await mUdsDiagnostic.flashInterpreter(
+
         flashConfig,
+
         jsonData.noOfSectors ?? 0,
+
         jsonData.sectorData!,
+
         interpreter,
+
       );
-
+ 
       print("­ƒôÑ [FLASH RESPONSE]: $response");
+ 
+      // print("­ƒøæ [UDS] Stopping tester present...");
 
-   ;
+       await stopTesterPresent();
 
+      // print("Ô£à [UDS] Tester present stopped");
+ 
       print("­ƒÄë [FLASH] ===== COMPLETED SUCCESS =====");
+ 
 
       return response;
     } catch (e, stackTrace) {

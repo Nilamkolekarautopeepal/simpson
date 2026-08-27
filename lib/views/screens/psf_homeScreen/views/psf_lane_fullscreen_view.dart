@@ -1276,7 +1276,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                  for (int i = 0; i < rows.length; i++)
             TableRow(
               decoration: BoxDecoration(
-                color: i.isEven ? _StationColors.teal : _StationColors.navy,
+                color: i.isEven ? _StationColors.teal : _StationColors.teal,
               ),
               children: _recipeRowCells(rows[i]),
             ),
@@ -1419,48 +1419,6 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     ];
   }
 
-// Widget _buildResolvedInfoTile() {
-//     return Padding(
-//       padding: EdgeInsets.zero,
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           const Row(
-//             children: [
-//               Icon(Icons.check_circle, size: 16, color: _StationColors.teal),
-//               SizedBox(width: 6),
-//               Text(
-//                 'Resolved from ESN',
-//                 style: TextStyle(fontWeight: FontWeight.w500, color: Colors.black87, fontSize: 13),
-//               ),
-//             ],
-//           ),
-//           const SizedBox(height: 8),
-//           _readOnlyInfoRow('List No.', lane.listNumber.value),
-//         ],
-//       ),
-//     );
-//   }
-
-//   Widget _readOnlyInfoRow(String label, String value) {
-//     return Container(
-//       width: double.infinity,
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//       decoration: BoxDecoration(
-//         color: _StationColors.tealBg,
-//         borderRadius: BorderRadius.circular(6),
-//         border: Border.all(color: _StationColors.teal.withOpacity(0.25)),
-//       ),
-//       child: Column(
-//         crossAxisAlignment: CrossAxisAlignment.start,
-//         children: [
-//           Text(label, style: TextStyle(fontSize: 10.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-//           const SizedBox(height: 2),
-//           Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
-//         ],
-//       ),
-//     );
-//   }
   Widget _scanField({
     required BuildContext context,
     required String label,
@@ -2029,10 +1987,18 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //   );
   // }
 
-  Widget _dtcTile(String raw) {
-    final splitIndex = raw.indexOf(' - ');
-    final code = splitIndex == -1 ? raw : raw.substring(0, splitIndex).trim();
-    var rest = splitIndex == -1 ? '' : raw.substring(splitIndex + 3).trim();
+    Widget _dtcTile(String raw) {
+    String register = '-';
+    final registerMatch = RegExp(r'\[REG:([^\]]*)\]\s*$').firstMatch(raw);
+    String withoutRegister = raw;
+    if (registerMatch != null) {
+      register = registerMatch.group(1)?.trim() ?? '-';
+      withoutRegister = raw.substring(0, registerMatch.start).trim();
+    }
+
+    final splitIndex = withoutRegister.indexOf(' - ');
+    final code = splitIndex == -1 ? withoutRegister : withoutRegister.substring(0, splitIndex).trim();
+    var rest = splitIndex == -1 ? '' : withoutRegister.substring(splitIndex + 3).trim();
 
     String? statusLabel;
     final statusMatch = RegExp(r'\(([^()]+)\)\s*$').firstMatch(rest);
@@ -2072,7 +2038,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                                Text(code,
+                                 Text(code,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12.5,
@@ -2083,6 +2049,15 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       style: const TextStyle(
                           fontSize: 11.5, color: _StationColors.slate))
                 ],
+                const SizedBox(height: 4),
+                Text(
+                  'Related Sensor : $register',
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: _StationColors.brightGreen,
+                  ),
+                ),
               ],
             ),
           ),
@@ -2692,7 +2667,7 @@ class _SensorWriteActionState extends State<_SensorWriteAction> {
           enabled: !isBusy,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12),
+                     style: const TextStyle(fontSize: 12, color: Colors.white),
           decoration: InputDecoration(
             isDense: true,
             contentPadding:
