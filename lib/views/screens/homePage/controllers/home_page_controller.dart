@@ -1346,8 +1346,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     flashProgress.value = 0;
     flashElapsedSeconds.value = 0;
 
-    dtcList.clear();
+      dtcList.clear();
     pidList.clear();
+    iqaWriteStatus.value = '';
+    dtcReadStatus.value = '';
 
     availableFlashFiles.clear();
     _fileToDtcDatasetId.clear();
@@ -1887,9 +1889,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
           '❌ Could not send pending session on exit ($key): $e — will retry next launch');
     }
   }
-
   final RxString flashStatus = 'Preparing...'.obs;
   final RxDouble postFlashProgress = 0.0.obs;
+  final RxString iqaWriteStatus = ''.obs;
+  final RxString dtcReadStatus = ''.obs;
   Future<void> startFlashing() async {
     if (flashInProgress.value) {
       return;
@@ -2125,13 +2128,14 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
         flashComplete.value = true;
         _log('Flashing completed successfully (${formattedElapsed})');
 
-        flashStatus.value = 'Writing IQA Values...';
-        final iqaWriteStatus = await _autoWriteIqaValues();
+              flashStatus.value = 'Writing IQA Values...';
+        final iqaWriteResult = await _autoWriteIqaValues();
+        iqaWriteStatus.value = iqaWriteResult;
         // ✅ Track IQA status for the local draft as soon as it's known.
-        _draftIqaStatus = iqaWriteStatus.toLowerCase().contains('successful')
+        _draftIqaStatus = iqaWriteResult.toLowerCase().contains('successful')
             ? 'Pass'
             : 'Fail';
-        _showFlashCompletePopup(iqaWriteStatus);
+        _showFlashCompletePopup(iqaWriteResult);
 
         flashStatus.value = 'Writing PLC Values...';
         if (harnessReceipes.isNotEmpty && plcService.isConnected.value) {
@@ -2373,8 +2377,9 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
           dummy[code] = '$code - $desc ($status) [REG:$registerText]';
         }
 
-        dtcList.assignAll(dummy.values.toList());
+               dtcList.assignAll(dummy.values.toList());
         _draftDtcStatus = 'Pass';
+        dtcReadStatus.value = 'DTC read successful';
         _log('DTC (${dtcList.length}) data loaded');
       } catch (e) {
         final message = e.toString().replaceFirst('Exception: ', '');
@@ -2578,7 +2583,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   void toggleDtc() => dtcExpanded.toggle();
   void togglePid() => pidExpanded.toggle();
 
-  Future<void> logout() async {
+    Future<void> logout() async {
     if (flashInProgress.value) {
       Get.snackbar(
         'Flashing in Progress',
@@ -2601,6 +2606,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     _resolvedDatasetType = null;
     _resolvedDatasetFileName = null;
     _sessionReportSent = false;
+
+    // Release the PLC connection (and its lock register) on logout so
+    // the next session can claim it cleanly.
+    await plcService.disconnect();
 
     _log('Logged out');
     await SecureStorageService.clearAll();

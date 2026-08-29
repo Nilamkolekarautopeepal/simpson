@@ -3667,6 +3667,7 @@ class HomePageView extends GetView<HomePageController> {
       }
 
       // ── Success state ──
+            // ── Success state ──
       if (controller.flashComplete.value && !controller.flashInProgress.value) {
         return Center(
           child: Column(
@@ -3741,6 +3742,89 @@ class HomePageView extends GetView<HomePageController> {
           ),
         );
       }
+      
+
+  Widget _stepRow({
+    required String label,
+    required bool isDone,
+    required bool isRunning,
+    required bool isPassed,
+    required String doneLabel,
+  }) {
+    Widget icon;
+    Color textColor;
+    String text;
+
+    if (isRunning) {
+      icon = const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.amber),
+      );
+      textColor = Colors.white;
+      text = '$label — in progress...';
+    } else if (isDone) {
+      icon = Icon(
+        isPassed ? Icons.check_circle : Icons.cancel,
+        size: 18,
+        color: isPassed ? _StationColors.brightGreen : _StationColors.red,
+      );
+      textColor = isPassed ? _StationColors.brightGreen : _StationColors.red;
+      text = doneLabel;
+    } else {
+      icon = Icon(Icons.radio_button_unchecked, size: 18, color: Colors.white.withOpacity(0.3));
+      textColor = Colors.white.withOpacity(0.4);
+      text = label;
+    }
+
+    return Row(
+      children: [
+        icon,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+        ),
+      ],
+    );
+  }
+
+        Widget _postFlashStepTracker() {
+    return Obx(() {
+      final iqaDone = controller.iqaWriteStatus.value.isNotEmpty;
+      final iqaPassed = controller.iqaWriteStatus.value.toLowerCase().contains('successful');
+      final dtcDone = controller.dtcReadStatus.value.isNotEmpty;
+      final dtcPassed = controller.dtcReadStatus.value.toLowerCase().contains('successful');
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _StationColors.slateBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _stepRow(
+              label: 'Write IQA',
+              isDone: iqaDone,
+              isRunning: !iqaDone,
+              isPassed: iqaPassed,
+              doneLabel: iqaPassed ? 'IQA write successful' : 'IQA write failed',
+            ),
+            const SizedBox(height: 10),
+            _stepRow(
+              label: 'Read DTC',
+              isDone: dtcDone,
+              isRunning: iqaDone && !dtcDone,
+              isPassed: dtcPassed,
+              doneLabel: dtcPassed ? 'DTC read successful' : 'DTC read failed',
+            ),
+          ],
+        ),
+      );
+    });
+  }
 
       // ── In-progress state ──
       if (controller.flashInProgress.value) {

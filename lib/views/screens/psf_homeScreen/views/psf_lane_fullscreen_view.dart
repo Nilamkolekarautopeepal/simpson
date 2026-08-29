@@ -1474,13 +1474,13 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       : _StationColors.slateBg,
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  suffixIcon: isLoading.value
+                                   suffixIcon: isLoading.value
                       ? const Padding(
                           padding: EdgeInsets.all(10),
                           child: SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2)),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.amber)),
                         )
                       : null,
                   hintText: hint,
@@ -1508,8 +1508,8 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             ? const SizedBox.shrink()
             : Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(error.value,
-                    style: const TextStyle(fontSize: 11, color: Colors.red)),
+                               child: Text(error.value,
+                    style: const TextStyle(fontSize: 11, color: _StationColors.red)),
               )),
       ],
     );
@@ -1625,200 +1625,139 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     });
   }
 
-  Widget _flashBody() {
+    Widget _flashBody() {
     return Obx(() {
       final failed = lane.flashStatus.value.startsWith('Flash Failed');
       final completed = lane.flashStatus.value == 'Flash Completed';
 
+      // ── Error state ──
       if (failed) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                    color: _StationColors.redBg, shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded,
-                    color: _StationColors.red, size: 28),
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(color: _StationColors.redBg, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded, color: _StationColors.red, size: 30),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               const Text('Flashing Failed',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: _StationColors.red)),
-              const SizedBox(height: 6),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _StationColors.red)),
+              const SizedBox(height: 8),
               Text(lane.flashStatus.value,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 12.5, color: _StationColors.slate)),
-              const SizedBox(height: 16),
+                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7))),
+              const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: lane.dongleConnected.value
-                    ? () => controller.onStartFlash(laneIndex)
-                    : null,
-                               style: ElevatedButton.styleFrom(
-                    backgroundColor: _StationColors.brightGreen,
-                    foregroundColor: Colors.black87,
-                    disabledBackgroundColor: Colors.white.withOpacity(0.15),
-                    disabledForegroundColor: Colors.white38,
-                    elevation: 3,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8))),
-                                child: const Text('Start Flashing',
-                    style: TextStyle(
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
+                onPressed: lane.dongleConnected.value ? () => controller.onStartFlash(laneIndex) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _StationColors.brightGreen,
+                  foregroundColor: Colors.black87,
+                  disabledBackgroundColor: Colors.white.withOpacity(0.15),
+                  elevation: 3,
+                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Start Flashing',
+                    style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 13)),
               ),
             ],
           ),
         );
       }
 
+      // ── Success state — with the step-by-step IQA/DTC narration ──
       if (completed && !lane.isFlashing.value) {
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-                           Obx(() => lane.isPostFlashProcessing.value
-                  ? const Padding(
-                      padding: EdgeInsets.only(bottom: 14),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: _StationColors.brightGreen)),
-                          SizedBox(height: 8),
-                          Text('Reading DTC/IQA — please wait…',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white)),
-                        ],
-                      ),
-                    )
-                  : const SizedBox.shrink()),
               if (lane.resolvedFlashFileName.value != null)
                 Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: Text(lane.resolvedFlashFileName.value!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 11.5, color: _StationColors.slate))),
-                           Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                    color: _StationColors.brightGreen, shape: BoxShape.circle),
-                child: const Icon(Icons.check_rounded,
-                    color: Colors.black87, size: 28),
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(lane.resolvedFlashFileName.value!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.5))),
+                ),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(color: _StationColors.brightGreen, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, color: Colors.black87, size: 30),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               const Text('Flashing successful',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: _StationColors.charcoal)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
               const SizedBox(height: 4),
               Text('Completed in ${lane.formattedElapsed}',
-                  style: const TextStyle(
-                      fontSize: 12, color: _StationColors.slate)),
-              if (lane.iqaWriteStatus.value.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                              Text(lane.iqaWriteStatus.value,
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: lane.iqaWriteStatus.value
-                                .toLowerCase()
-                                .contains('successful')
-                            ? _StationColors.brightGreen
-                            : _StationColors.red)),
-              ],
+                  style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.6))),
+              const SizedBox(height: 18),
+
+              // ── Post-flash step tracker: IQA write → DTC read ──
+              _postFlashStepTracker(),
             ],
           ),
         );
       }
 
+      // ── In-progress state ──
       if (lane.isFlashing.value) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: _StationColors.amber.withOpacity(0.16),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _StationColors.amber.withOpacity(0.4)),
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: CircularProgressIndicator(strokeWidth: 3, valueColor: AlwaysStoppedAnimation<Color>(_StationColors.amber)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(lane.flashStatus.value,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
+            const SizedBox(height: 20),
             if (lane.resolvedFlashFileName.value != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 18),
                 child: Text(lane.resolvedFlashFileName.value!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 11.5, color: _StationColors.slate)),
+                    style: const TextStyle(fontSize: 13, color: _StationColors.brightGreen, fontWeight: FontWeight.bold)),
               ),
-                      Center(
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                    color: _StationColors.amber.withOpacity(0.16),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
-                child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor:
-                            AlwaysStoppedAnimation(_StationColors.amber))),
-              ),
-            ),
-                      const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                  color: _StationColors.amber.withOpacity(0.16),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
-              child: Text(lane.flashStatus.value,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white)),
-            ),
-            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Elapsed  ${lane.formattedElapsed}',
-                    style: const TextStyle(
-                        fontSize: 12, color: _StationColors.slate)),
-                                   Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%',
-                    style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        color: _StationColors.brightGreen)),
+                    style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.6))),
+                Text('${(lane.flashProgress.value * 100).toStringAsFixed(1)}%',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _StationColors.brightGreen)),
               ],
             ),
-            const SizedBox(height: 6),
-                       ClipRRect(
+            const SizedBox(height: 8),
+            ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
                   value: lane.flashProgress.value.clamp(0.0, 1.0),
-                  minHeight: 10,
+                  minHeight: 12,
                   backgroundColor: Colors.white.withOpacity(0.08),
-                  valueColor:
-                      const AlwaysStoppedAnimation(_StationColors.brightGreen)),
+                  valueColor: const AlwaysStoppedAnimation<Color>(_StationColors.brightGreen)),
             ),
           ],
         );
       }
 
+      // ── Idle / ready state ──
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1827,19 +1766,15 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
               decoration: BoxDecoration(
-                  color: _StationColors.greenBg,
-                  border: Border.all(color: _StationColors.green),
+                  color: _StationColors.brightGreen.withOpacity(0.12),
+                  border: Border.all(color: _StationColors.brightGreen),
                   borderRadius: BorderRadius.circular(6)),
               child: Row(children: [
-                const Icon(Icons.check_circle,
-                    size: 15, color: _StationColors.green),
+                const Icon(Icons.check_circle, size: 15, color: _StationColors.brightGreen),
                 const SizedBox(width: 6),
                 Expanded(
                     child: Text(lane.resolvedFlashFileName.value!,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: _StationColors.greenDark),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _StationColors.brightGreen),
                         overflow: TextOverflow.ellipsis)),
               ]),
             ),
@@ -1850,41 +1785,120 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               decoration: BoxDecoration(
                   color: _StationColors.amberBg,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: _StationColors.amber.withValues(alpha: 0.4))),
+                  border: Border.all(color: _StationColors.amber.withOpacity(0.4))),
               child: Row(children: [
-                const Icon(Icons.info_outline,
-                    size: 16, color: _StationColors.amber),
+                const Icon(Icons.info_outline, size: 16, color: _StationColors.amber),
                 const SizedBox(width: 8),
                 const Expanded(
                     child: Text('Waiting for the dongle to connect…',
-                        style: TextStyle(
-                            fontSize: 12, color: _StationColors.amber))),
+                        style: TextStyle(fontSize: 12, color: _StationColors.amber))),
               ]),
             ),
           Center(
             child: ElevatedButton(
-              onPressed: (lane.resolvedFlashFileUrl.value != null &&
-                      lane.dongleConnected.value)
+              onPressed: (lane.resolvedFlashFileUrl.value != null && lane.dongleConnected.value)
                   ? () => controller.onStartFlash(laneIndex)
                   : null,
               style: ElevatedButton.styleFrom(
-                  backgroundColor: _StationColors.teal,
-                  disabledBackgroundColor: _StationColors.slateBorder,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8))),
+                  backgroundColor: _StationColors.brightGreen,
+                  foregroundColor: Colors.black87,
+                  disabledBackgroundColor: Colors.white.withOpacity(0.15),
+                  elevation: 3,
+                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               child: const Text('Start Flashing',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13)),
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 13)),
             ),
           ),
         ],
       );
     });
+  }
+
+  /// Shows IQA write and DTC read as two sequential step rows —
+  /// spinner while running, checkmark + result once each finishes.
+  Widget _postFlashStepTracker() {
+    return Obx(() {
+      final processing = lane.isPostFlashProcessing.value;
+      final iqaDone = lane.iqaWriteStatus.value.isNotEmpty;
+      final iqaPassed = lane.iqaWriteStatus.value.toLowerCase().contains('successful');
+      final dtcDone = !processing; // DTC read is the last step before processing flips off
+      final dtcPassed = lane.dtcError.value.isEmpty;
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _StationColors.slateBorder),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _stepRow(
+              label: 'Write IQA',
+              isDone: iqaDone,
+              isRunning: processing && !iqaDone,
+              isPassed: iqaPassed,
+              doneLabel: iqaPassed ? 'IQA write successful' : 'IQA write failed',
+            ),
+            const SizedBox(height: 10),
+            _stepRow(
+              label: 'Read DTC',
+              isDone: dtcDone && iqaDone,
+              isRunning: processing && iqaDone,
+              isPassed: dtcPassed,
+              doneLabel: dtcPassed ? 'DTC read successful' : 'DTC read failed',
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _stepRow({
+    required String label,
+    required bool isDone,
+    required bool isRunning,
+    required bool isPassed,
+    required String doneLabel,
+  }) {
+    Widget icon;
+    Color textColor;
+    String text;
+
+    if (isRunning) {
+      icon = const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2, color: _StationColors.amber),
+      );
+      textColor = Colors.white;
+      text = '$label — in progress...';
+    } else if (isDone) {
+      icon = Icon(
+        isPassed ? Icons.check_circle : Icons.cancel,
+        size: 18,
+        color: isPassed ? _StationColors.brightGreen : _StationColors.red,
+      );
+      textColor = isPassed ? _StationColors.brightGreen : _StationColors.red;
+      text = doneLabel;
+    } else {
+      icon = Icon(Icons.radio_button_unchecked, size: 18, color: Colors.white.withOpacity(0.3));
+      textColor = Colors.white.withOpacity(0.4);
+      text = label;
+    }
+
+    return Row(
+      children: [
+        icon,
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(text,
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
+        ),
+      ],
+    );
   }
 
   // ── DTC SECTION ────────────────────────────────────────────────
@@ -1917,11 +1931,11 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       : null,
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: busy
+                                       child: busy
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 1.6))
+                            child: CircularProgressIndicator(strokeWidth: 1.6, color: _StationColors.amber))
                                                : Icon(Icons.refresh,
                             size: 18,
                             color: canRead

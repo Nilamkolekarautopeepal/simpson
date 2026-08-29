@@ -231,76 +231,295 @@ class PsfHomeScreenController extends GetxController {
 
    final Set<String> _activeFlashProtocols = {};
 
+  // Future<String?> _runFlashInIsolate({
+  //   required int laneNumber,
+  //   required String host,
+  //   required int port,
+  //   required String protocolName,
+  //   required String protocolHex,
+  //   required String txHeader,
+  //   required String rxHeader,
+  //   required String flashJson,
+  //   required String interpreter,
+  //   required String seedKeyAlgo,
+  //   required void Function(double percent) onProgress,
+  // }) async {
+  //   await _staggerIsolateFlashStart();
+  //   final signature = '$protocolHex|$txHeader|$rxHeader';
+  //   while (_activeFlashProtocols.isNotEmpty && !_activeFlashProtocols.contains(signature)) {
+  //     print('   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');
+  //     await Future.delayed(const Duration(seconds: 1));
+  //   }
+  //   _activeFlashProtocols.add(signature);
+
+  //   final receivePort = ReceivePort();
+  //   Isolate? isolate;
+  //   final completer = Completer<String?>();
+
+  //   final sub = receivePort.listen((message) {
+  //     if (message is PfsFlashMessage) {
+  //       if (message.type == 'progress' && message.percent != null) {
+  //         onProgress(message.percent!);
+  //       } else if (message.type == 'done') {
+  //         if (!completer.isCompleted) completer.complete(message.result);
+  //       } else if (message.type == 'error') {
+  //         if (!completer.isCompleted) {
+  //           completer.complete(message.result ?? 'ERROR');
+  //         }
+  //       }
+  //     }
+  //   });
+
+  //   try {
+  //     final args = PfsFlashArgs(
+  //       host: host,
+  //       port: port,
+  //       protocolName: protocolName,
+  //       protocolHex: protocolHex,
+  //       txHeader: txHeader,
+  //       rxHeader: rxHeader,
+  //       flashJson: flashJson,
+  //       interpreter: interpreter,
+  //       seedKeyAlgo: seedKeyAlgo,
+  //       laneNumber: laneNumber,
+  //     );
+
+  //     isolate = await Isolate.spawn(
+  //       pfsFlashIsolateEntry,
+  //       [receivePort.sendPort, args],
+  //     );
+
+  //     final result = await completer.future;
+  //     return result;
+  //   } catch (e) {
+  //     print('   ❌ [Lane $laneNumber] isolate spawn/run failed: $e');
+  //     return e.toString();
+
+
+
+  //   //     } finally {
+  //   //   await sub.cancel();
+  //   //   receivePort.close();
+  //   //   isolate?.kill(priority: Isolate.beforeNextEvent);
+  //   //   _activeFlashProtocols.remove(signature);
+  //   // }
+     
+  //        } finally {
+  //     await sub.cancel();
+  //     receivePort.close();
+  //     isolate?.kill(priority: Isolate.immediate);
+  //     _activeFlashProtocols.remove(signature);
+  //   }
+
+  // }
   Future<String?> _runFlashInIsolate({
-    required int laneNumber,
-    required String host,
-    required int port,
-    required String protocolName,
-    required String protocolHex,
-    required String txHeader,
-    required String rxHeader,
-    required String flashJson,
-    required String interpreter,
-    required String seedKeyAlgo,
-    required void Function(double percent) onProgress,
-  }) async {
-    await _staggerIsolateFlashStart();
-    final signature = '$protocolHex|$txHeader|$rxHeader';
-    while (_activeFlashProtocols.isNotEmpty && !_activeFlashProtocols.contains(signature)) {
-      print('   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');
-      await Future.delayed(const Duration(seconds: 1));
-    }
-    _activeFlashProtocols.add(signature);
+  required int laneNumber,
+  required String host,
+  required int port,
+  required String protocolName,
+  required String protocolHex,
+  required String txHeader,
+  required String rxHeader,
+  required String flashJson,
+  required String interpreter,
+  required String seedKeyAlgo,
+  required void Function(double percent) onProgress,
+}) async {
+  print('====================================================');
+  print('🚀 [Lane $laneNumber] START FLASH');
+  print('   Dongle : $host:$port');
+  print('   Protocol : $protocolName');
+  print('====================================================');
 
-    final receivePort = ReceivePort();
-    Isolate? isolate;
-    final completer = Completer<String?>();
+  final ReceivePort receivePort = ReceivePort();
 
-    final sub = receivePort.listen((message) {
-      if (message is PfsFlashMessage) {
-        if (message.type == 'progress' && message.percent != null) {
-          onProgress(message.percent!);
-        } else if (message.type == 'done') {
-          if (!completer.isCompleted) completer.complete(message.result);
-        } else if (message.type == 'error') {
-          if (!completer.isCompleted) {
-            completer.complete(message.result ?? 'ERROR');
-          }
+  Isolate? isolate;
+  StreamSubscription? subscription;
+
+  final Completer<String?> completer = Completer<String?>();
+
+  try {
+    // ------------------------------------------------------------
+    // LISTEN ONLY TO THIS LANE
+    // ------------------------------------------------------------
+
+    subscription = receivePort.listen((dynamic message) {
+      if (message is! PfsFlashMessage) {
+        return;
+      }
+
+      // ----------------------------------------------------------
+      // PROGRESS
+      // ----------------------------------------------------------
+
+      if (message.type == 'progress') {
+        if (message.percent != null) {
+          final double percent = message.percent!;
+
+          print(
+            '📊 [Lane $laneNumber] '
+            'Flash progress: ${(percent * 100).toStringAsFixed(1)}%',
+          );
+
+          onProgress(percent);
         }
+
+        return;
+      }
+
+      // ----------------------------------------------------------
+      // DONE
+      // ----------------------------------------------------------
+
+      if (message.type == 'done') {
+        print(
+          '🏁 [Lane $laneNumber] '
+          'FLASH DONE: ${message.result}',
+        );
+
+        if (!completer.isCompleted) {
+          completer.complete(message.result);
+        }
+
+        return;
+      }
+
+      // ----------------------------------------------------------
+      // ERROR
+      // ----------------------------------------------------------
+
+      if (message.type == 'error') {
+        print(
+          '❌ [Lane $laneNumber] '
+          'FLASH ERROR: ${message.result}',
+        );
+
+        if (!completer.isCompleted) {
+          completer.complete(
+            message.result ?? 'ERROR',
+          );
+        }
+
+        return;
       }
     });
 
-    try {
-      final args = PfsFlashArgs(
-        host: host,
-        port: port,
-        protocolName: protocolName,
-        protocolHex: protocolHex,
-        txHeader: txHeader,
-        rxHeader: rxHeader,
-        flashJson: flashJson,
-        interpreter: interpreter,
-        seedKeyAlgo: seedKeyAlgo,
-        laneNumber: laneNumber,
-      );
+    // ------------------------------------------------------------
+    // CREATE LANE-SPECIFIC ARGUMENTS
+    // ------------------------------------------------------------
 
-      isolate = await Isolate.spawn(
-        pfsFlashIsolateEntry,
-        [receivePort.sendPort, args],
-      );
+    final PfsFlashArgs args = PfsFlashArgs(
+      host: host,
+      port: port,
+      protocolName: protocolName,
+      protocolHex: protocolHex,
+      txHeader: txHeader,
+      rxHeader: rxHeader,
+      flashJson: flashJson,
+      interpreter: interpreter,
+      seedKeyAlgo: seedKeyAlgo,
+      laneNumber: laneNumber,
+    );
 
-      final result = await completer.future;
-      return result;
-    } catch (e) {
-      print('   ❌ [Lane $laneNumber] isolate spawn/run failed: $e');
-      return e.toString();
-        } finally {
-      await sub.cancel();
-      receivePort.close();
-      isolate?.kill(priority: Isolate.beforeNextEvent);
-      _activeFlashProtocols.remove(signature);
+    // ------------------------------------------------------------
+    // CREATE INDEPENDENT ISOLATE
+    // ------------------------------------------------------------
+
+    print(
+      '🔧 [Lane $laneNumber] '
+      'Creating independent flash isolate...',
+    );
+
+    isolate = await Isolate.spawn(
+      pfsFlashIsolateEntry,
+      <dynamic>[
+        receivePort.sendPort,
+        args,
+      ],
+      debugName: 'PFS_FLASH_LANE_$laneNumber',
+    );
+
+    print(
+      '✅ [Lane $laneNumber] '
+      'Flash isolate started',
+    );
+
+    // ------------------------------------------------------------
+    // WAIT FOR THIS LANE ONLY
+    // ------------------------------------------------------------
+
+    final String? result = await completer.future;
+
+    print(
+      '🏁 [Lane $laneNumber] '
+      'Flash completed with result: $result',
+    );
+
+    return result;
+  } catch (e, stackTrace) {
+    print(
+      '❌ [Lane $laneNumber] '
+      'Flash isolate exception: $e',
+    );
+
+    print(stackTrace);
+
+    if (!completer.isCompleted) {
+      completer.complete(
+        e.toString(),
+      );
     }
+
+    return e.toString();
+  } finally {
+    // ------------------------------------------------------------
+    // CLEANUP ONLY THIS LANE
+    // ------------------------------------------------------------
+
+    print(
+      '🧹 [Lane $laneNumber] '
+      'Cleaning flash resources...',
+    );
+
+    if (subscription != null) {
+      await subscription!.cancel();
+    }
+
+    receivePort.close();
+
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT use Isolate.immediate here.
+     *
+     * The flash isolate sends DONE and then naturally finishes.
+     *
+     * We don't want Lane 0 cleanup to interfere with Lane 1/2.
+     */
+
+    if (isolate != null) {
+      print(
+        '🛑 [Lane $laneNumber] '
+        'Requesting isolate shutdown...',
+      );
+
+      isolate!.kill(
+        priority: Isolate.beforeNextEvent,
+      );
+
+      isolate = null;
+    }
+
+    print(
+      '✅ [Lane $laneNumber] '
+      'Flash cleanup completed',
+    );
   }
+}
+
+
+
+//===========================================gpt===========================
 
   bool get isDongleConnectedAnywhere =>
       lanes.any((l) => l.dongleConnected.value || l.isFlashing.value);
@@ -1127,20 +1346,72 @@ class PsfHomeScreenController extends GetxController {
     });
   }
 
-  Future<void> releaseDongleForLane(int laneIndex) async {
-    lanes[laneIndex].dongleConnected.value = false;
-    lanes[laneIndex].dongleRetryTimer?.cancel();
-    lanes[laneIndex].dllFunctions = null;
+  // Future<void> releaseDongleForLane(int laneIndex) async {
+  //   lanes[laneIndex].dongleConnected.value = false;
+  //   lanes[laneIndex].dongleRetryTimer?.cancel();
+  //   lanes[laneIndex].dllFunctions = null;
 
-    final comm = _laneCommControllers.remove(laneIndex);
-    if (comm != null) {
-      try {
-        await comm.disconnect();
-      } catch (e) {
-        debugPrint('releaseDongleForLane: disconnect error: $e');
-      }
-    }
+  //   final comm = _laneCommControllers.remove(laneIndex);
+  //   if (comm != null) {
+  //     try {
+  //       await comm.disconnect();
+  //     } catch (e) {
+  //       debugPrint('releaseDongleForLane: disconnect error: $e');
+  //     }
+  //   }
+  // }
+
+Future<void> releaseDongleForLane(int laneIndex) async {
+  final lane = lanes[laneIndex];
+
+  print(
+    '🔌 [Lane ${lane.laneNumber}] '
+    'Releasing normal dongle connection',
+  );
+
+  // ONLY this lane
+  lane.dongleConnected.value = false;
+
+  // ONLY this lane's retry timer
+  lane.dongleRetryTimer?.cancel();
+  lane.dongleRetryTimer = null;
+
+  // ONLY this lane's DLL
+  lane.dllFunctions = null;
+
+  // ONLY this lane's communication controller
+  final comm = _laneCommControllers.remove(laneIndex);
+
+  if (comm == null) {
+    print(
+      'ℹ️ [Lane ${lane.laneNumber}] '
+      'No normal communication controller found',
+    );
+    return;
   }
+
+  try {
+    print(
+      '🔌 [Lane ${lane.laneNumber}] '
+      'Disconnecting normal connection...',
+    );
+
+    await comm.disconnect();
+
+    print(
+      '✅ [Lane ${lane.laneNumber}] '
+      'Normal connection released',
+    );
+  } catch (e, stackTrace) {
+    print(
+      '⚠️ [Lane ${lane.laneNumber}] '
+      'Disconnect error: $e',
+    );
+
+    print(stackTrace);
+  }
+}
+//===================================================================================
 
   Future<void> reconnectDongleWithFeedback(int laneIndex) async {
     final lane = lanes[laneIndex];
@@ -1289,7 +1560,7 @@ class PsfHomeScreenController extends GetxController {
       return;
     }
 
-        if (lane.isDongleBusy) {
+            if (lane.isDongleBusy) {
       print(
           '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
       print('══════════════════════════════════════════');
@@ -1305,25 +1576,6 @@ class PsfHomeScreenController extends GetxController {
       );
       return;
     }
-
-        if (lane.isDongleBusy) {
-      print(
-          '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
-      print('══════════════════════════════════════════');
-      if (Get.isDialogOpen == true) Get.back();
-      Get.dialog(
-        CustomPopup(
-          title: 'Flash',
-          message:
-              'This lane\'s dongle is busy — wait for the current operation to finish.',
-          confirmText: 'OK',
-        ),
-        barrierDismissible: true,
-      );
-      return;
-    }
-    lane.isDongleBusy = true;
-
     lane.isDongleBusy = true;
 
     final ip = lane.dongleIpFromLogin;
@@ -2210,7 +2462,7 @@ class PsfHomeScreenController extends GetxController {
     lanes[index].isLedOn.toggle();
   }
 
-  void logout() {
+    void logout() {
     final flashingLanes = lanes.where((l) => l.isFlashing.value).toList();
     if (flashingLanes.isNotEmpty) {
       final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');
@@ -2229,6 +2481,11 @@ class PsfHomeScreenController extends GetxController {
       );
       return;
     }
+
+    // Release the PLC connection (and its lock register) so the next
+    // station/session can claim it cleanly, instead of leaving this
+    // session's ownership token sitting in the lock register.
+    unawaited(plcService.disconnect());
 
     Get.offAllNamed("/login");
 
