@@ -1912,6 +1912,21 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
       return;
     }
 
+    // ✅ Start a fresh reportable cycle for THIS flash attempt.
+    // Previously this was only reset on ESN scan, so reflashing the same
+    // ESN without re-scanning left `_sessionReportSent == true` from the
+    // prior flash and every send/draft call below silently no-op'd.
+    _sessionReportSent = false;
+    _flashCycleStartTime = DateTime.now();
+    _currentSessionKey =
+        '${currentEsn.value}_${_flashCycleStartTime!.millisecondsSinceEpoch}';
+    _draftFlashStatus = null;
+    _draftIqaStatus = null;
+    _draftDtcStatus = null;
+    // Note: _resolvedDatasetType / _resolvedDatasetFileName are intentionally
+    // NOT cleared here — they get re-resolved a few lines below from the
+    // selected file/variant, same as before.
+
     flashErrorMessage.value = '';
     flashComplete.value = false;
     flashProgress.value = 0;
