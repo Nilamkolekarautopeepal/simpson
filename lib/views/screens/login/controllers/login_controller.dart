@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:simpson/AppPreferences/app_areferences.dart';
 import 'package:simpson/api/app_urls.dart';
 import 'package:simpson/common_widgets/popup.dart';
@@ -27,11 +28,19 @@ class LoginController extends GetxController {
   final RxBool rememberMe = false.obs;
   final RxString errorMessage = ''.obs;
   final Rx<User?> currentUser = Rx<User?>(null);
+  final RxString appVersion = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
     _loadSavedCredentials();
+    _loadAppVersion();
+  }
+
+   Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    appVersion.value = '${info.version}';
+    // or just 'v${info.version}' if you don't want the build number shown
   }
 
   /// Pre-fills the form with the last saved credentials, but only if the

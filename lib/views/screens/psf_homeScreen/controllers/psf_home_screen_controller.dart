@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
-import 'package:ap_dongle_comm/utils/commController.dart';
+import 'package:ap_dongle_comm/utils/comm_controller_isolate_safe.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -31,12 +31,6 @@ String _decodeLatin1Isolate(Uint8List bytes) {
 }
 
 class PsfHomeScreenController extends GetxController {
-// bypass new code
-
-  // static final HttpClient _sharedHttpClient = HttpClient()
-  //   ..maxConnectionsPerHost = 8 // enough for several lanes downloading at once
-  //   ..connectionTimeout = const Duration(seconds: 15);
-
   static final HttpClient _sharedHttpClient = HttpClient()
     ..maxConnectionsPerHost = 8
     ..connectionTimeout = const Duration(seconds: 15)
@@ -56,10 +50,9 @@ class PsfHomeScreenController extends GetxController {
     return await compute(_decodeLatin1Isolate, bytes);
   }
 
-  //bypass new code
-
   static const int _dongleFlashPort = 6888;
-  bool get _anyOtherLaneFlashing => lanes.any((l) => l.isFlashing.value);
+  bool get _anyOtherLaneFlashing =>
+      lanes.any((PsfLane l) => l.isFlashing.value);
 
   final RxnInt expandedLaneIndex = RxnInt(0);
 
@@ -81,7 +74,6 @@ class PsfHomeScreenController extends GetxController {
 
   Future<void> _resendPendingSessions() async {
     final drafts = PendingSessionStorage.getAllDrafts();
-    // Only resend drafts that belong to THIS app (PFS), not Test Station's.
     final pfsDrafts = drafts
         .where((d) => (d['sessionKey'] as String? ?? '').startsWith('pfs_'))
         .toList();
@@ -210,319 +202,163 @@ class PsfHomeScreenController extends GetxController {
   list_ds.ListNumber? _variantListCache;
 
   final ConnectionWifi _connectionWifi = ConnectionWifi();
-  final Map<int, CommController> _laneCommControllers = {};
 
   DateTime? _lastIsolateFlashStart;
 
-  Future<void> _staggerIsolateFlashStart() async {
-    const minGap = Duration(seconds: 8);
-    final last = _lastIsolateFlashStart;
-    if (last != null) {
-      final elapsed = DateTime.now().difference(last);
-      if (elapsed < minGap) {
-        final wait = minGap - elapsed;
+  final Set<String> _activeFlashProtocols = {};
+
+  // SendPort each finished-but-not-yet-closed flash isolate gave us, so we
+  // can tell it "safe to disconnect now" once no OTHER lane is mid-flash.
+  final Map<int, SendPort> _pendingLaneCloseSignal = {};
+
+  // Resolves once THIS lane's flash isolate has confirmed its socket is
+  // actually closed. onStartFlash awaits this (not "all lanes done")
+  // before reconnecting — so a lane that finishes while nothing else is
+  // flashing proceeds immediately, and one that finishes mid-way through
+  // another lane's flash only waits for that lane, never longer.
+  final Map<int, Completer<void>> _laneFlashTeardownCompleters = {};
+
+  // Call any time a lane's isFlashing flips false, or a controlPort
+  // registers. Cheap and idempotent — safe to call liberally.
+  void _trySendProceedSignals() {
+    if (_pendingLaneCloseSignal.isEmpty) return;
+    final ready = <int>[];
+    for (final laneNum in _pendingLaneCloseSignal.keys) {
+      final lane =
+          lanes.firstWhereOrNull((PsfLane l) => l.laneNumber == laneNum);
+      if (lane == null) {
         print(
-            '   ⏳ Staggering flash isolate start by ${wait.inMilliseconds}ms');
-        await Future.delayed(wait);
+            '   🔸 [proceed-check] Lane $laneNum: no matching PsfLane found — skipping');
+        continue;
+      }
+      if (lane.isFlashing.value) {
+        print(
+            '   🔸 [proceed-check] Lane $laneNum: still flashing itself — not ready');
+        continue;
+      }
+      if (_anyOtherLaneFlashing) {
+        final stillFlashing = lanes
+            .where((PsfLane l) => l.isFlashing.value)
+            .map((PsfLane l) => l.laneNumber)
+            .join(', ');
+        print(
+            '   🔸 [proceed-check] Lane $laneNum: waiting — lane(s) still flashing: $stillFlashing');
+        continue;
+      }
+      print('   🔸 [proceed-check] Lane $laneNum: safe to proceed');
+      ready.add(laneNum);
+    }
+    for (final laneNum in ready) {
+      final port = _pendingLaneCloseSignal.remove(laneNum);
+      if (port != null) {
+        port.send('proceed');
+        print('   ✅ [proceed-check] sent proceed signal to Lane $laneNum');
       }
     }
-    _lastIsolateFlashStart = DateTime.now();
   }
 
-   final Set<String> _activeFlashProtocols = {};
-
-  // Future<String?> _runFlashInIsolate({
-  //   required int laneNumber,
-  //   required String host,
-  //   required int port,
-  //   required String protocolName,
-  //   required String protocolHex,
-  //   required String txHeader,
-  //   required String rxHeader,
-  //   required String flashJson,
-  //   required String interpreter,
-  //   required String seedKeyAlgo,
-  //   required void Function(double percent) onProgress,
-  // }) async {
-  //   await _staggerIsolateFlashStart();
-  //   final signature = '$protocolHex|$txHeader|$rxHeader';
-  //   while (_activeFlashProtocols.isNotEmpty && !_activeFlashProtocols.contains(signature)) {
-  //     print('   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');
-  //     await Future.delayed(const Duration(seconds: 1));
-  //   }
-  //   _activeFlashProtocols.add(signature);
-
-  //   final receivePort = ReceivePort();
-  //   Isolate? isolate;
-  //   final completer = Completer<String?>();
-
-  //   final sub = receivePort.listen((message) {
-  //     if (message is PfsFlashMessage) {
-  //       if (message.type == 'progress' && message.percent != null) {
-  //         onProgress(message.percent!);
-  //       } else if (message.type == 'done') {
-  //         if (!completer.isCompleted) completer.complete(message.result);
-  //       } else if (message.type == 'error') {
-  //         if (!completer.isCompleted) {
-  //           completer.complete(message.result ?? 'ERROR');
-  //         }
-  //       }
-  //     }
-  //   });
-
-  //   try {
-  //     final args = PfsFlashArgs(
-  //       host: host,
-  //       port: port,
-  //       protocolName: protocolName,
-  //       protocolHex: protocolHex,
-  //       txHeader: txHeader,
-  //       rxHeader: rxHeader,
-  //       flashJson: flashJson,
-  //       interpreter: interpreter,
-  //       seedKeyAlgo: seedKeyAlgo,
-  //       laneNumber: laneNumber,
-  //     );
-
-  //     isolate = await Isolate.spawn(
-  //       pfsFlashIsolateEntry,
-  //       [receivePort.sendPort, args],
-  //     );
-
-  //     final result = await completer.future;
-  //     return result;
-  //   } catch (e) {
-  //     print('   ❌ [Lane $laneNumber] isolate spawn/run failed: $e');
-  //     return e.toString();
-
-
-
-  //   //     } finally {
-  //   //   await sub.cancel();
-  //   //   receivePort.close();
-  //   //   isolate?.kill(priority: Isolate.beforeNextEvent);
-  //   //   _activeFlashProtocols.remove(signature);
-  //   // }
-     
-  //        } finally {
-  //     await sub.cancel();
-  //     receivePort.close();
-  //     isolate?.kill(priority: Isolate.immediate);
-  //     _activeFlashProtocols.remove(signature);
-  //   }
-
-  // }
   Future<String?> _runFlashInIsolate({
-  required int laneNumber,
-  required String host,
-  required int port,
-  required String protocolName,
-  required String protocolHex,
-  required String txHeader,
-  required String rxHeader,
-  required String flashJson,
-  required String interpreter,
-  required String seedKeyAlgo,
-  required void Function(double percent) onProgress,
-}) async {
-  print('====================================================');
-  print('🚀 [Lane $laneNumber] START FLASH');
-  print('   Dongle : $host:$port');
-  print('   Protocol : $protocolName');
-  print('====================================================');
+    required int laneNumber,
+    required String host,
+    required int port,
+    required String protocolName,
+    required String protocolHex,
+    required String txHeader,
+    required String rxHeader,
+    required String flashJson,
+    required String interpreter,
+    required String seedKeyAlgo,
+    required void Function(double percent) onProgress,
+  }) async {
+    final signature = '$protocolHex|$txHeader|$rxHeader';
+    while (_activeFlashProtocols.isNotEmpty &&
+        !_activeFlashProtocols.contains(signature)) {
+      print(
+          '   ⏳ [Lane $laneNumber] waiting — a different protocol config is actively flashing on another lane');
+      await Future.delayed(const Duration(seconds: 1));
+    }
+    _activeFlashProtocols.add(signature);
 
-  final ReceivePort receivePort = ReceivePort();
+    final receivePort = ReceivePort();
+    Isolate? isolate;
+    final completer = Completer<String?>();
+    final teardownCompleter = Completer<void>();
+    _laneFlashTeardownCompleters[laneNumber] = teardownCompleter;
 
-  Isolate? isolate;
-  StreamSubscription? subscription;
-
-  final Completer<String?> completer = Completer<String?>();
-
-  try {
-    // ------------------------------------------------------------
-    // LISTEN ONLY TO THIS LANE
-    // ------------------------------------------------------------
-
-    subscription = receivePort.listen((dynamic message) {
-      if (message is! PfsFlashMessage) {
-        return;
-      }
-
-      // ----------------------------------------------------------
-      // PROGRESS
-      // ----------------------------------------------------------
-
-      if (message.type == 'progress') {
-        if (message.percent != null) {
-          final double percent = message.percent!;
-
-          print(
-            '📊 [Lane $laneNumber] '
-            'Flash progress: ${(percent * 100).toStringAsFixed(1)}%',
-          );
-
-          onProgress(percent);
-        }
-
-        return;
-      }
-
-      // ----------------------------------------------------------
-      // DONE
-      // ----------------------------------------------------------
-
-      if (message.type == 'done') {
-        print(
-          '🏁 [Lane $laneNumber] '
-          'FLASH DONE: ${message.result}',
-        );
-
-        if (!completer.isCompleted) {
-          completer.complete(message.result);
-        }
-
-        return;
-      }
-
-      // ----------------------------------------------------------
-      // ERROR
-      // ----------------------------------------------------------
-
-      if (message.type == 'error') {
-        print(
-          '❌ [Lane $laneNumber] '
-          'FLASH ERROR: ${message.result}',
-        );
-
-        if (!completer.isCompleted) {
-          completer.complete(
-            message.result ?? 'ERROR',
-          );
-        }
-
-        return;
+    final sub = receivePort.listen((message) {
+      if (message is! PfsFlashMessage) return;
+      switch (message.type) {
+        case 'progress':
+          if (message.percent != null) onProgress(message.percent!);
+          break;
+        case 'controlPort':
+          if (message.controlPort != null) {
+            _pendingLaneCloseSignal[laneNumber] = message.controlPort!;
+            print(
+                '   🔹 [Lane $laneNumber] registered control port — checking if already safe to proceed');
+            _trySendProceedSignals();
+          }
+          break;
+        case 'done':
+          if (!completer.isCompleted) completer.complete(message.result);
+          break;
+        case 'error':
+          if (!completer.isCompleted) {
+            completer.complete(message.result ?? 'ERROR');
+          }
+          break;
+        case 'closed':
+          if (!teardownCompleter.isCompleted) teardownCompleter.complete();
+          break;
       }
     });
 
-    // ------------------------------------------------------------
-    // CREATE LANE-SPECIFIC ARGUMENTS
-    // ------------------------------------------------------------
-
-    final PfsFlashArgs args = PfsFlashArgs(
-      host: host,
-      port: port,
-      protocolName: protocolName,
-      protocolHex: protocolHex,
-      txHeader: txHeader,
-      rxHeader: rxHeader,
-      flashJson: flashJson,
-      interpreter: interpreter,
-      seedKeyAlgo: seedKeyAlgo,
-      laneNumber: laneNumber,
-    );
-
-    // ------------------------------------------------------------
-    // CREATE INDEPENDENT ISOLATE
-    // ------------------------------------------------------------
-
-    print(
-      '🔧 [Lane $laneNumber] '
-      'Creating independent flash isolate...',
-    );
-
-    isolate = await Isolate.spawn(
-      pfsFlashIsolateEntry,
-      <dynamic>[
-        receivePort.sendPort,
-        args,
-      ],
-      debugName: 'PFS_FLASH_LANE_$laneNumber',
-    );
-
-    print(
-      '✅ [Lane $laneNumber] '
-      'Flash isolate started',
-    );
-
-    // ------------------------------------------------------------
-    // WAIT FOR THIS LANE ONLY
-    // ------------------------------------------------------------
-
-    final String? result = await completer.future;
-
-    print(
-      '🏁 [Lane $laneNumber] '
-      'Flash completed with result: $result',
-    );
-
-    return result;
-  } catch (e, stackTrace) {
-    print(
-      '❌ [Lane $laneNumber] '
-      'Flash isolate exception: $e',
-    );
-
-    print(stackTrace);
-
-    if (!completer.isCompleted) {
-      completer.complete(
-        e.toString(),
-      );
-    }
-
-    return e.toString();
-  } finally {
-    // ------------------------------------------------------------
-    // CLEANUP ONLY THIS LANE
-    // ------------------------------------------------------------
-
-    print(
-      '🧹 [Lane $laneNumber] '
-      'Cleaning flash resources...',
-    );
-
-    if (subscription != null) {
-      await subscription!.cancel();
-    }
-
-    receivePort.close();
-
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT use Isolate.immediate here.
-     *
-     * The flash isolate sends DONE and then naturally finishes.
-     *
-     * We don't want Lane 0 cleanup to interfere with Lane 1/2.
-     */
-
-    if (isolate != null) {
-      print(
-        '🛑 [Lane $laneNumber] '
-        'Requesting isolate shutdown...',
+    try {
+      final args = PfsFlashArgs(
+        host: host,
+        port: port,
+        protocolName: protocolName,
+        protocolHex: protocolHex,
+        txHeader: txHeader,
+        rxHeader: rxHeader,
+        flashJson: flashJson,
+        interpreter: interpreter,
+        seedKeyAlgo: seedKeyAlgo,
+        laneNumber: laneNumber,
       );
 
-      isolate!.kill(
-        priority: Isolate.beforeNextEvent,
+      isolate = await Isolate.spawn(
+        pfsFlashIsolateEntry,
+        [receivePort.sendPort, args],
       );
 
-      isolate = null;
+      return await completer.future;
+    } catch (e) {
+      print('   ❌ [Lane $laneNumber] isolate spawn/run failed: $e');
+      if (!teardownCompleter.isCompleted) teardownCompleter.complete();
+      return e.toString();
+    } finally {
+      final isolateRef = isolate;
+      unawaited(() async {
+        try {
+          await teardownCompleter.future.timeout(const Duration(minutes: 10));
+        } catch (_) {
+          print(
+              '   ⚠️ [Lane $laneNumber] isolate did not confirm socket close in time — killing anyway');
+          if (!teardownCompleter.isCompleted) teardownCompleter.complete();
+        }
+        await sub.cancel();
+        receivePort.close();
+        isolateRef?.kill(priority: Isolate.beforeNextEvent);
+        _activeFlashProtocols.remove(signature);
+        _pendingLaneCloseSignal.remove(laneNumber);
+        _laneFlashTeardownCompleters.remove(laneNumber);
+      }());
     }
-
-    print(
-      '✅ [Lane $laneNumber] '
-      'Flash cleanup completed',
-    );
   }
-}
-
-
-
-//===========================================gpt===========================
 
   bool get isDongleConnectedAnywhere =>
-      lanes.any((l) => l.dongleConnected.value || l.isFlashing.value);
+      lanes.any((PsfLane l) => l.dongleConnected.value || l.isFlashing.value);
   RxBool get isPlcConnected => plcService.isConnected;
   RxBool get isPlcConnecting => plcService.isConnecting;
   RxString get plcStatus => plcService.status;
@@ -541,16 +377,9 @@ class PsfHomeScreenController extends GetxController {
     _loadLanesFromDongleList();
     _loadAccessToken();
     _loadPlcConfig().then((_) => _autoConnectPlc());
+    PendingSessionStorage.init().then((_) => _resendPendingSessions());
 
-    debugPrint(
-      "PFS Controller Loaded",
-    );
-    @override
-    void onInit() {
-      super.onInit();
-      // ... existing init code ...
-      PendingSessionStorage.init().then((_) => _resendPendingSessions());
-    }
+    debugPrint("PFS Controller Loaded");
   }
 
   Future<void> _loadLanesFromDongleList() async {
@@ -730,10 +559,6 @@ class PsfHomeScreenController extends GetxController {
           '   ✅ ESN accepted — model/sub-model/ECU applied to Lane ${lane.laneNumber}');
       print('══════════════════════════════════════════');
 
-      // Auto-advance to List Number once ESN resolves successfully.
-      // Auto-advance directly to the first IQA field once ESN
-      // resolves successfully — List Number is no longer a separate
-      // step, everything now comes back from the ESN lookup itself.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (lane.iqaFocusNodes.isNotEmpty) {
           lane.iqaFocusNodes.first.requestFocus();
@@ -1169,7 +994,6 @@ class PsfHomeScreenController extends GetxController {
         return;
       }
 
-      // Refetch once to rule out a stale cache before giving up.
       final fresh = await _ensureVariantList(forceRefresh: true);
       if (tryResolve(fresh)) {
         print(
@@ -1195,8 +1019,7 @@ class PsfHomeScreenController extends GetxController {
 
   Future<void> connectDongleForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
-    _dongleRetryAttempts[laneIndex] =
-        0; // any fresh connect call, manual or automatic, gets a full fresh attempt budget
+    _dongleRetryAttempts[laneIndex] = 0;
 
     print('══════════════════════════════════════════');
     print(
@@ -1210,11 +1033,6 @@ class PsfHomeScreenController extends GetxController {
       return;
     }
 
-    // If a manual tap comes in while an old attempt is genuinely still
-    // in flight, don't stack another one on top — but a "stuck" state
-    // that's been sitting for a while is more likely a leftover flag
-    // from a previous failure than a real in-progress attempt, so
-    // don't let this block a fresh manual retry indefinitely.
     if (lane.dongleConnecting.value || lane.isDongleBusy) {
       print(
           '   ⚠️ dongle marked busy/connecting — forcing a clean retry anyway');
@@ -1289,15 +1107,14 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
+  final Map<int, CommControllerIsolateSafe> _laneCommControllers = {};
+
   final Map<int, int> _dongleRetryAttempts = {};
 
   void _startDongleRetryTimer(int laneIndex) {
     final lane = lanes[laneIndex];
     lane.dongleRetryTimer?.cancel();
     _dongleRetryAttempts[laneIndex] = 0;
-    // First retry is quick (3s) since most transient socket issues
-    // clear up fast — backoff only kicks in if it's still failing
-    // after that.
     _scheduleDongleRetry(laneIndex, const Duration(seconds: 3));
   }
 
@@ -1338,7 +1155,7 @@ class PsfHomeScreenController extends GetxController {
             barrierDismissible: true,
           );
         } catch (_) {}
-        return; // stop scheduling further retries
+        return;
       }
 
       final nextDelay = Duration(seconds: (delay.inSeconds * 2).clamp(10, 60));
@@ -1416,26 +1233,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
   Future<void> reconnectDongleWithFeedback(int laneIndex) async {
     final lane = lanes[laneIndex];
 
-    if (lane.dongleConnected.value) return; // already fine, nothing to do
-
-    // Get.dialog(
-    //   const Center(
-    //     child: Card(
-    //       child: Padding(
-    //         padding: EdgeInsets.all(24),
-    //         child: Column(
-    //           mainAxisSize: MainAxisSize.min,
-    //           children: [
-    //             CircularProgressIndicator(),
-    //             SizedBox(height: 16),
-    //             Text("Reconnecting..."),
-    //           ],
-    //         ),
-    //       ),
-    //     ),
-    //   ),
-    //   barrierDismissible: false,
-    // );
+    if (lane.dongleConnected.value) return;
 
     await connectDongleForLane(laneIndex);
 
@@ -1504,10 +1302,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
     lane.resetToUnlockedIdle();
 
-    // Give the dongle's TCP stack a moment to fully settle after the
-    // previous flash before the next ESN scan tries to reconnect —
-    // reconnecting too quickly after a flash is a common cause of
-    // "semaphore timeout" style failures.
     await releaseDongleForLane(laneIndex);
     await Future.delayed(const Duration(seconds: 2));
     unawaited(connectDongleForLane(laneIndex));
@@ -1560,7 +1354,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-            if (lane.isDongleBusy) {
+    if (lane.isDongleBusy) {
       print(
           '   ⏭️ this lane\'s dongle is busy with another operation (Live Parameter read, DTC read, etc) — cannot flash yet');
       print('══════════════════════════════════════════');
@@ -1576,6 +1370,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       );
       return;
     }
+
     lane.isDongleBusy = true;
 
     final ip = lane.dongleIpFromLogin;
@@ -1641,7 +1436,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
       print('   Releasing main-isolate connection before handoff to isolate…');
       await releaseDongleForLane(index);
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(seconds: 2));
 
       result = await _runFlashInIsolate(
         laneNumber: lane.laneNumber,
@@ -1666,6 +1461,9 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
     lane.flashStopwatch?.cancel();
     lane.isFlashing.value = false;
+    print(
+        '   🔹 [Lane ${lane.laneNumber}] isFlashing set false — checking pending close signals');
+    _trySendProceedSignals();
 
     if (result == null || result.isEmpty || result != 'NOERROR') {
       print('   ❌ Flash FAILED: $result  (elapsed ${lane.formattedElapsed})');
@@ -1680,9 +1478,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       lane.logActivity(
           'SESSION SUMMARY — Flash: Fail ($result)  |  IQA: Fail  |  DTC: Fail');
 
-      // A failed flash never reaches IQA/DTC — report it as a failed
-      // cycle anyway, so the server has a record of every attempt,
-      // not just the successful ones.
       lane.draftFlashStatus = 'Fail';
       lane.draftIqaStatus = 'Fail';
       lane.draftDtcStatus = 'Fail';
@@ -1699,28 +1494,23 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     lane.flashProgress.value = 1;
     lane.flashStatus.value = "Flash Completed";
 
-    // Show "processing" feedback from the moment flashing finishes —
-    // covers reconnect + IQA + DTC as one continuous, visible step,
-    // instead of a silent gap before any indicator appears.
     lane.isPostFlashProcessing.value = true;
     lane.isReconnectingAfterFlash.value = true;
 
-    // If another lane is still mid-flash, hold off on this lane's own
-    // reconnect/IQA/DTC burst of WiFi traffic — a real flash takes
-    // several minutes, so there's no safe fixed cap to wait here.
-    // Just wait for as long as any other lane genuinely IS flashing;
-    // it will always eventually finish (succeed or fail) on its own.
-    int waitedSeconds = 0;
-    while (_anyOtherLaneFlashing) {
-      await Future.delayed(const Duration(seconds: 1));
-      waitedSeconds++;
-    }
-    if (waitedSeconds > 0) {
+    final teardown = _laneFlashTeardownCompleters[lane.laneNumber];
+    if (teardown != null && !teardown.isCompleted) {
       print(
-          '   ⏳ [Lane ${lane.laneNumber}] waited ${waitedSeconds}s for other lane(s) to finish flashing before reconnecting/IQA/DTC');
+          '   ⏳ [Lane ${lane.laneNumber}] waiting for its own flash socket to close gracefully before reconnecting...');
+      final waitStart = DateTime.now();
+      await teardown.future;
+      final waited = DateTime.now().difference(waitStart).inSeconds;
+      if (waited > 0) {
+        print(
+            '   ⏳ [Lane ${lane.laneNumber}] waited ${waited}s for its flash socket to close');
+      }
     }
 
-    await Future.delayed(const Duration(seconds: 5));
+    await Future.delayed(const Duration(seconds: 2));
 
     lane.isDongleBusy = false;
 
@@ -1751,8 +1541,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-    // One more check right before the actual write — a new lane could
-    // have started flashing during the reconnect delay above.
     while (_anyOtherLaneFlashing) {
       await Future.delayed(const Duration(seconds: 1));
     }
@@ -1768,8 +1556,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     final flashPassed = result == 'NOERROR';
     final iqaPassed =
         lane.iqaWriteStatus.value.toLowerCase().contains('successful');
-    final dtcPassed = lane.dtcError.value
-        .isEmpty; // Pass = DTC read loaded successfully, regardless of what codes it found
+    final dtcPassed = lane.dtcError.value.isEmpty;
     final continutyPassed = lane.isHarnessConnected.value;
 
     final startTime = lane.flashCycleStartTime ?? DateTime.now();
@@ -1777,9 +1564,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     String fmtTime(DateTime t) =>
         '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
 
-    // One clear summary line covering the whole cycle — shows in the
-    // Activity Log as a single glance-able result, with any "Fail"
-    // rendering in red automatically.
     lane.logActivity(
       'SESSION SUMMARY — Start ${fmtTime(startTime)}  End ${fmtTime(endTime)}  |  '
       'Flash: ${flashPassed ? "Pass" : "Fail"}  '
@@ -1788,9 +1572,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
     );
 
-    // Save the draft locally FIRST — this is what makes the report
-    // crash-safe: even if the app closes right after this line, the
-    // full result is already on disk and will auto-resend next launch.
     lane.draftFlashStatus = flashPassed ? 'Pass' : 'Fail';
     lane.draftIqaStatus = iqaPassed ? 'Pass' : 'Fail';
     lane.draftDtcStatus = dtcPassed ? 'Pass' : 'Fail';
@@ -1800,25 +1581,10 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
     lane.isDongleBusy = false;
   }
-// bypass due to cetfide error
-
-  // Future<String> _downloadAsRawStringFast(String url) async {
-  //   final request = await _sharedHttpClient.getUrl(Uri.parse(url));
-  //   final response = await request.close();
-
-  //   final builder = BytesBuilder(copy: false);
-  //   await for (final chunk in response) {
-  //     builder.add(chunk);
-  //   }
-  //   final bytes = builder.takeBytes();
-
-  //   return await compute(_decodeLatin1Isolate, bytes);
-  // }
 
   Future<String> _downloadAsRawString(String url) async {
     final client = HttpClient()
-      ..badCertificateCallback = (cert, host, port) =>
-          true; // TEMPORARY: same expired-cert bypass as login, until the server's TLS cert is renewed
+      ..badCertificateCallback = (cert, host, port) => true;
     final request = await client.getUrl(Uri.parse(url));
     final response = await request.close();
     final bytes =
@@ -1936,7 +1702,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     );
   }
 
-  /// the shared App.dllFunctions.
   Future<void> readLiveDtcForLane(int laneIndex) async {
     final lane = lanes[laneIndex];
 
@@ -1961,7 +1726,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     lane.isClearingDtc.value = true;
     lane.dtcError.value = '';
     try {
-      // Make sure the dataset catalog (for descriptions) is loaded.
       if (lane.dtcCodes.isEmpty) {
         await loadDtcForLane(laneIndex);
       }
@@ -2007,11 +1771,9 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
       for (final row in rows) {
         if (row.length < 2) continue;
-        //final code = row[0];
         final code = row[0].toString().toUpperCase();
         final status = row[1].toString();
 
-        //final match = lane.dtcCodes.firstWhereOrNull((c) => c.code == code);
         final match = lane.dtcCodes.firstWhereOrNull(
           (c) => (c.code ?? '').toUpperCase() == code,
         );
@@ -2110,7 +1872,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-    // Re-read to show the real resulting state, same as after a flash.
     await readLiveDtcForLane(laneIndex);
   }
 
@@ -2121,7 +1882,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     print('🔹 [Lane ${lane.laneNumber}] IQA WRITE');
 
     try {
-      // Make sure the PID dataset (which carries the IQA code) is loaded.
       if (lane.iqaParameterCodes.isEmpty) {
         await loadPidForLane(laneIndex);
       }
@@ -2462,10 +2222,12 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     lanes[index].isLedOn.toggle();
   }
 
-    void logout() {
-    final flashingLanes = lanes.where((l) => l.isFlashing.value).toList();
+  void logout() {
+    final flashingLanes =
+        lanes.where((PsfLane l) => l.isFlashing.value).toList();
     if (flashingLanes.isNotEmpty) {
-      final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');
+      final laneNumbers =
+          flashingLanes.map((PsfLane l) => l.laneNumber).join(', ');
       final label = flashingLanes.length == 1 ? 'Lane' : 'Lanes';
       if (Get.isDialogOpen == true) Get.back();
       Get.dialog(
@@ -2489,10 +2251,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
     Get.offAllNamed("/login");
 
-    // Force this controller (and every lane's timers inside it) to
-    // actually be destroyed after navigating away — without this,
-    // GetX keeps it alive in memory, and old lanes' retry timers keep
-    // firing indefinitely into whatever new session starts next.
     Get.delete<PsfHomeScreenController>(force: true);
   }
 }

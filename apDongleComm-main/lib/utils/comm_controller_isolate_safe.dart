@@ -34,7 +34,7 @@ class CommControllerIsolateSafe implements ICommController {
   StreamSubscription? _socketSub;
   List<int> _buffer = [];
 
-  Future<void> connectWifi({
+  Future<void> connectWifi1({
     required String host,
     required int port,
     required Connectivity selectedType,
@@ -132,6 +132,11 @@ class CommControllerIsolateSafe implements ICommController {
       .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
       .join(' ');
 
+  // FIX: sendCommand now retries the whole send+read cycle a few times
+  // if the read times out, instead of failing on the very first
+  // transient network hiccup. Each retry re-sends the command (safe —
+  // these are idempotent request/response exchanges like Security
+  // Access, CAN config, etc., not bulk data writes) and waits again.
   @override
   Future<Uint8List?> sendCommand(
     Uint8List finalPacket, {
@@ -139,21 +144,43 @@ class CommControllerIsolateSafe implements ICommController {
   }) async {
     if (connectivity == Connectivity.none) return null;
 
-    try {
-      print("[SENDING HEX] ${bytesToHex(finalPacket)}");
+    const maxRetries = 3;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        print("[SENDING HEX] ${bytesToHex(finalPacket)}"
+            "${attempt > 1 ? ' (retry $attempt/$maxRetries)' : ''}");
 
-      final socket = _socket;
-      if (socket == null) return null;
+        final socket = _socket;
+        if (socket == null) return null;
 
-      _buffer.clear();
-      socket.add(finalPacket);
-      await socket.flush();
-      print("📥 Waiting for WiFi response...");
-      return await _readDirect(socket);
-    } catch (e) {
-      print("[EXCEPTION in sendCommand] $e");
-      return Uint8List.fromList(utf8.encode('No Resp From Dongle'));
+        _buffer.clear();
+        socket.add(finalPacket);
+        await socket.flush();
+        print("📥 Waiting for WiFi response...");
+
+        final result = await _readDirect(socket);
+
+        // _readDirect returns the "No Resp From Dongle" fallback on a
+        // genuine timeout — treat that as a retryable failure rather
+        // than accepting it as a real (bad) response on the first try.
+        final isFallback = result != null &&
+            String.fromCharCodes(result).contains('No Resp From Dongle');
+
+        if (isFallback && attempt < maxRetries) {
+          print(
+              "⚠️ sendCommand: no response (attempt $attempt/$maxRetries) — retrying...");
+          continue;
+        }
+
+        return result;
+      } catch (e) {
+        print("[EXCEPTION in sendCommand] $e");
+        if (attempt == maxRetries) {
+          return Uint8List.fromList(utf8.encode('No Resp From Dongle'));
+        }
+      }
     }
+    return Uint8List.fromList(utf8.encode('No Resp From Dongle'));
   }
 
   void _handleData(Uint8List data) {
@@ -228,7 +255,11 @@ class CommControllerIsolateSafe implements ICommController {
     }
   }
 
-  Future<Uint8List> _readExactBytes(int length, {int timeoutSec = 15}) async {
+  // 25s per individual read attempt. Combined with the retry loop in
+  // getWifiResponse() below, a single bulk-transfer step now tolerates
+  // up to 3 × 25s = 75s of cumulative network trouble before actually
+  // failing, instead of dying on the very first 25s hiccup.
+  Future<Uint8List> _readExactBytes(int length, {int timeoutSec = 25}) async {
     final DateTime startTime = DateTime.now();
     while (_buffer.length < length) {
       await Future.delayed(const Duration(milliseconds: 1));
@@ -248,7 +279,7 @@ class CommControllerIsolateSafe implements ICommController {
 
   Future<Uint8List?> _readDirect(
     Socket socket, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 20),
   }) async {
     final deadline = DateTime.now().add(timeout);
 
@@ -285,43 +316,66 @@ class CommControllerIsolateSafe implements ICommController {
     return result;
   }
 
+  // FIX: getWifiResponse now retries up to 3 times on a read timeout
+  // before giving up, instead of failing on the very first 25s hiccup.
+  // This is the path used during the bulk-transfer loop, so it's the
+  // one that matters most for surviving a brief mid-flash network
+  // congestion event like the one that was killing Lane 1 at 84%.
   Future<Uint8List> getWifiResponse() async {
-    try {
-      while (true) {
-        print("WiFi Communication : ---------INSIDE READ DATA -----------");
+    const maxRetries = 3;
 
-        Uint8List trgtlen = await _readExactBytes(2, timeoutSec: 15);
-        if (trgtlen.isEmpty) {
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        while (true) {
+          print("WiFi Communication : ---------INSIDE READ DATA -----------");
+
+          Uint8List trgtlen = await _readExactBytes(2);
+          if (trgtlen.isEmpty) {
+            if (attempt < maxRetries) {
+              print(
+                  "⚠️ getWifiResponse: header read timed out (attempt $attempt/$maxRetries) — retrying...");
+              break; // exit inner while, retry from outer for-loop
+            }
+            return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
+          }
+
+          int msglen = ((trgtlen[0] & 0x0F) << 8) + trgtlen[1];
+          Uint8List remData = await _readExactBytes(msglen + 3);
+          if (remData.isEmpty) {
+            if (attempt < maxRetries) {
+              print(
+                  "⚠️ getWifiResponse: body read timed out (attempt $attempt/$maxRetries) — retrying...");
+              break;
+            }
+            return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
+          }
+
+          final builder = BytesBuilder();
+          builder.add(trgtlen);
+          builder.add(remData);
+          Uint8List retArray = builder.toBytes();
+
+          print(
+            "WiFi Communication : ---------Response Received = ${bytesToHex(retArray)} -----------",
+          );
+
+          if (retArray.length >= 6 &&
+              retArray[3] == 0x7F &&
+              retArray[5] == 0x78) {
+            print("⚠️ NRC 0x78 Detected: ECU Busy. Reading again...");
+            continue;
+          }
+
+          return retArray;
+        }
+      } catch (e) {
+        print("Exception @getWifiResponse (attempt $attempt/$maxRetries): $e");
+        if (attempt == maxRetries) {
           return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
         }
-
-        int msglen = ((trgtlen[0] & 0x0F) << 8) + trgtlen[1];
-        Uint8List remData = await _readExactBytes(msglen + 3, timeoutSec: 15);
-        if (remData.isEmpty) {
-          return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
-        }
-
-        final builder = BytesBuilder();
-        builder.add(trgtlen);
-        builder.add(remData);
-        Uint8List retArray = builder.toBytes();
-
-        print(
-          "WiFi Communication : ---------Response Received = ${bytesToHex(retArray)} -----------",
-        );
-
-        if (retArray.length >= 6 &&
-            retArray[3] == 0x7F &&
-            retArray[5] == 0x78) {
-          print("⚠️ NRC 0x78 Detected: ECU Busy. Reading again...");
-          continue;
-        }
-
-        return retArray;
       }
-    } catch (e) {
-      print("Exception @getWifiResponse : $e");
-      return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
     }
+
+    return Uint8List.fromList(utf8.encode("No Resp From Dongle"));
   }
 }
