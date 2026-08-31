@@ -72,6 +72,7 @@ class DtcCode {
   int? pageNo;
   dynamic environmentSnapshot;
   dynamic environmentSnapshot2;
+  String? relatedSensor;
 
   DtcCode({
     this.id,
@@ -81,6 +82,7 @@ class DtcCode {
     this.pageNo,
     this.environmentSnapshot,
     this.environmentSnapshot2,
+    this.relatedSensor,
   });
 
   factory DtcCode.fromJson(Map<String, dynamic> json) => DtcCode(
@@ -91,6 +93,7 @@ class DtcCode {
         pageNo: json["page_no"],
         environmentSnapshot: json["environment_snapshot"],
         environmentSnapshot2: json["environment_snapshot2"],
+        relatedSensor: json["related_sensor"],
       );
 
   Map<String, dynamic> toJson() => {
@@ -101,5 +104,6 @@ class DtcCode {
         "page_no": pageNo,
         "environment_snapshot": environmentSnapshot,
         "environment_snapshot2": environmentSnapshot2,
+        "related_sensor": relatedSensor,
       };
 }

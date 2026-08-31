@@ -2000,19 +2000,18 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //     },
   //   );
   // }
-
-    Widget _dtcTile(String raw) {
-    String register = '-';
-    final registerMatch = RegExp(r'\[REG:([^\]]*)\]\s*$').firstMatch(raw);
-    String withoutRegister = raw;
-    if (registerMatch != null) {
-      register = registerMatch.group(1)?.trim() ?? '-';
-      withoutRegister = raw.substring(0, registerMatch.start).trim();
+  Widget _dtcTile(String raw) {
+    String relatedSensor = '-';
+    final sensorMatch = RegExp(r'\[SENSOR:([^\]]*)\]\s*$').firstMatch(raw);
+    String withoutSensor = raw;
+    if (sensorMatch != null) {
+      relatedSensor = sensorMatch.group(1)?.trim() ?? '-';
+      withoutSensor = raw.substring(0, sensorMatch.start).trim();
     }
 
-    final splitIndex = withoutRegister.indexOf(' - ');
-    final code = splitIndex == -1 ? withoutRegister : withoutRegister.substring(0, splitIndex).trim();
-    var rest = splitIndex == -1 ? '' : withoutRegister.substring(splitIndex + 3).trim();
+    final splitIndex = withoutSensor.indexOf(' - ');
+    final code = splitIndex == -1 ? withoutSensor : withoutSensor.substring(0, splitIndex).trim();
+    var rest = splitIndex == -1 ? '' : withoutSensor.substring(splitIndex + 3).trim();
 
     String? statusLabel;
     final statusMatch = RegExp(r'\(([^()]+)\)\s*$').firstMatch(rest);
@@ -2031,10 +2030,10 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
       badgeColor = _StationColors.amber;
       badgeLabel = 'Pending';
     } else if (statusLower == 'inactive') {
-      badgeColor = _StationColors.greenDark;
+      badgeColor = _StationColors.brightGreen;
       badgeLabel = 'InActive';
     } else {
-      badgeColor = _StationColors.greenDark;
+      badgeColor = _StationColors.brightGreen;
       badgeLabel = statusLower.isNotEmpty ? 'History' : '-';
     }
 
@@ -2052,7 +2051,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                                 Text(code,
+                Text(code,
                     style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12.5,
@@ -2065,11 +2064,11 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 ],
                 const SizedBox(height: 4),
                 Text(
-                  'Related Sensor : $register',
+                  'Related Sensor: $relatedSensor',
                   style: const TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w600,
-                    color: _StationColors.brightGreen,
+                    color: Color.fromARGB(255, 3, 216, 3),
                   ),
                 ),
               ],
@@ -2195,7 +2194,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   decoration: BoxDecoration(
-                      color: _StationColors.teal,
+                      color: const Color.fromARGB(255, 17, 44, 53),
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         
@@ -2480,7 +2479,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             foregroundColor: Colors.white,
             title: Text('Activity Log — Lane ${lane.laneNumber}'),
           ),
-          backgroundColor: _StationColors.slateBg,
+                  backgroundColor: _StationColors.navy,
           body: StatefulBuilder(
             builder: (context, setDialogState) {
               return SafeArea(
@@ -2508,7 +2507,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         ),
                       ),
                     ),
-                    const Divider(height: 1),
+                                        Divider(height: 1, color: _StationColors.slateBorder),
                     Expanded(
                       child: Obx(() {
                         final entries = lane.activityLog.where((e) {
@@ -2533,12 +2532,12 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           itemCount: entries.length,
                           itemBuilder: (context, i) {
                             final parsed = _parseLogEntry(entries[i]);
-                            return Container(
+                                                       return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 10),
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: _StationColors.teal,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                     color: _StationColors.slateBorder),

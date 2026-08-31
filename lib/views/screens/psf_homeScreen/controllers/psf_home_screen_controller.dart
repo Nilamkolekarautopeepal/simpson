@@ -220,7 +220,7 @@ class PsfHomeScreenController extends GetxController {
 
   // Call any time a lane's isFlashing flips false, or a controlPort
   // registers. Cheap and idempotent — safe to call liberally.
-  void _trySendProceedSignals() {
+    void _trySendProceedSignals() {
     if (_pendingLaneCloseSignal.isEmpty) return;
     final ready = <int>[];
     for (final laneNum in _pendingLaneCloseSignal.keys) {
@@ -236,16 +236,10 @@ class PsfHomeScreenController extends GetxController {
             '   🔸 [proceed-check] Lane $laneNum: still flashing itself — not ready');
         continue;
       }
-      if (_anyOtherLaneFlashing) {
-        final stillFlashing = lanes
-            .where((PsfLane l) => l.isFlashing.value)
-            .map((PsfLane l) => l.laneNumber)
-            .join(', ');
-        print(
-            '   🔸 [proceed-check] Lane $laneNum: waiting — lane(s) still flashing: $stillFlashing');
-        continue;
-      }
-      print('   🔸 [proceed-check] Lane $laneNum: safe to proceed');
+      // Proceed as soon as THIS lane's own flash is done — no longer
+      // waiting for any other lane to finish. Each lane's IQA/DTC now
+      // runs immediately after its own flash, independent of others.
+      print('   🔸 [proceed-check] Lane $laneNum: its own flash is done — proceeding immediately');
       ready.add(laneNum);
     }
     for (final laneNum in ready) {
@@ -728,9 +722,10 @@ class PsfHomeScreenController extends GetxController {
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
     lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
     lane.flashCycleStartTime = DateTime.now();
-    lane.currentSessionKey =
+       lane.currentSessionKey =
         'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
     lane.sessionReportSent = false;
+    lane.logActivity('Session started for ESN $esn (key: ${lane.currentSessionKey})');
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
@@ -1541,10 +1536,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-    while (_anyOtherLaneFlashing) {
-      await Future.delayed(const Duration(seconds: 1));
-    }
-    lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
+       lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
 
     await Future.delayed(const Duration(milliseconds: 500));
     await readLiveDtcForLane(index);
@@ -1774,12 +1766,16 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         final code = row[0].toString().toUpperCase();
         final status = row[1].toString();
 
-        final match = lane.dtcCodes.firstWhereOrNull(
+                final match = lane.dtcCodes.firstWhereOrNull(
           (c) => (c.code ?? '').toUpperCase() == code,
         );
         final desc = match?.description ?? 'Description not found';
+        final relatedSensor = match?.relatedSensor;
+        final sensorTag = (relatedSensor != null && relatedSensor.isNotEmpty)
+            ? ' [SENSOR:$relatedSensor]'
+            : '';
 
-        merged[code] = '$code - $desc ($status)';
+        merged[code] = '$code - $desc ($status)$sensorTag';
       }
 
       lane.dtcReadResults.assignAll(merged.values.toList());

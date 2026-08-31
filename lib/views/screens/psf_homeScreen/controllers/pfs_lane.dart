@@ -22,6 +22,7 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
     this.macIdFromLogin,
   }) {
     // ── Dongle ──
+        // ══════════════════ DONGLE ══════════════════
     ever(dongleConnected, (bool connected) {
       final ip = dongleIpFromLogin ?? 'unknown IP';
       logActivity(connected ? 'Dongle connected ($ip)' : 'Dongle disconnected ($ip)');
@@ -32,8 +33,11 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
     ever(dongleError, (String v) {
       if (v.isNotEmpty) logActivity('Dongle error: $v');
     });
+    ever(isReconnectingAfterFlash, (bool reconnecting) {
+      if (reconnecting) logActivity('Reconnecting to dongle after flash...');
+    });
 
-    // ── ESN / variant resolution ──
+    // ══════════════════ ESN ══════════════════
     ever(esn, (String v) {
       if (v.isNotEmpty) logActivity('ESN scanned: $v');
     });
@@ -44,13 +48,18 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
       if (v.isNotEmpty) logActivity('List Number: $v');
     });
     ever(ecuModelName, (String v) {
-      if (v.isNotEmpty && v != 'ECU MODEL NAME') logActivity('Model: $v');
+      if (v.isNotEmpty && v != 'ECU MODEL NAME') logActivity('Model resolved: $v');
     });
     ever(resolvedFlashFileName, (String? v) {
-      if (v != null && v.isNotEmpty) logActivity('Flash file: $v');
+      if (v != null && v.isNotEmpty) logActivity('Flash file resolved: $v');
     });
 
-    // ── IQA ──
+    // ══════════════════ HARNESS ══════════════════
+    ever(isHarnessConnected, (bool connected) {
+      logActivity(connected ? 'Harness connected — continuity OK' : 'Harness disconnected — continuity lost');
+    });
+
+    // ══════════════════ IQA ══════════════════
     for (int i = 0; i < iqaControllers.length; i++) {
       final index = i;
       iqaControllers[index].addListener(() {
@@ -69,17 +78,23 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
       if (v.isNotEmpty) logActivity(v);
     });
 
-    // ── Flash ──
+    // ══════════════════ FLASH ══════════════════
     ever(isFlashing, (bool flashing) {
-      if (flashing) logActivity('Flashing started');
+      logActivity(flashing ? 'Flashing started' : 'Flashing stopped');
     });
     ever(flashStatus, (String v) {
       if (v.isNotEmpty) logActivity(v);
     });
+    ever(isPostFlashProcessing, (bool processing) {
+      if (processing) logActivity('Post-flash processing started (IQA write + DTC read)');
+    });
 
-    // ── DTC ──
+    // ══════════════════ DTC ══════════════════
     ever(isReadingDtc, (bool reading) {
       if (reading) logActivity('Reading DTCs...');
+    });
+    ever(isClearingDtc, (bool clearing) {
+      if (clearing) logActivity('Clearing DTCs...');
     });
     ever(dtcError, (String v) {
       if (v.isNotEmpty) logActivity('DTC error: $v');
@@ -88,7 +103,7 @@ import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart
       logActivity('DTC read complete: ${results.length} code(s) found');
     });
 
-    // ── Live Parameter (PID) ──
+    // ══════════════════ PID (Live Parameter) ══════════════════
     ever(pidPlaying, (bool playing) {
       logActivity(playing ? 'Live Parameter read started' : 'Live Parameter read stopped');
     });
