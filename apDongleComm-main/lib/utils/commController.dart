@@ -12,20 +12,26 @@ import 'i_comm_controller.dart';
 
 class CommController extends GetxController implements ICommController {
   var connectivityRx = Connectivity.none.obs;
-  @override
-  Connectivity get connectivity => connectivityRx.value;
-
   late DongleComm? dongleComm;
   var isConnected = false.obs;
+
+  // ---------------- FRAMING ----------------
+
+  final _buffer = <int>[];
+
+  final StreamController<bool> _connectionStream = StreamController.broadcast();
+  Completer<void>? _dataCompleter;
+  final StreamController<Uint8List> _responseStream =
+      StreamController.broadcast();
 
   Socket? _socket;
   StreamSubscription? _socketSub;
 
-  final StreamController<Uint8List> _responseStream =
-      StreamController.broadcast();
-  final StreamController<bool> _connectionStream = StreamController.broadcast();
+  @override
+  Connectivity get connectivity => connectivityRx.value;
 
   Stream<Uint8List> get responses => _responseStream.stream;
+
   Stream<bool> get connectionUpdates => _connectionStream.stream;
 
   // ---------------- CONNECT ----------------
@@ -98,11 +104,6 @@ class CommController extends GetxController implements ICommController {
     }
   }
 
-  void _handleDisconnect() {
-    print("⚠️ Handling unexpected disconnect...");
-    disconnect();
-  }
-
   String formatHex(Uint8List bytes) => bytesToHex(bytes);
 
   Uint8List hexToBytes(String hexStr) {
@@ -159,10 +160,10 @@ class CommController extends GetxController implements ICommController {
     _buffer.clear();
   }
 
-  // ---------------- FRAMING ----------------
-
-  final _buffer = <int>[];
-  Completer<void>? _dataCompleter;
+  void _handleDisconnect() {
+    print("⚠️ Handling unexpected disconnect...");
+    disconnect();
+  }
 
   void _handleData(Uint8List data) {
     if (data.isEmpty) return;

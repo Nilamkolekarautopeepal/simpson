@@ -203,7 +203,6 @@ class PsfHomeScreenController extends GetxController {
 
   final ConnectionWifi _connectionWifi = ConnectionWifi();
 
-  DateTime? _lastIsolateFlashStart;
 
   final Set<String> _activeFlashProtocols = {};
 
@@ -1574,16 +1573,6 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     lane.isDongleBusy = false;
   }
 
-  Future<String> _downloadAsRawString(String url) async {
-    final client = HttpClient()
-      ..badCertificateCallback = (cert, host, port) => true;
-    final request = await client.getUrl(Uri.parse(url));
-    final response = await request.close();
-    final bytes =
-        await response.fold<List<int>>(<int>[], (p, c) => p..addAll(c));
-    client.close();
-    return latin1.decode(bytes);
-  }
 
   List<all_ds.EcuMapFile> _parseEcuMapFilesFromSequence(
       String sequenceContent) {
