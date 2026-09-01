@@ -300,7 +300,7 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Color.fromARGB(255, 17, 29, 37),
+      backgroundColor:  Color.fromARGB(255, 13, 20, 26),
       elevation: 2,
       centerTitle: false,
       automaticallyImplyLeading: false,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter/gestures.dart';
 import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
 
 class _StationColors {
@@ -8,6 +9,9 @@ class _StationColors {
   static const charcoal = Color(0xFF16232C);
   static const green = Color(0xFF2ECC71);
   static const red = Color(0xFFD64545);
+   static const slateBg = Color(0xFF1B333D);
+    static const slateBorder = Color(0xFF345A66);
+  
 }
 
 Widget _glowDot(Color core, {double size = 10}) {
@@ -34,12 +38,15 @@ class PsfTopLaneStatusBar extends StatelessWidget {
 
   final PsfHomeScreenController controller;
 
-  @override
+     @override
   Widget build(BuildContext context) {
     return Container(
       height: 68,
+      margin: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: _StationColors.charcoal,
+        color: _StationColors.teal,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withValues(alpha: 0.25),
@@ -47,16 +54,27 @@ class PsfTopLaneStatusBar extends StatelessWidget {
               offset: const Offset(0, 3)),
         ],
       ),
-      child: Obx(
-        () => ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          itemCount: controller.lanes.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (context, i) => _laneChip(i),
+      clipBehavior: Clip.antiAlias,
+            child: Obx(
+        () => ScrollConfiguration(
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              PointerDeviceKind.touch,
+              PointerDeviceKind.mouse,
+              PointerDeviceKind.trackpad,
+            },
+          ),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            itemCount: controller.lanes.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) => _laneChip(i),
+          ),
         ),
       ),
     );
+  
   }
 
   Widget _laneChip(int index) {
@@ -70,10 +88,6 @@ class PsfTopLaneStatusBar extends StatelessWidget {
 
       final reconnecting = lane.isReconnectingAfterFlash.value;
 
-      // The dot is purely this lane's OWN dongle connection state —
-      // green if connected (or actively flashing/reconnecting right
-      // after a flash — both are expected, not real failures), red
-      // only for a genuine unexpected disconnect.
       final Color dotColor = (lane.dongleConnected.value || flashing || reconnecting) ? _StationColors.green : _StationColors.red;
 
       String subLabel;
@@ -106,25 +120,27 @@ class PsfTopLaneStatusBar extends StatelessWidget {
         print(  'Lane $index is offline, showing "Offline"');
       }
 
-      return Material(
+             return Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         child: InkWell(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => controller.expandLane(index),
           child: Container(
+            width: 190,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: isExpanded
-                  ? _StationColors.teal
+                  ? _StationColors.tealLight
                   : Colors.white.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
                   color: isExpanded
-                      ? _StationColors.tealLight
-                      : Colors.white.withValues(alpha: 0.12)),
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.12),
+                  width: isExpanded ? 1.5 : 1),
             ),
-            child: Row(
+                      child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 GestureDetector(
@@ -133,34 +149,36 @@ class PsfTopLaneStatusBar extends StatelessWidget {
                   child: _glowDot(dotColor, size: 10),
                 ),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '${lane.laneNumber}. ${lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value}',
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.05,
-                        fontWeight: FontWeight.w800,
-                        color: isExpanded
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${lane.laneNumber}. ${lane.ecuModelName.value.isEmpty ? "ECU MODEL NAME" : lane.ecuModelName.value}',
+                        textAlign: TextAlign.start,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          height: 1.05,
+                          fontWeight: FontWeight.w800,
+                          color: isExpanded
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.9),
+                        ),
                       ),
-                    ),
-                    Text(
-                      subLabel,
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        height: 1.0,
-                        color: isExpanded ? Colors.white70 : Colors.white38,
+                      Text(
+                        subLabel,
+                        textAlign: TextAlign.start,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9,
+                          height: 1.0,
+                          color: isExpanded ? Colors.white70 : Colors.white38,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

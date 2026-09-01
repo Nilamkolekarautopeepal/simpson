@@ -824,16 +824,22 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //   });
   // }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     return Container(
       color: _StationColors.slateBg,
+      padding: const EdgeInsets.all(12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(width: 320, child: _leftSidebar(context)),
-          const VerticalDivider(
-              width: 1, thickness: 1, color: _StationColors.slateBorder),
+          SizedBox(
+            width: 320,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: _leftSidebar(context),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(child: _mainArea(context)),
         ],
       ),
@@ -920,9 +926,21 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-   Widget _leftSidebar(BuildContext context) {
+    Widget _leftSidebar(BuildContext context) {
     return Container(
-      color: _StationColors.teal,
+      decoration: BoxDecoration(
+        color: _StationColors.teal,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _StationColors.slateBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2063,12 +2081,22 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           fontSize: 11.5, color: _StationColors.slate))
                 ],
                 const SizedBox(height: 4),
-                Text(
-                  'Related Sensor: $relatedSensor',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color.fromARGB(255, 3, 216, 3),
+                                RichText(
+                  text: TextSpan(
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    children: [
+                      const TextSpan(
+                        text: 'Related Sensor : ',
+                        style: TextStyle(color: Color.fromARGB(255, 250, 250, 250)),
+                      ),
+                      TextSpan(
+                        text: relatedSensor,
+                        style: const TextStyle(color: _StationColors.brightGreen),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -2347,31 +2375,31 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   )),
             ],
           ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 24,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: ActivityLogTag.allTags.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (context, i) {
-                if (i == 0) {
-                  return _tagChip(
-                    'All',
-                    selected: _activityFilter == null,
-                    onTap: () => setState(() => _activityFilter = null),
-                  );
-                }
-                final tag = ActivityLogTag.allTags[i - 1];
-                return _tagChip(
-                  tag,
-                  selected: _activityFilter == tag,
-                  onTap: () => setState(() =>
-                      _activityFilter = _activityFilter == tag ? null : tag),
-                );
-              },
-            ),
-          ),
+          // const SizedBox(height: 6),
+          // SizedBox(
+          //   height: 24,
+          //   child: ListView.separated(
+          //     scrollDirection: Axis.horizontal,
+          //     itemCount: ActivityLogTag.allTags.length + 1,
+          //     separatorBuilder: (_, __) => const SizedBox(width: 6),
+          //     itemBuilder: (context, i) {
+          //       if (i == 0) {
+          //         return _tagChip(
+          //           'All',
+          //           selected: _activityFilter == null,
+          //           onTap: () => setState(() => _activityFilter = null),
+          //         );
+          //       }
+          //       final tag = ActivityLogTag.allTags[i - 1];
+          //       return _tagChip(
+          //         tag,
+          //         selected: _activityFilter == tag,
+          //         onTap: () => setState(() =>
+          //             _activityFilter = _activityFilter == tag ? null : tag),
+          //       );
+          //     },
+          //   ),
+          // ),
           const Divider(height: 14),
           Expanded(
             child: Obx(() {

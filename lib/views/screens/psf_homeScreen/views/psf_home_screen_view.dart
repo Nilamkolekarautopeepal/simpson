@@ -15,7 +15,8 @@ class _LaneColors {
   static const tealLight = Color(0xFF2C6478); // lighter accent variant
   static const green = Color(0xFF2ECC71);
   static const red = Color(0xFFD64545);
-  static const slateBg = Color(0xFF2E6D82); // main working-area background
+  static const slateBg = Color(0xFF2E6D82);
+  static const slateBorder = Color(0xFF345A66); // main working-area background
 }
 
 Widget _glowDot(Color core, {double size = 10}) {
@@ -119,25 +120,13 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
           ),
         ],
       ),
-      backgroundColor: _LaneColors.slateBg,
+      backgroundColor: Color(0xFF16232C),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Same teal gradient as the login screen's background, used
           // here as the lane status bar's backdrop for visual continuity.
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  _LaneColors.teal,
-                  _LaneColors.tealLight,
-                ],
-              ),
-            ),
-            child: PsfTopLaneStatusBar(controller: controller),
-          ),
+                    PsfTopLaneStatusBar(controller: controller),
           Expanded(
             child: Obx(() {
               if (controller.lanes.isEmpty) {
