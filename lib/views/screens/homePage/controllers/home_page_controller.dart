@@ -20,12 +20,9 @@ import 'package:simpson/routes/app_pages.dart';
 import 'package:simpson/services/apiServices.dart';
 import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/plc/plc_service.dart';
-import 'package:simpson/services/connectionWifiService.dart';
 import 'package:simpson/services/getJson_service.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:simpson/services/pending_session_storage.dart';
-
-import '../../../../services/connectionWifiService.dart';
 
 enum StepType { single, iqaGroup }
 
@@ -50,7 +47,6 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   List<String> iqaLabels =
       List.generate(_defaultIqaCount, (i) => 'IQA ${i + 1}');
   List<String>? _iqaFiringOrder;
-
   late List<TextEditingController> iqaControllers;
   late List<FocusNode> iqaFocusNodes;
   late List<Timer?> _iqaIdleTimers;
@@ -75,13 +71,21 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   String? _draftDtcStatus;
   bool _sessionReportSent = false;
 
+  Future<void> _dongleLock = Future.value();
+
   Future<T> _withDongleBusy<T>(Future<T> Function() action) async {
-    final wasAlreadyBusy = isDongleBusy.value;
+    final previous = _dongleLock;
+    final completer = Completer<void>();
+    _dongleLock = completer.future;
+
+    await previous;
+
     isDongleBusy.value = true;
     try {
       return await action();
     } finally {
-      if (!wasAlreadyBusy) isDongleBusy.value = false;
+      isDongleBusy.value = false;
+      completer.complete(); // release the next queued caller
     }
   }
 
@@ -214,6 +218,9 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   final RxList<String> dtcList = <String>[].obs;
   int get dtcCount => dtcList.length;
 
+  final RxMap<String, String?> dtcRelatedSensors =
+    RxMap<String, String?>({});
+
   // ── PID ──
   final RxBool pidExpanded = true.obs;
   final RxList<String> pidList = <String>[].obs;
@@ -270,63 +277,121 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  // Future<void> _resendPendingSessions() async {
+  //   final drafts = PendingSessionStorage.getAllDrafts();
+  //   if (drafts.isEmpty) return;
+
+  //   _log(
+  //       'Found ${drafts.length} unsent session report(s) from a previous run — resending...');
+
+  //   const validStatuses = {'Pass', 'Fail'};
+  //   String sanitizeStatus(dynamic raw) {
+  //     final value = raw as String?;
+  //     return validStatuses.contains(value) ? value! : 'Fail';
+  //   }
+
+  //   for (final draft in drafts) {
+  //     final key = draft['sessionKey'] as String?;
+  //     if (key == null) continue;
+
+  //     final datasetType = draft['datasetType'] as String?;
+  //     final datafileName = draft['datafileName'] as String?;
+  //     if (datasetType == null ||
+  //         datasetType.isEmpty ||
+  //         datafileName == null ||
+  //         datafileName.isEmpty) {
+  //       await PendingSessionStorage.removeDraft(key);
+  //       _log(
+  //           'Discarded invalid draft ($key) — no dataset resolved, nothing worth resending');
+  //       continue;
+  //     }
+
+  //     final flashStatus = sanitizeStatus(draft['flashStatus']);
+  //     final iqaStatus = sanitizeStatus(draft['iqaStatus']);
+  //     final dtcStatus = sanitizeStatus(draft['dtcStatus']);
+
+  //     try {
+  //       await _authService.createTestBedSession(
+  //         esnId: draft['esnId'] as int?,
+  //         dongleId: draft['dongleId'] as int?,
+  //         datasetType: datasetType,
+  //         datafileName: datafileName,
+  //         startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ??
+  //             DateTime.now(),
+  //         endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ??
+  //             DateTime.now(),
+  //         flashStatus: flashStatus,
+  //         iqaStatus: iqaStatus,
+  //         dtcStatus: dtcStatus,
+  //         activityLog: List<String>.from(draft['activityLog'] as List? ?? []),
+  //         accessToken: _accessToken,
+  //       );
+  //       await PendingSessionStorage.removeDraft(key);
+  //       _log('✅ Resent previously unsent session report ($key)');
+  //     } catch (e) {
+  //       _log(
+  //           '❌ Failed to resend session report ($key): $e — will retry next launch');
+  //     }
+  //   }
+  // }
   Future<void> _resendPendingSessions() async {
-    final drafts = PendingSessionStorage.getAllDrafts();
-    if (drafts.isEmpty) return;
+  final drafts = PendingSessionStorage.getAllDrafts();
+  if (drafts.isEmpty) return;
 
-    _log(
-        'Found ${drafts.length} unsent session report(s) from a previous run — resending...');
+  _log(
+      'Found ${drafts.length} unsent session report(s) from a previous run — resending...');
 
-    const validStatuses = {'Pass', 'Fail'};
-    String sanitizeStatus(dynamic raw) {
-      final value = raw as String?;
-      return validStatuses.contains(value) ? value! : 'Fail';
-    }
-
-    for (final draft in drafts) {
-      final key = draft['sessionKey'] as String?;
-      if (key == null) continue;
-
-      final datasetType = draft['datasetType'] as String?;
-      final datafileName = draft['datafileName'] as String?;
-      if (datasetType == null ||
-          datasetType.isEmpty ||
-          datafileName == null ||
-          datafileName.isEmpty) {
-        await PendingSessionStorage.removeDraft(key);
-        _log(
-            'Discarded invalid draft ($key) — no dataset resolved, nothing worth resending');
-        continue;
-      }
-
-      final flashStatus = sanitizeStatus(draft['flashStatus']);
-      final iqaStatus = sanitizeStatus(draft['iqaStatus']);
-      final dtcStatus = sanitizeStatus(draft['dtcStatus']);
-
-      try {
-        await _authService.createTestBedSession(
-          esnId: draft['esnId'] as int?,
-          dongleId: draft['dongleId'] as int?,
-          datasetType: datasetType,
-          datafileName: datafileName,
-          startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ??
-              DateTime.now(),
-          endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ??
-              DateTime.now(),
-          flashStatus: flashStatus,
-          iqaStatus: iqaStatus,
-          dtcStatus: dtcStatus,
-          activityLog: List<String>.from(draft['activityLog'] as List? ?? []),
-          accessToken: _accessToken,
-        );
-        await PendingSessionStorage.removeDraft(key);
-        _log('✅ Resent previously unsent session report ($key)');
-      } catch (e) {
-        _log(
-            '❌ Failed to resend session report ($key): $e — will retry next launch');
-      }
-    }
+  const validStatuses = {'Pass', 'Fail'};
+  String sanitizeStatus(dynamic raw) {
+    final value = raw as String?;
+    return validStatuses.contains(value) ? value! : 'Fail';
   }
+
+  for (final draft in drafts) {
+    final key = draft['sessionKey'] as String?;
+    if (key == null) continue;
+
+    final datasetType = draft['datasetType'] as String?;
+    final datafileName = draft['datafileName'] as String?;
+    final esnId = draft['esnId'] as int?;
+
+    if (datasetType == null ||
+        datasetType.isEmpty ||
+        datafileName == null ||
+        datafileName.isEmpty ||
+        esnId == null) {
+      await PendingSessionStorage.removeDraft(key);
+      _log(
+          'Discarded invalid draft ($key) — missing dataset or ESN id, nothing valid to resend');
+      continue;
+    }
+
+    final flashStatus = sanitizeStatus(draft['flashStatus']);
+    final iqaStatus = sanitizeStatus(draft['iqaStatus']);
+    final dtcStatus = sanitizeStatus(draft['dtcStatus']);
+
+    try {
+      await _authService.createTestBedSession(
+        esnId: esnId,
+        dongleId: draft['dongleId'] as int?,
+        datasetType: datasetType,
+        datafileName: datafileName,
+        startDate: DateTime.tryParse(draft['startDate'] as String? ?? '') ??
+            DateTime.now(),
+        endDate: DateTime.tryParse(draft['endDate'] as String? ?? '') ??
+            DateTime.now(),
+        flashStatus: flashStatus,
+        iqaStatus: iqaStatus,
+        dtcStatus: dtcStatus,
+        activityLog: List<String>.from(draft['activityLog'] as List? ?? []),
+        accessToken: _accessToken,
+      );
+      await PendingSessionStorage.removeDraft(key);
+      _log('✅ Resent previously unsent session report ($key)');
+    } catch (e) {
+          }
+  }
+}
 
   final RxBool isReadingDtcManually = false.obs;
 
@@ -1346,7 +1411,8 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     flashProgress.value = 0;
     flashElapsedSeconds.value = 0;
 
-      dtcList.clear();
+    dtcList.clear();
+    dtcRelatedSensors.clear(); // NEW — avoid stale sensor data leaking into a new ESN session
     pidList.clear();
     iqaWriteStatus.value = '';
     dtcReadStatus.value = '';
@@ -1889,6 +1955,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
           '❌ Could not send pending session on exit ($key): $e — will retry next launch');
     }
   }
+
   final RxString flashStatus = 'Preparing...'.obs;
   final RxDouble postFlashProgress = 0.0.obs;
   final RxString iqaWriteStatus = ''.obs;
@@ -2143,7 +2210,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
         flashComplete.value = true;
         _log('Flashing completed successfully (${formattedElapsed})');
 
-              flashStatus.value = 'Writing IQA Values...';
+        flashStatus.value = 'Writing IQA Values...';
         final iqaWriteResult = await _autoWriteIqaValues();
         iqaWriteStatus.value = iqaWriteResult;
         // ✅ Track IQA status for the local draft as soon as it's known.
@@ -2161,10 +2228,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
         }
 
         flashStatus.value = 'Loading DTCs...';
-        await _loadDtcResults();
+        await _loadDtcResultsUnlocked();
 
         flashStatus.value = 'Loading PIDs...';
-        await _loadPidResults();
+        await _loadPidResultsUnlocked();
 
         flashStatus.value = 'Completed';
 
@@ -2285,127 +2352,131 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   void _resetLoader() => _setBusy(false, "");
 
   Future<void> _loadDtcResults() {
-    return _withDongleBusy(() async {
-      final datasetId = _currentDtcDatasetId;
-      if (datasetId == null) {
-        _log('No DTC dataset id available — skipping');
-        return;
-      }
-
-      final ecu =
-          StaticData.ecuInfo.firstWhereOrNull((e) => e.readDtcIndex != null);
-      if (ecu == null) {
-        _log('DTC read: no ECU with read_dtc_index configured — skipping');
-        return;
-      }
-
-      _accessToken ??= await SecureStorageService.getAccessToken();
-
-      try {
-        final dtc_ds.DtcDataset dtc = await _authService.getDtcDataset(
-          id: datasetId,
-          accessToken: _accessToken,
-        );
-
-        final serverCodes = <dtc_ds.DtcCode>[];
-        for (final result in dtc.results ?? <dtc_ds.Result>[]) {
-          serverCodes.addAll(result.dtcCode ?? <dtc_ds.DtcCode>[]);
-        }
-
-        await App.dllFunctions!.setDongleProperties(
-          ecu.protocol?.name ?? '',
-          ecu.protocol?.autopeepal ?? '',
-          ecu.txHeader ?? '',
-          ecu.rxHeader ?? '',
-        );
-        dynamic readResult;
-        const maxAttempts = 2;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-          _log(
-              'Reading DTCs from ${ecu.ecuName}... (attempt $attempt/$maxAttempts)');
-          readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
-
-          final status = readResult?.status?.toString();
-          final looksBad = readResult == null ||
-              (status != 'NO_ERROR' &&
-                  (status == null ||
-                      status == 'No Resp From Dongle' ||
-                      status == 'SOCKET_CLOSED' ||
-                      status.toLowerCase().contains('no resp')));
-
-          if (!looksBad) break; // good read — stop retrying
-
-          if (attempt < maxAttempts) {
-            _log(
-                'DTC read attempt $attempt failed (${readResult?.status ?? "no response"}) '
-                '— retrying once before giving up...');
-            await Future.delayed(const Duration(milliseconds: 300));
-          }
-        }
-        if (readResult == null) {
-          _log(
-              'DTC read: ECU_COMMUNICATION_ERROR (after $maxAttempts attempts)');
-          dtcList.clear();
-          _draftDtcStatus = 'Fail';
-          unawaited(
-              _sendPartialSessionReport('DTC read: no response from ECU'));
-          dongleConnected.value = false;
-          _startDongleRetryTimer();
-          _showReconnectPopup();
-          return;
-        }
-        if (readResult.status != 'NO_ERROR') {
-          _log(
-              'DTC read failed: ${readResult.status} (after $maxAttempts attempts)');
-          dtcList.clear();
-          _draftDtcStatus = 'Fail';
-          unawaited(_sendPartialSessionReport('DTC read failed'));
-          final statusLower = readResult.status.toString().toLowerCase();
-          if (readResult.status == 'No Resp From Dongle' ||
-              readResult.status == 'SOCKET_CLOSED' ||
-              statusLower.contains('no resp')) {
-            dongleConnected.value = false;
-            _startDongleRetryTimer();
-            _showReconnectPopup();
-          }
-          return;
-        }
-
-        final rows = readResult.dtcs ?? [];
-        final dummy = <String, String>{};
-
-        for (final row in rows) {
-          if (row.length < 2) continue;
-          final code = row[0].toString().toUpperCase();
-          final status = row[1].toString();
-          final match = serverCodes.firstWhereOrNull(
-            (c) => (c.code ?? '').toUpperCase() == code,
-          );
-          final desc = match?.description ?? 'Description not found';
-
-          dummy[code] = '$code - $desc ($status)';
-          final register =
-              null; // placeholder — becomes match?.regAddress later
-          final registerText = register?.toString() ?? '-';
-
-          dummy[code] = '$code - $desc ($status) [REG:$registerText]';
-        }
-
-               dtcList.assignAll(dummy.values.toList());
-        _draftDtcStatus = 'Pass';
-        dtcReadStatus.value = 'DTC read successful';
-        _log('DTC (${dtcList.length}) data loaded');
-      } catch (e) {
-        final message = e.toString().replaceFirst('Exception: ', '');
-        _log('Failed to load DTC dataset: $e');
-        dtcList.clear();
-        _draftDtcStatus = 'Fail';
-        unawaited(_sendPartialSessionReport('DTC read exception'));
-        _showErrorPopup(message, title: 'Failed to Load DTC');
-      }
-    });
+    return _withDongleBusy(_loadDtcResultsUnlocked);
   }
+
+ Future<void> _loadDtcResultsUnlocked() async {
+  final datasetId = _currentDtcDatasetId;
+  if (datasetId == null) {
+    _log('No DTC dataset id available — skipping');
+    return;
+  }
+
+  final ecu =
+      StaticData.ecuInfo.firstWhereOrNull((e) => e.readDtcIndex != null);
+  if (ecu == null) {
+    _log('DTC read: no ECU with read_dtc_index configured — skipping');
+    return;
+  }
+
+  _accessToken ??= await SecureStorageService.getAccessToken();
+
+  try {
+    final dtc_ds.DtcDataset dtc = await _authService.getDtcDataset(
+      id: datasetId,
+      accessToken: _accessToken,
+    );
+
+    final serverCodes = <dtc_ds.DtcCode>[];
+    for (final result in dtc.results ?? <dtc_ds.Result>[]) {
+      serverCodes.addAll(result.dtcCode ?? <dtc_ds.DtcCode>[]);
+    }
+
+    await App.dllFunctions!.setDongleProperties(
+      ecu.protocol?.name ?? '',
+      ecu.protocol?.autopeepal ?? '',
+      ecu.txHeader ?? '',
+      ecu.rxHeader ?? '',
+    );
+
+    dynamic readResult;
+    const maxAttempts = 2;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      _log(
+          'Reading DTCs from ${ecu.ecuName}... (attempt $attempt/$maxAttempts)');
+      readResult = await App.dllFunctions!.readDtc(ecu.readDtcIndex!);
+
+      final status = readResult?.status?.toString();
+      final looksBad = readResult == null ||
+          (status != 'NO_ERROR' &&
+              (status == null ||
+                  status == 'No Resp From Dongle' ||
+                  status == 'SOCKET_CLOSED' ||
+                  status.toLowerCase().contains('no resp')));
+
+      if (!looksBad) break; // good read — stop retrying
+
+      if (attempt < maxAttempts) {
+        _log(
+            'DTC read attempt $attempt failed (${readResult?.status ?? "no response"}) '
+            '— retrying once before giving up...');
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+    }
+
+    if (readResult == null) {
+      _log('DTC read: ECU_COMMUNICATION_ERROR (after $maxAttempts attempts)');
+      dtcList.clear();
+      dtcRelatedSensors.clear();
+      _draftDtcStatus = 'Fail';
+      unawaited(_sendPartialSessionReport('DTC read: no response from ECU'));
+      dongleConnected.value = false;
+      _startDongleRetryTimer();
+      _showReconnectPopup();
+      return;
+    }
+    if (readResult.status != 'NO_ERROR') {
+      _log(
+          'DTC read failed: ${readResult.status} (after $maxAttempts attempts)');
+      dtcList.clear();
+      dtcRelatedSensors.clear();
+      _draftDtcStatus = 'Fail';
+      unawaited(_sendPartialSessionReport('DTC read failed'));
+      final statusLower = readResult.status.toString().toLowerCase();
+      if (readResult.status == 'No Resp From Dongle' ||
+          readResult.status == 'SOCKET_CLOSED' ||
+          statusLower.contains('no resp')) {
+        dongleConnected.value = false;
+        _startDongleRetryTimer();
+        _showReconnectPopup();
+      }
+      return;
+    }
+
+    final rows = readResult.dtcs ?? [];
+    final Map<String, String> dummy = <String, String>{};
+    final Map<String, String?> relatedSensorsByCode = <String, String?>{};
+
+    for (final row in rows) {
+      if (row.length < 2) continue;
+      final String code = row[0].toString().toUpperCase();
+      final String status = row[1].toString();
+      final dtc_ds.DtcCode? match = serverCodes.firstWhereOrNull(
+        (c) => (c.code ?? '').toUpperCase() == code,
+      );
+      final String desc = match?.description ?? 'Description not found';
+
+      relatedSensorsByCode[code] = match?.relatedSensor;
+
+      dummy[code] = '$code - $desc ($status)';
+    }
+
+    dtcList.assignAll(dummy.values.toList());
+    dtcRelatedSensors.assignAll(relatedSensorsByCode);
+    _draftDtcStatus = 'Pass';
+    dtcReadStatus.value = 'DTC read successful';
+    _log('DTC (${dtcList.length}) data loaded');
+  } catch (e) {
+    final message = e.toString().replaceFirst('Exception: ', '');
+    _log('Failed to load DTC dataset: $e');
+    dtcList.clear();
+    dtcRelatedSensors.clear();
+    _draftDtcStatus = 'Fail';
+    unawaited(_sendPartialSessionReport('DTC read exception'));
+    _showErrorPopup(message, title: 'Failed to Load DTC');
+  }
+}
 
   Future<void> refreshDtcResults() => _loadDtcResults();
 
@@ -2438,7 +2509,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   Future<void> clearDTC() {
     return _withDongleBusy(() async {
       await _clearDTCInternal();
-      await _loadDtcResults(); // ✅ immediately re-read DTCs after clearing
+      await _loadDtcResultsUnlocked(); // ✅ immediately re-read DTCs after clearing
     });
   }
 
@@ -2532,48 +2603,53 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────
   Future<void> _loadPidResults() {
-    return _withDongleBusy(() async {
-      final datasetId = _currentPidDatasetId;
-      if (datasetId == null) {
-        _log('No PID dataset id available — skipping');
-        return;
-      }
+    return _withDongleBusy(_loadPidResultsUnlocked);
+  }
 
-      _accessToken ??= await SecureStorageService.getAccessToken();
+  // Internal implementation — used directly by startFlashing(), which is
+  // already holding the dongle lock (see note above _loadDtcResultsUnlocked).
+  Future<void> _loadPidResultsUnlocked() async {
+    final datasetId = _currentPidDatasetId;
+    if (datasetId == null) {
+      _log('No PID dataset id available — skipping');
+      return;
+    }
 
-      try {
-        final pid_ds.PidDataset pid = await _authService.getPidDataset(
-          id: datasetId,
-          accessToken: _accessToken,
-        );
+    _accessToken ??= await SecureStorageService.getAccessToken();
 
-        // Builds livePidCodes / selection state for the Run/Play PID feature.
-        _buildLivePidGroups(pid);
+    try {
+      final pid_ds.PidDataset pid = await _authService.getPidDataset(
+        id: datasetId,
+        accessToken: _accessToken,
+      );
 
-        final pidStrings = <String>[];
-        for (final result in pid.results ?? <pid_ds.Result>[]) {
-          for (final code in result.codes ?? <pid_ds.Code>[]) {
-            for (final v in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
-              final name = v.longName ??
-                  v.shortName ??
-                  code.shortName ??
-                  code.code ??
-                  'PID';
-              final unit = v.unit ?? '';
-              pidStrings.add(unit.isNotEmpty ? '$name — $unit' : name);
-            }
+      // Builds livePidCodes / selection state for the Run/Play PID feature.
+      _buildLivePidGroups(pid);
+
+      final pidStrings = <String>[];
+      for (final result in pid.results ?? <pid_ds.Result>[]) {
+        for (final code in result.codes ?? <pid_ds.Code>[]) {
+          for (final v in code.piCodeVariable ?? <pid_ds.PiCodeVariables>[]) {
+            final name = v.longName ??
+                v.shortName ??
+                code.shortName ??
+                code.code ??
+                'PID';
+            final unit = v.unit ?? '';
+            pidStrings.add(unit.isNotEmpty ? '$name — $unit' : name);
           }
         }
-        pidList.assignAll(pidStrings);
-        _log('PID (${pidList.length}) data loaded');
-      } catch (e) {
-        final message = e.toString().replaceFirst('Exception: ', '');
-        _log('Failed to load PID dataset: $e');
-        pidList.clear();
-        _showErrorPopup(message, title: 'Failed to Load PID');
       }
-    });
+      pidList.assignAll(pidStrings);
+      _log('PID (${pidList.length}) data loaded');
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      _log('Failed to load PID dataset: $e');
+      pidList.clear();
+      _showErrorPopup(message, title: 'Failed to Load PID');
+    }
   }
 
   void _showFlashCompletePopup(String iqaWriteStatus) {
@@ -2598,7 +2674,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   void toggleDtc() => dtcExpanded.toggle();
   void togglePid() => pidExpanded.toggle();
 
-    Future<void> logout() async {
+  Future<void> logout() async {
     if (flashInProgress.value) {
       Get.snackbar(
         'Flashing in Progress',
@@ -2786,7 +2862,12 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   Future<bool> checkDongleStatus() async {
     if (!dongleConnected.value) return false;
 
-    if (isDongleBusy.value) return true;
+    // Never let the periodic heartbeat contend with a long-running
+    // operation (e.g. flashing) for the socket — just skip this tick.
+    // The real serialization is handled by _withDongleBusy below; this
+    // check is just to avoid needlessly queuing heartbeat traffic behind
+    // a multi-minute flash.
+    if (flashInProgress.value) return dongleConnected.value;
 
     if (_dongleIp == null || _dongleIp!.isEmpty) return dongleConnected.value;
 
@@ -2820,6 +2901,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     _dongleHeartbeatTimer?.cancel();
     _dongleHeartbeatTimer =
         Timer.periodic(const Duration(seconds: 5), (_) async {
+      // Cheap guard before even attempting to queue — the real
+      // serialization still happens inside checkDongleStatus/_withDongleBusy,
+      // but this avoids piling up heartbeat calls while a flash is running.
+      if (flashInProgress.value) return;
       await checkDongleStatus();
     });
   }
