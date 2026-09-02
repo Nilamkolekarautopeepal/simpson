@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
 import 'package:simpson/dev/dev_screen.dart';
 import 'package:simpson/modals/listNumber.model.dart' as list_ds;
+import 'package:simpson/themes/app_colors.dart';
 import 'package:simpson/views/screens/homePage/views/home_session_history_screen.dart';
 import '../controllers/home_page_controller.dart';
 // StepType is exported from home_page_controller.dart
@@ -2106,31 +2107,31 @@ class HomePageView extends GetView<HomePageController> {
     }
   }
 
-  Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
-    final color = _tagColor(tag);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: selected ? color : Colors.transparent,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-              color: selected ? color : Colors.white.withOpacity(0.35)),
-        ),
-        child: Text(
-          tag,
-          style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.bold,
-            color: selected ? Colors.black87 : Colors.white.withOpacity(0.75),
-            letterSpacing: 0.3,
-          ),
+ Widget _tagChip(String tag, {VoidCallback? onTap, bool selected = false}) {
+  final color = _tagColor(tag);
+  return InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(4),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: selected ? color : color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+            color: selected ? color : color.withOpacity(0.5)),
+      ),
+      child: Text(
+        tag,
+        style: TextStyle(
+          fontSize: 9.5,
+          fontWeight: FontWeight.bold,
+          color: selected ? Colors.black87 : color.withOpacity(0.9),
+          letterSpacing: 0.3,
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // Widget _buildActivitySection() {
   //   return Container(
@@ -2398,7 +2399,7 @@ class HomePageView extends GetView<HomePageController> {
         child: Scaffold(
           appBar: AppBar(
             iconTheme: const IconThemeData(color: Colors.white),
-            backgroundColor: _StationColors.navy,
+            backgroundColor: AppColors.themeColor,
             foregroundColor: Colors.white,
             title: const Text('Activity Log'),
             actions: [
@@ -2420,12 +2421,36 @@ class HomePageView extends GetView<HomePageController> {
                   )),
             ],
           ),
-          backgroundColor: _StationColors.navy,
+          backgroundColor: const Color(0xFFF4F5F7),
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Divider(height: 1, color: _StationColors.slateBorder),
+                // ── Tag filter row ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Obx(() {
+                    final active = controller.activityLogFilter.value;
+                    return SizedBox(
+                      height: 30,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: controller.allTags.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 6),
+                        itemBuilder: (context, i) {
+                          final tag = controller.allTags[i];
+                          return _tagChip(
+                            tag,
+                            selected: active == tag,
+                            onTap: () => controller.setActivityLogFilter(tag),
+                          );
+                        },
+                      ),
+                    );
+                  }),
+                ),
+                const Divider(height: 1),
+                // ── Log list fills all remaining space ──
                 Expanded(
                   child: Obx(() {
                     final filter = controller.activityLogFilter.value;
@@ -2440,8 +2465,7 @@ class HomePageView extends GetView<HomePageController> {
                           filter == null
                               ? 'No activity yet'
                               : 'No "$filter" entries yet',
-                          style:
-                              TextStyle(color: Colors.white.withOpacity(0.5)),
+                          style: TextStyle(color: Colors.grey.shade500),
                         ),
                       );
                     }
@@ -2451,24 +2475,20 @@ class HomePageView extends GetView<HomePageController> {
                       itemCount: entries.length,
                       itemBuilder: (context, index) {
                         final parsed = _parseLogEntry(entries[index]);
-                        final tag = parsed['tag']!;
                         return Container(
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: _StationColors.teal,
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(8),
-                            border:
-                                Border.all(color: _StationColors.slateBorder),
+                            border: Border.all(color: Colors.black),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (tag != 'All') ...[
-                                _tagChip(tag),
-                                const SizedBox(width: 10),
-                              ],
+                              _tagChip(parsed['tag']!),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: SelectableText(
                                   '[${parsed['time']}] ${parsed['message']}',
@@ -2493,6 +2513,107 @@ class HomePageView extends GetView<HomePageController> {
       barrierDismissible: true,
     );
   }
+  // void _showActivityFullScreen() {
+  //   Get.dialog(
+  //     Dialog.fullscreen(
+  //       child: Scaffold(
+  //         appBar: AppBar(
+  //           iconTheme: const IconThemeData(color: Colors.white),
+  //           backgroundColor: _StationColors.navy,
+  //           foregroundColor: Colors.white,
+  //           title: const Text('Activity Log'),
+  //           actions: [
+  //             Obx(() => IconButton(
+  //                   icon: const Icon(Icons.save_alt, color: Colors.white),
+  //                   tooltip: 'Save Activity Log',
+  //                   onPressed: controller.activityLog.isEmpty
+  //                       ? null
+  //                       : () async {
+  //                           await controller.saveActivityLog();
+  //                         },
+  //                 )),
+  //             Obx(() => IconButton(
+  //                   icon: const Icon(Icons.copy, color: Colors.white),
+  //                   tooltip: 'Copy all activity log',
+  //                   onPressed: controller.activityLog.isEmpty
+  //                       ? null
+  //                       : () => _copyActivityLog(),
+  //                 )),
+  //           ],
+  //         ),
+  //         backgroundColor: _StationColors.navy,
+  //         body: SafeArea(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Divider(height: 1, color: _StationColors.slateBorder),
+  //               Expanded(
+  //                 child: Obx(() {
+  //                   final filter = controller.activityLogFilter.value;
+  //                   final entries = controller.activityLog.where((entry) {
+  //                     if (filter == null) return true;
+  //                     return _parseLogEntry(entry)['tag'] == filter;
+  //                   }).toList();
+
+  //                   if (entries.isEmpty) {
+  //                     return Center(
+  //                       child: Text(
+  //                         filter == null
+  //                             ? 'No activity yet'
+  //                             : 'No "$filter" entries yet',
+  //                         style:
+  //                             TextStyle(color: Colors.white.withOpacity(0.5)),
+  //                       ),
+  //                     );
+  //                   }
+
+  //                   return ListView.builder(
+  //                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+  //                     itemCount: entries.length,
+  //                     itemBuilder: (context, index) {
+  //                       final parsed = _parseLogEntry(entries[index]);
+  //                       final tag = parsed['tag']!;
+  //                       return Container(
+  //                         margin: const EdgeInsets.only(bottom: 8),
+  //                         padding: const EdgeInsets.symmetric(
+  //                             horizontal: 12, vertical: 10),
+  //                         decoration: BoxDecoration(
+  //                           color: _StationColors.teal,
+  //                           borderRadius: BorderRadius.circular(8),
+  //                           border:
+  //                               Border.all(color: _StationColors.slateBorder),
+  //                         ),
+  //                         child: Row(
+  //                           crossAxisAlignment: CrossAxisAlignment.start,
+  //                           children: [
+  //                             if (tag != 'All') ...[
+  //                               _tagChip(tag),
+  //                               const SizedBox(width: 10),
+  //                             ],
+  //                             Expanded(
+  //                               child: SelectableText(
+  //                                 '[${parsed['time']}] ${parsed['message']}',
+  //                                 style: TextStyle(
+  //                                   fontSize: 13.5,
+  //                                   color: _activityLogColor(entries[index]),
+  //                                 ),
+  //                               ),
+  //                             ),
+  //                           ],
+  //                         ),
+  //                       );
+  //                     },
+  //                   );
+  //                 }),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //     barrierDismissible: true,
+  //   );
+  // }
 }
 
 class _SensorWriteAction extends StatefulWidget {
