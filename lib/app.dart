@@ -221,7 +221,9 @@ import 'package:get/get.dart'; // ← needed for Get.put
 import 'package:get_storage/get_storage.dart';
 import 'package:simpson/utils/ui_helper.dart/dllFunctions.dart';
 import 'package:window_manager/window_manager.dart';
-
+import 'package:simpson/common_widgets/popup.dart';
+import 'package:simpson/views/screens/psf_homeScreen/controllers/psf_home_screen_controller.dart';
+import 'package:simpson/views/screens/homePage/controllers/home_page_controller.dart';
 /// Handles the window's close (X) button on Windows. Since
 /// windowManager.setPreventClose(true) tells Windows "don't close
 /// automatically, the app will handle it" — without a listener like
@@ -233,12 +235,51 @@ import 'package:window_manager/window_manager.dart';
 class AppWindowListener extends WindowListener {
   @override
   void onWindowClose() async {
-    print('Window close requested — closing immediately...');
+    // Block closing the app entirely while any flash is in progress —
+    // killing the process mid-flash can leave the ECU in a bad state.
+    if (Get.isRegistered<PsfHomeScreenController>()) {
+      final pfsController = Get.find<PsfHomeScreenController>();
+      final flashingLanes =
+          pfsController.lanes.where((lane) => lane.isFlashing.value).toList();
+      if (flashingLanes.isNotEmpty) {
+        final laneNumbers = flashingLanes.map((l) => l.laneNumber).join(', ');
+        final label = flashingLanes.length == 1 ? 'Lane' : 'Lanes';
+        if (Get.isDialogOpen == true) Get.back();
+        Get.dialog(
+          CustomPopup(
+            title: 'Flashing in Progress',
+            message:
+                '$label $laneNumbers ${flashingLanes.length == 1 ? 'is' : 'are'} still flashing. '
+                'Please wait for it to finish before closing the app — closing now '
+                'could interrupt the flash and leave the ECU in a bad state.',
+            confirmText: 'OK',
+          ),
+          barrierDismissible: true,
+        );
+        return; // do NOT close the window
+      }
+    }
+
+    if (Get.isRegistered<HomePageController>()) {
+      final testStationController = Get.find<HomePageController>();
+      if (testStationController.flashInProgress.value) {
+        if (Get.isDialogOpen == true) Get.back();
+        Get.dialog(
+          CustomPopup(
+            title: 'Flashing in Progress',
+            message:
+                'Flashing is still in progress. Please wait for it to finish '
+                'before closing the app — closing now could interrupt the flash '
+                'and leave the ECU in a bad state.',
+            confirmText: 'OK',
+          ),
+          barrierDismissible: true,
+        );
+        return; // do NOT close the window
+      }
+    }
+
     await windowManager.destroy();
-    // Force the process to actually terminate right away, instead of
-    // waiting for every background Timer (PLC heartbeat, per-lane
-    // dongle retries, harness checks) to naturally wind down — those
-    // keep the Dart process alive otherwise, causing the long delay.
     exit(0);
   }
 }
