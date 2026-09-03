@@ -8,6 +8,7 @@ import 'package:simpson/modals/listNumber.model.dart' as list_ds;
 import 'package:simpson/themes/app_colors.dart';
 import 'package:simpson/views/screens/homePage/views/home_session_history_screen.dart';
 import '../controllers/home_page_controller.dart';
+import 'package:simpson/modals/dtcDataset.model.dart';
 // StepType is exported from home_page_controller.dart
 
 class _StationColors {
@@ -1477,8 +1478,110 @@ class HomePageView extends GetView<HomePageController> {
       ),
     );
   }
+Widget _buildDtcCard(String raw) {
+  String code = raw;
+  String description = '';
+  String status = '';
 
-  Widget _buildDtcCard(String raw) {
+  final statusMatch = RegExp(r'\(([^()]*)\)\s*$').firstMatch(raw);
+  String withoutStatus = raw;
+  if (statusMatch != null) {
+    status = statusMatch.group(1)?.trim() ?? '';
+    withoutStatus = raw.substring(0, statusMatch.start).trim();
+  }
+
+  final splitIndex = withoutStatus.indexOf(' - ');
+  code = splitIndex == -1
+      ? withoutStatus
+      : withoutStatus.substring(0, splitIndex).trim();
+  description =
+      splitIndex == -1 ? '' : withoutStatus.substring(splitIndex + 3).trim();
+
+  final statusLower = status.toLowerCase();
+  Color badgeColor;
+  String badgeLabel;
+  if (statusLower == 'active' || statusLower == 'current') {
+    badgeColor = _StationColors.red;
+    badgeLabel = 'Active';
+  } else if (statusLower == 'pending') {
+    badgeColor = _StationColors.amber;
+    badgeLabel = 'Pending';
+  } else if (statusLower == 'inactive') {
+    badgeColor = _StationColors.brightGreen;
+    badgeLabel = 'History';
+  } else {
+    badgeColor = _StationColors.brightGreen;
+    badgeLabel = status.isNotEmpty ? 'History' : '-';
+  }
+
+  // ── Related sensor name for this DTC code (plain string from backend) ──
+  final String? relatedSensorName = controller.dtcRelatedSensors[code];
+  final bool hasSensor = relatedSensorName != null && relatedSensorName.isNotEmpty;
+
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      border: Border.all(color: _StationColors.slateBorder),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                code,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12.5,
+                  color: Colors.white,
+                ),
+              ),
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.6)),
+                ),
+              ],
+              const SizedBox(height: 4),
+              Text(
+                'Related Sensor: ${hasSensor ? relatedSensorName : '-'}',
+                style: const TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w600,
+                  color: _StationColors.brightGreen,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: badgeColor.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: badgeColor.withOpacity(0.4)),
+          ),
+          child: Text(
+            badgeLabel,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.bold,
+              color: badgeColor,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+  Widget _buildDtcCard1(String raw) {
     String code = raw;
     String description = '';
     String status = '';
@@ -1584,114 +1687,7 @@ class HomePageView extends GetView<HomePageController> {
     );
   }
 
-  Widget _buildDtcCard1(String raw) {
-    String code = raw;
-    String description = '';
-    String status = '';
-    String register = '-';
-
-    final registerMatch = RegExp(r'\[REG:([^\]]*)\]\s*$').firstMatch(raw);
-    String withoutRegister = raw;
-    if (registerMatch != null) {
-      register = registerMatch.group(1)?.trim() ?? '-';
-      withoutRegister = raw.substring(0, registerMatch.start).trim();
-    }
-
-    final statusMatch = RegExp(r'\(([^()]*)\)\s*$').firstMatch(withoutRegister);
-    String withoutStatus = withoutRegister;
-    if (statusMatch != null) {
-      status = statusMatch.group(1)?.trim() ?? '';
-      withoutStatus = withoutRegister.substring(0, statusMatch.start).trim();
-    }
-
-    final splitIndex = withoutStatus.indexOf(' - ');
-    code = splitIndex == -1
-        ? withoutStatus
-        : withoutStatus.substring(0, splitIndex).trim();
-    description =
-        splitIndex == -1 ? '' : withoutStatus.substring(splitIndex + 3).trim();
-
-    final statusLower = status.toLowerCase();
-    Color badgeColor;
-    String badgeLabel;
-    if (statusLower == 'active' || statusLower == 'current') {
-      badgeColor = _StationColors.red;
-      badgeLabel = 'Active';
-    } else if (statusLower == 'pending') {
-      badgeColor = _StationColors.amber;
-      badgeLabel = 'Pending';
-    } else if (statusLower == 'inactive') {
-      badgeColor = _StationColors.brightGreen;
-      badgeLabel = 'History';
-    } else {
-      badgeColor = _StationColors.brightGreen;
-      badgeLabel = status.isNotEmpty ? 'History' : '-';
-    }
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border.all(color: _StationColors.slateBorder),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  code,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12.5,
-                    color: Colors.white,
-                  ),
-                ),
-                if (description.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    description,
-                    style: TextStyle(
-                        fontSize: 11.5, color: Colors.white.withOpacity(0.6)),
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  'Related Sensor :  $register',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: _StationColors.brightGreen,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: badgeColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: badgeColor.withOpacity(0.4)),
-            ),
-            child: Text(
-              badgeLabel,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: FontWeight.bold,
-                color: badgeColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
+ 
   Widget _buildPidSection() {
     return Obx(() {
       final expanded = controller.pidExpanded.value;
