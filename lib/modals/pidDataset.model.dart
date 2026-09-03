@@ -82,7 +82,7 @@ class Code {
   bool? isStatic;
   bool? ecuParameter;
   int? priority;
-  List<PiCodeVariable>? piCodeVariable;
+  List<PiCodeVariables>? piCodeVariable;
 
   Code({
     this.id,
@@ -127,8 +127,8 @@ class Code {
         priority: json["priority"],
         piCodeVariable: json["pi_code_variable"] == null
             ? []
-            : List<PiCodeVariable>.from(json["pi_code_variable"]!
-                .map((x) => PiCodeVariable.fromJson(x))),
+            : List<PiCodeVariables>.from(json["pi_code_variable"]!
+                .map((x) => PiCodeVariables.fromJson(x))),
       );
 
   Map<String, dynamic> toJson() => {
@@ -253,7 +253,7 @@ class Code {
 //       };
 // }
 
-class PiCodeVariable {
+class PiCodeVariables {
   int? id;
   String? shortName;
   String? longName;
@@ -274,7 +274,7 @@ class PiCodeVariable {
   int? priority;
   List<Message>? messages;
 
-  PiCodeVariable({
+  PiCodeVariables({
     this.id,
     this.shortName,
     this.longName,
@@ -296,7 +296,7 @@ class PiCodeVariable {
     this.messages,
   });
 
-  factory PiCodeVariable.fromJson(Map<String, dynamic> json) => PiCodeVariable(
+  factory PiCodeVariables.fromJson(Map<String, dynamic> json) => PiCodeVariables(
         id: json["id"],
         shortName: json["short_name"],
         longName: json["long_name"],

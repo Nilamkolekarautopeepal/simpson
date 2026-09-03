@@ -672,213 +672,213 @@
 //     });
 //   });
 
-// //    group('actuatorTestWriteParameters Tests', () {
+//    group('actuatorTestWriteParameters Tests', () {
     
-// //     test('Sequence Check: Session -> Seed -> Key -> Actuator Command', () async {
-// //   List<String> logs = [];
+//     test('Sequence Check: Session -> Seed -> Key -> Actuator Command', () async {
+//   List<String> logs = [];
 
-// //   mockDongle.onTxRx = (len, hexData) {
-// //     // Normalize input to uppercase for reliable matching
-// //     String command = hexData.toUpperCase();
-// //     logs.add(command);
+//   mockDongle.onTxRx = (len, hexData) {
+//     // Normalize input to uppercase for reliable matching
+//     String command = hexData.toUpperCase();
+//     logs.add(command);
     
-// //     if (command == "1003") {
-// //       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //     }
+//     if (command == "1003") {
+//       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//     }
     
-// //     if (command == "2701") {
-// //       return ResponseArrayStatus(
-// //         ecuResponseStatus: "NOERROR",
-// //         actualDataBytes: Uint8List.fromList([0x67, 0x01, 0x11, 0x22]), 
-// //       );
-// //     }
+//     if (command == "2701") {
+//       return ResponseArrayStatus(
+//         ecuResponseStatus: "NOERROR",
+//         actualDataBytes: Uint8List.fromList([0x67, 0x01, 0x11, 0x22]), 
+//       );
+//     }
 
-// //     // This is the most likely spot for the null error.
-// //     // Ensure the Key calculation (Seed + 1) matches your expectations.
-// //     if (command == "27021223") {
-// //       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //     }
+//     // This is the most likely spot for the null error.
+//     // Ensure the Key calculation (Seed + 1) matches your expectations.
+//     if (command == "27021223") {
+//       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//     }
 
-// //     if (command.startsWith("2F")) {
-// //       return ResponseArrayStatus(
-// //         ecuResponseStatus: "NOERROR",
-// //         actualDataBytes: Uint8List.fromList([0x6F, 0xF4, 0x01, 0x03]),
-// //       );
-// //     }
+//     if (command.startsWith("2F")) {
+//       return ResponseArrayStatus(
+//         ecuResponseStatus: "NOERROR",
+//         actualDataBytes: Uint8List.fromList([0x6F, 0xF4, 0x01, 0x03]),
+//       );
+//     }
 
-// //     // If it hits here, your test will fail, but result.status won't be null!
-// //     return ResponseArrayStatus(ecuResponseStatus: "MOCK_UNHANDLED_$command");
-// //   };
+//     // If it hits here, your test will fail, but result.status won't be null!
+//     return ResponseArrayStatus(ecuResponseStatus: "MOCK_UNHANDLED_$command");
+//   };
 
-// //   final actuatorCmd = [Uint8List.fromList([0x2F, 0xF4, 0x01, 0x03, 0x01])];
+//   final actuatorCmd = [Uint8List.fromList([0x2F, 0xF4, 0x01, 0x03, 0x01])];
 
-// //   final result = await uds.actuatorTestWriteParameters(
-// //     WriteParameterIndex.UDS_DS1003_SK0102,
-// //     SeedKeyIndexType.greavesBoschBs6Prod,
-// //     actuatorCmd,
-// //   );
+//   final result = await uds.actuatorTestWriteParameters(
+//     WriteParameterIndex.UDS_DS1003_SK0102,
+//     SeedKeyIndexType.greavesBoschBs6Prod,
+//     actuatorCmd,
+//   );
 
-// //   // This helps you see exactly what failed if it's not "NOERROR"
-// //   expect(result.status, "NOERROR", reason: "Expected NOERROR but got ${result.status}. Logs: $logs");
-// // });
+//   // This helps you see exactly what failed if it's not "NOERROR"
+//   expect(result.status, "NOERROR", reason: "Expected NOERROR but got ${result.status}. Logs: $logs");
+// });
 
-// //     test('NA Index: Should skip preamble and send command directly', () async {
-// //       List<String> transmittedFrames = [];
-// //       mockDongle.onTxRx = (len, hexData) {
-// //         transmittedFrames.add(hexData.toUpperCase());
-// //         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //       };
+//     test('NA Index: Should skip preamble and send command directly', () async {
+//       List<String> transmittedFrames = [];
+//       mockDongle.onTxRx = (len, hexData) {
+//         transmittedFrames.add(hexData.toUpperCase());
+//         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//       };
 
-// //       final actuatorCmd = [Uint8List.fromList([0x2F, 0xDE, 0xAD, 0x03])];
+//       final actuatorCmd = [Uint8List.fromList([0x2F, 0xDE, 0xAD, 0x03])];
 
-// //       await uds.actuatorTestWriteParameters(
-// //         WriteParameterIndex.NA,
-// //         SeedKeyIndexType.greavesBoschBs6Prod,
-// //         actuatorCmd,
-// //       );
+//       await uds.actuatorTestWriteParameters(
+//         WriteParameterIndex.NA,
+//         SeedKeyIndexType.greavesBoschBs6Prod,
+//         actuatorCmd,
+//       );
 
-// //       expect(transmittedFrames.length, 1);
-// //       expect(transmittedFrames[0], "2FDEAD03");
-// //     });
+//       expect(transmittedFrames.length, 1);
+//       expect(transmittedFrames[0], "2FDEAD03");
+//     });
 
-// //  test('Multi-Command: Should stop if a command fails', () async {
-// //   int cmdCount = 0;
-// //   mockDongle.onTxRx = (len, hexData) {
-// //     cmdCount++;
-// //     if (cmdCount == 1) return ResponseArrayStatus(ecuResponseStatus: "FAILED");
-// //     return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //   };
+//  test('Multi-Command: Should stop if a command fails', () async {
+//   int cmdCount = 0;
+//   mockDongle.onTxRx = (len, hexData) {
+//     cmdCount++;
+//     if (cmdCount == 1) return ResponseArrayStatus(ecuResponseStatus: "FAILED");
+//     return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//   };
 
-// //   await uds.actuatorTestWriteParameters(
-// //     WriteParameterIndex.NA,
-// //     SeedKeyIndexType.greavesBoschBs6Prod,
-// //     [Uint8List.fromList([0x2F, 0x01]), Uint8List.fromList([0x2F, 0x02])],
-// //   );
+//   await uds.actuatorTestWriteParameters(
+//     WriteParameterIndex.NA,
+//     SeedKeyIndexType.greavesBoschBs6Prod,
+//     [Uint8List.fromList([0x2F, 0x01]), Uint8List.fromList([0x2F, 0x02])],
+//   );
 
-// //   // Should be 1, because the loop 'breaks' after the first failure
-// //   expect(cmdCount, 1); 
-// // });
+//   // Should be 1, because the loop 'breaks' after the first failure
+//   expect(cmdCount, 1); 
+// });
 
-// //     test('Failure Handling: Should stop and return error if Session fails', () async {
-// //       mockDongle.onTxRx = (len, hexData) {
-// //         if (hexData == "1003") {
-// //           return ResponseArrayStatus(ecuResponseStatus: "ECUERROR CONDITIONSNOTCORRECT");
-// //         }
-// //         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //       };
+//     test('Failure Handling: Should stop and return error if Session fails', () async {
+//       mockDongle.onTxRx = (len, hexData) {
+//         if (hexData == "1003") {
+//           return ResponseArrayStatus(ecuResponseStatus: "ECUERROR CONDITIONSNOTCORRECT");
+//         }
+//         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//       };
 
-// //       final result = await uds.actuatorTestWriteParameters(
-// //         WriteParameterIndex.UDS_DS1003,
-// //         SeedKeyIndexType.greavesBoschBs6Prod,
-// //         [Uint8List.fromList([0x2F, 0x01, 0x03])],
-// //       );
+//       final result = await uds.actuatorTestWriteParameters(
+//         WriteParameterIndex.UDS_DS1003,
+//         SeedKeyIndexType.greavesBoschBs6Prod,
+//         [Uint8List.fromList([0x2F, 0x01, 0x03])],
+//       );
 
-// //       expect(result.status, "ECUERROR CONDITIONSNOTCORRECT");
-// //       expect(mockDongle.lastTxHex, "1003"); // Should not have progressed to 2F
-// //     });
-// //   });
+//       expect(result.status, "ECUERROR CONDITIONSNOTCORRECT");
+//       expect(mockDongle.lastTxHex, "1003"); // Should not have progressed to 2F
+//     });
+//   });
 
-// // group('iorTestParameters1 Unit Tests', () {
-// //   late MockDongleComm mockDongle;
-// //   late MockSeedKeyCalculator mockCalculator;
-// //   late UDSDiagnostic udsDiagnostic;
+// group('iorTestParameters1 Unit Tests', () {
+//   late MockDongleComm mockDongle;
+//   late MockSeedKeyCalculator mockCalculator;
+//   late UDSDiagnostic udsDiagnostic;
 
-// //   setUp(() {
-// //     mockDongle = MockDongleComm();
-// //     mockCalculator = MockSeedKeyCalculator();
-// //     udsDiagnostic = UDSDiagnostic(mockDongle, mockCalculator);
-// //   });
+//   setUp(() {
+//     mockDongle = MockDongleComm();
+//     mockCalculator = MockSeedKeyCalculator();
+//     udsDiagnostic = UDSDiagnostic(mockDongle, mockCalculator);
+//   });
 
-// //   test('Happy Path: Complete IOR Sequence with Polling and Auto-Stop', () async {
-// //     int callCount = 0;
+//   test('Happy Path: Complete IOR Sequence with Polling and Auto-Stop', () async {
+//     int callCount = 0;
 
-// //     mockDongle.onTxRx = (len, hexStr) {
-// //       callCount++;
-// //       String command = hexStr.toUpperCase();
+//     mockDongle.onTxRx = (len, hexStr) {
+//       callCount++;
+//       String command = hexStr.toUpperCase();
 
-// //       if (callCount == 1) {
-// //         expect(command, "1003"); // Session
-// //         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //       } else if (callCount == 2) {
-// //         expect(command, "2701"); // Request Seed
-// //         return ResponseArrayStatus(
-// //           ecuResponseStatus: "NOERROR",
-// //           actualDataBytes: Uint8List.fromList([0x67, 0x01, 0x11, 0x22]),
-// //         );
-// //       } else if (callCount == 3) {
-// //         expect(command, "27021223"); // Send Key (Calculated by Mock)
-// //         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //       } else if (callCount == 4) {
-// //         expect(command, "START_CMD"); // Start Command
-// //         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //       } else if (callCount == 5) {
-// //         expect(command, "REQ_CMD"); // First Poll
-// //         // Return "Active" state (assuming activeCommand is "01")
-// //         return ResponseArrayStatus(
-// //           ecuResponseStatus: "NOERROR",
-// //           actualDataBytes: Uint8List.fromList([0x01]), 
-// //         );
-// //       } else if (callCount == 6) {
-// //         expect(command, "REQ_CMD"); // Second Poll
-// //         // Return "Complete" state (assuming completeCommand is "02")
-// //         return ResponseArrayStatus(
-// //           ecuResponseStatus: "NOERROR",
-// //           actualDataBytes: Uint8List.fromList([0x02]), 
-// //         );
-// //       }
-// //       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //     };
+//       if (callCount == 1) {
+//         expect(command, "1003"); // Session
+//         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//       } else if (callCount == 2) {
+//         expect(command, "2701"); // Request Seed
+//         return ResponseArrayStatus(
+//           ecuResponseStatus: "NOERROR",
+//           actualDataBytes: Uint8List.fromList([0x67, 0x01, 0x11, 0x22]),
+//         );
+//       } else if (callCount == 3) {
+//         expect(command, "27021223"); // Send Key (Calculated by Mock)
+//         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//       } else if (callCount == 4) {
+//         expect(command, "START_CMD"); // Start Command
+//         return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//       } else if (callCount == 5) {
+//         expect(command, "REQ_CMD"); // First Poll
+//         // Return "Active" state (assuming activeCommand is "01")
+//         return ResponseArrayStatus(
+//           ecuResponseStatus: "NOERROR",
+//           actualDataBytes: Uint8List.fromList([0x01]), 
+//         );
+//       } else if (callCount == 6) {
+//         expect(command, "REQ_CMD"); // Second Poll
+//         // Return "Complete" state (assuming completeCommand is "02")
+//         return ResponseArrayStatus(
+//           ecuResponseStatus: "NOERROR",
+//           actualDataBytes: Uint8List.fromList([0x02]), 
+//         );
+//       }
+//       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//     };
 
-// //     final result = await udsDiagnostic.iorTestParameters1(
-// //       seedKeyIndex1: SeedKeyIndexType.SK_0102,
-// //       writeParameterIndex: WriteParameterIndex.UDS,
-// //       startCommand: "START_CMD",
-// //       requestCommand: "REQ_CMD",
-// //       stopCommand: "STOP_CMD",
-// //      // inputTestCondition: true,
-// //       bitPosition: 1,
-// //       activeCommand: "01",
-// //       completeCommand: "02",
-// //       failCommand: "03",
-// //       isStop: false,
-// //       timeBase: 5, inputTestCondition: true,
-// //     );
+//     final result = await udsDiagnostic.iorTestParameters1(
+//       seedKeyIndex1: SeedKeyIndexType.SK_0102,
+//       writeParameterIndex: WriteParameterIndex.UDS,
+//       startCommand: "START_CMD",
+//       requestCommand: "REQ_CMD",
+//       stopCommand: "STOP_CMD",
+//      // inputTestCondition: true,
+//       bitPosition: 1,
+//       activeCommand: "01",
+//       completeCommand: "02",
+//       failCommand: "03",
+//       isStop: false,
+//       timeBase: 5, inputTestCondition: true,
+//     );
 
-// //     expect(result.ecuResponseStatus, "Test Completed");
-// //   });
+//     expect(result.ecuResponseStatus, "Test Completed");
+//   });
 
-// //   test('Security Access Failure: Should not send Start Command', () async {
-// //     int callCount = 0;
-// //     bool startSent = false;
+//   test('Security Access Failure: Should not send Start Command', () async {
+//     int callCount = 0;
+//     bool startSent = false;
 
-// //     mockDongle.onTxRx = (len, hexStr) {
-// //       callCount++;
-// //       if (hexStr == "START_CMD") startSent = true;
+//     mockDongle.onTxRx = (len, hexStr) {
+//       callCount++;
+//       if (hexStr == "START_CMD") startSent = true;
 
-// //       if (callCount == 1) return ResponseArrayStatus(ecuResponseStatus: "NOERROR"); // Session
-// //       if (callCount == 2) return ResponseArrayStatus(ecuResponseStatus: "ECUERROR"); // Seed Fail
+//       if (callCount == 1) return ResponseArrayStatus(ecuResponseStatus: "NOERROR"); // Session
+//       if (callCount == 2) return ResponseArrayStatus(ecuResponseStatus: "ECUERROR"); // Seed Fail
       
-// //       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
-// //     };
+//       return ResponseArrayStatus(ecuResponseStatus: "NOERROR");
+//     };
 
-// //     await udsDiagnostic.iorTestParameters1(
-// //       seedKeyIndex1: SeedKeyIndexType.SK_0102,
-// //       writeParameterIndex: WriteParameterIndex.UDS,
-// //       startCommand: "START_CMD",
-// //       requestCommand: "REQ_CMD",
-// //       stopCommand: "STOP_CMD",
-// //       inputTestCondition: true,
-// //       bitPosition: 1,
-// //       activeCommand: "01",
-// //       completeCommand: "02",
-// //       failCommand: "03",
-// //       isStop: false,
-// //       timeBase: 5,
-// //     );
+//     await udsDiagnostic.iorTestParameters1(
+//       seedKeyIndex1: SeedKeyIndexType.SK_0102,
+//       writeParameterIndex: WriteParameterIndex.UDS,
+//       startCommand: "START_CMD",
+//       requestCommand: "REQ_CMD",
+//       stopCommand: "STOP_CMD",
+//       inputTestCondition: true,
+//       bitPosition: 1,
+//       activeCommand: "01",
+//       completeCommand: "02",
+//       failCommand: "03",
+//       isStop: false,
+//       timeBase: 5,
+//     );
 
-// //     expect(startSent, false);
-// //   });
-// // });
+//     expect(startSent, false);
+//   });
+//  });
 
 // group('iorTestParameters Setup Sequence', () {
 //     test('Successful Routine Start with Security Access', () async {

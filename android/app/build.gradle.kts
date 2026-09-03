@@ -18,23 +18,26 @@ plugins {
 
 android {
     namespace = "example.simpson.com"
-    compileSdk = 35
+    compileSdk = 36
+    ndkVersion = "28.2.13676358"
     defaultConfig {
         applicationId = "example.simpson.com"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = flutter.minSdkVersion
+        targetSdk = 36
         versionCode = 1
         versionName = "0.0.1"
     }
 
      signingConfigs {
         create("release") {
+        if (keystorePropertiesFile.exists()) {
             storeFile = file(keystoreProperties["storeFile"] as String)
             storePassword = keystoreProperties["storePassword"] as String
             keyAlias = keystoreProperties["keyAlias"] as String
             keyPassword = keystoreProperties["keyPassword"] as String
         }
     }
+}
 buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")

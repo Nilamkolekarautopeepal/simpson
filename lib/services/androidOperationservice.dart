@@ -16,16 +16,16 @@ import 'package:simpson/common_widgets/popup.dart'; // only used for Android/iOS
 class AndroidOperationsService {
   static Future<bool> hasInternet() async {
     final ConnectivityResult connectivityResult =
-    await Connectivity().checkConnectivity();
+        await Connectivity().checkConnectivity();
 
-if (connectivityResult == ConnectivityResult.none) {
-  return false;
-}
+    if (connectivityResult == ConnectivityResult.none) {
+      return false;
+    }
 
-return connectivityResult == ConnectivityResult.mobile ||
-    connectivityResult == ConnectivityResult.wifi ||
-    connectivityResult == ConnectivityResult.ethernet ||
-    connectivityResult == ConnectivityResult.vpn;
+    return connectivityResult == ConnectivityResult.mobile ||
+        connectivityResult == ConnectivityResult.wifi ||
+        connectivityResult == ConnectivityResult.ethernet ||
+        connectivityResult == ConnectivityResult.vpn;
   }
 
   static Future<String> getVersionNumber() async {
@@ -60,49 +60,31 @@ return connectivityResult == ConnectivityResult.mobile ||
   //   return uniqueId;
   // }
 
-  static Future<List<String>> getDeviceUniqueId() async {
-    List<String> uniqueId = ["false", "Device id not found."];
-    try {
-      if (Platform.isWindows) {
-        final mac = await _getWindowsMacAddress();
-        if (mac != null && mac.isNotEmpty) {
-          uniqueId = ["true", mac];
-        }
-      } else {
-        uniqueId = ["false", "Platform not supported."];
-      }
-    } catch (e) {}
-    return uniqueId;
-  }
+  // static Future<List<String>> getDeviceUniqueId() async {
+  //   List<String> uniqueId = ["false", "Device id not found."];
+  //   try {
+  //     if (Platform.isWindows) {
+  //       final mac = await _getWindowsMacAddress();
+  //       if (mac != null && mac.isNotEmpty) {
+  //         uniqueId = ["true", mac];
+  //       }
+  //     } else {
+  //       uniqueId = ["false", "Platform not supported."];
+  //     }
+  //   } catch (e) {}
+  //   return uniqueId;
+  // }
 
-  /// Runs `getmac /fo csv /nh` and returns the first real (non-virtual,
-  /// non-all-zero) physical MAC address formatted as "AA:BB:CC:DD:EE:FF".
-  static Future<String?> _getWindowsMacAddress() async {
-    try {
-      final result = await Process.run('getmac', ['/fo', 'csv', '/nh']);
-      if (result.exitCode != 0) return null;
-
-      final output = result.stdout.toString();
-      final lines = output.split('\n').where((line) => line.trim().isNotEmpty);
-
-      final macPattern = RegExp(r'"([0-9A-Fa-f]{2}(-[0-9A-Fa-f]{2}){5})"');
-
-      for (final line in lines) {
-        final match = macPattern.firstMatch(line);
-        if (match == null) continue;
-
-        final formatted = match.group(1)!.replaceAll('-', ':').toUpperCase();
-
-        // Skip disabled/virtual adapters reporting all zeros
-        if (formatted == "00:00:00:00:00:00") continue;
-
-        return formatted;
-      }
-    } catch (e) {
-      // fall through to null below
+  static Future<String> getDeviceUniqueId() async {
+    if (Platform.isWindows) {
+      return "1234567890"; // TODO: replace with real Windows machine ID
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      // TODO: use device_info_plus to get real androidId / identifierForVendor
+      return "1234567890";
     }
-    return null;
+    return "1234567890"; // fallback for other platforms
   }
+
 
   static Future<String?> getData(String fileName) async {
     try {

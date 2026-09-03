@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:simpson/AppPreferences/app_areferences.dart';
 import 'package:simpson/api/app_urls.dart';
 import 'package:simpson/common_widgets/popup.dart';
@@ -9,6 +11,7 @@ import 'package:simpson/modals/user.model.dart';
 import 'package:simpson/routes/app_pages.dart';
 import 'package:simpson/services/androidOperationservice.dart';
 import 'package:simpson/services/apiServices.dart';
+import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 
 class LoginController extends GetxController {
   final AuthService _authService = AuthService();
@@ -26,15 +29,19 @@ class LoginController extends GetxController {
   final RxBool rememberMe = false.obs;
   final RxString errorMessage = ''.obs;
   final Rx<User?> currentUser = Rx<User?>(null);
-
-  // Station selection dropdown
-  final List<String> stationOptions = const ['PFS Station', 'Test Station'];
-  final RxString selectedStation = 'PFS Station'.obs;
+  final RxString appVersion = ''.obs;
 
   @override
   void onInit() {
     super.onInit();
     _loadSavedCredentials();
+    _loadAppVersion();
+  }
+
+   Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    appVersion.value = '${info.version}';
+    // or just 'v${info.version}' if you don't want the build number shown
   }
 
   /// Pre-fills the form with the last saved credentials, but only if the
@@ -76,7 +83,7 @@ class LoginController extends GetxController {
       errorMessage.value = '';
       debugPrint("🔵 [Login] Fetching macId and deviceType...");
 
-      final macId = await _getMacId();
+      final macId = await AndroidOperationsService.getDeviceUniqueId();
       final deviceType = _getDeviceType();
       debugPrint("🔵 [Login] macId=$macId deviceType=$deviceType");
 
@@ -102,27 +109,62 @@ class LoginController extends GetxController {
       } else {
         await SecureStorageService.clearCredentials();
       }
-      // await SecureStorageService.saveTokens(
-      //   accessToken: user.token?.access,
-      //   refreshToken: user.token?.refresh,
-      // );
+
       debugPrint(
           "🔵 [Login] user.token=${user.token} access=${user.token?.access} refresh=${user.token?.refresh}");
       await SecureStorageService.saveTokens(
         accessToken: user.token?.access,
         refreshToken: user.token?.refresh,
       );
-      //await AppPreferences.setUserData(user.toJson());
+
       debugPrint(
           "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
 
+      final station = user.stationData?.firstOrNull;
+      final stationType = station?.stationType?.trim();
 
-      debugPrint("🔵 [Login] Navigating to ${Routes.PSF_HOME_SCREEN} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.PSF_HOME_SCREEN, arguments: selectedStation.value);
+            final dongleEntries = (station?.prodbudDongles ?? [])
+          .map((d) {
+            final ecuStations = d.ecuStation ?? [];
+            final ecuIds = ecuStations
+                .map((e) => e.ecu?.id)
+                .whereType<int>()
+                .toList();
 
-      debugPrint(
-          "🔵 [Login] Navigating to ${Routes.HOME_PAGE} with station=${selectedStation.value}");
-      Get.offAllNamed(Routes.HOME_PAGE, arguments: selectedStation.value);
+            final ecuName = ecuStations
+                .map((e) => e.ecu?.name)
+                .firstWhere((n) => n != null && n.isNotEmpty, orElse: () => null);
+
+            return {
+              'mac_id': d.macId,
+              'ip': d.ip,
+              'is_active': d.isActive,
+              'ecu_ids': ecuIds,
+              'ecuId': ecuIds.firstOrNull,
+              'ecuName': ecuName,
+              'dongleDbId': d.id,
+              'indicator_reg_addr': d.indicatorRegAddr,
+              'ecu_reg_addr': d.ecuRegAddr,
+            };
+          })
+          .toList();
+      debugPrint("🔵 [Login] dongle_entries=$dongleEntries");
+
+      final plcIp = station?.plcIp;
+      final plcPort = station?.plcPort;
+
+      debugPrint("🔵 [Login] plc_ip='$plcIp' plc_port='$plcPort'");
+
+      await SecureStorageService.saveDongleList(jsonEncode(dongleEntries));
+      await SecureStorageService.savePlcIp(plcIp);
+      await SecureStorageService.savePlcPort(plcPort?.toString());
+
+      if (stationType == 'Testing') {
+        Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
+      } else {
+        Get.offAllNamed(Routes.PSF_HOME_SCREEN,
+            arguments: station?.stationType);
+      }
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");
       debugPrint("🔴 [Login] StackTrace: $stackTrace");
@@ -145,21 +187,7 @@ class LoginController extends GetxController {
     );
   }
 
-  /// Uses your existing device-id utility, which returns a 2-element
-  /// array matching the C# GetDeviceUniqueId() shape:
   /// ["true", "<mac>"] on success, ["false", "<reason>"] on failure.
-  Future<String> _getMacId() async {
-    final result = await AndroidOperationsService.getDeviceUniqueId();
-
-    if (result.length < 2) {
-      throw Exception("Could not determine device id.");
-    }
-    if (result[0] != "true") {
-      throw Exception(result[1]);
-    }
-
-    return result[1];
-  }
 
   String _getDeviceType() {
     if (Platform.isWindows) return "windows";

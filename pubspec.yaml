@@ -3,7 +3,7 @@ description: A new Flutter project.
 
 publish_to: "none"
 
-version: 0.0.1+2
+version: 0.0.2
 
 environment:
   sdk: ">=3.1.4 <4.0.0"
@@ -34,7 +34,6 @@ dependencies:
   carousel_slider: ^5.1.2
   flutter_form_builder: ^10.3.0+2
   google_fonts: ^8.1.0
-  url_launcher:
   searchfield: ^2.0.0
   flutter_svg:
   timelines:
@@ -53,7 +52,12 @@ dependencies:
   connectivity_wrapper: ^1.0.6
   device_info_plus: ^13.2.0
   flutter_secure_storage: ^10.3.0
+  url_launcher: ^6.2.0
   flutter_libserialport: 0.6.0
+  window_manager: ^0.5.1
+  wakelock_plus: ^1.2.8
+  file_selector: ^1.0.3
+
 
   ap_dongle_comm:
     path: apDongleComm-main

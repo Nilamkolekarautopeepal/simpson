@@ -10,140 +10,81 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFF12414D),
       body: Row(
         children: [
-          // ── Left panel: full-bleed branding image ──
+          // ── Left half: logo only, exactly 50% width ──
           Expanded(
-            flex: 5,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.asset(
-                  'asset/images/ic_backgroungimg.png',
-                  fit: BoxFit.cover,
+            flex: 1,
+            child: Container(
+              color: const Color(0xFF12414D),
+              alignment: Alignment.center,
+              child: Padding(
+                padding: const EdgeInsets.only(right:1),
+                child: Image.asset(
+                  'asset/images/simpsons_engine_img.png',
+                  width: 1100,
+                  errorBuilder: (context, error, stackTrace) {
+                    debugPrint(
+                        "🔴 [LoginScreen] Failed to load simpsons_engine_img.png: $error");
+                    return const Text(
+                      'Logo not found',
+                      style: TextStyle(color: Colors.red),
+                    );
+                  },
                 ),
-                // Subtle dark gradient so the logo/any overlay text stays readable
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.15),
-                        Colors.black.withOpacity(0.35),
-                      ],
-                    ),
-                  ),
-                ),
-                Center(
-                  child: Image.asset(
-                    'asset/images/ic_sidialogo1.png',
-                    width: 400,
-                    errorBuilder: (context, error, stackTrace) {
-                      debugPrint(
-                          "🔴 [LoginScreen] Failed to load ic_sidialogo1.png: $error");
-                      return const Text(
-                        'Logo not found',
-                        style: TextStyle(color: Colors.red),
-                      );
-                    },
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
 
-          // ── Right panel: login form ──
+          // ── Right half: glassy pill login form, exactly 50% width ──
           Expanded(
-            flex: 4,
-            child: Center(
+            flex: 1,
+            child: Container(
+              color: const Color(0xFF12414D),
+              alignment: Alignment.center,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
+                constraints: const BoxConstraints(maxWidth: 500),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Center(
-                        child: Image.asset(
-                          'asset/images/ic_sidialogo1.png',
-                          height: 60,
-                        ),
-                      ),
-                      const SizedBox(height: 36),
                       const Text(
-                        'Login',
-                        textAlign: TextAlign.center,
+                        'Sign In',
                         style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 35,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white70,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 30),
 
-                      // Station
-                      const Text(
-                        'Station',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Obx(
-                        () => DropdownButtonFormField<String>(
-                          value: controller.selectedStation.value,
-                          items: controller.stationOptions
-                              .map(
-                                (station) => DropdownMenuItem(
-                                  value: station,
-                                  child: Text(station),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              controller.selectedStation.value = value;
-                            }
-                          },
-                          decoration: _fieldDecoration('Select Station'),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Email
-                      const Text(
-                        'Email',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      TextField(
+                      _GlassPillField(
+                        icon: Icons.person_outline,
+                        hint: 'User ID',
                         controller: controller.usernameController.value,
-                        cursorColor: AppColors.themeColor,
-                        decoration: _fieldDecoration('Enter Username'),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 18),
 
-                      // Password
-                      const Text(
-                        'Password',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
                       Obx(
-                        () => TextField(
+                        () => _GlassPillField(
+                          icon: Icons.lock_outline,
+                          hint: 'Password',
                           controller: controller.passwordController.value,
-                          cursorColor: AppColors.themeColor,
                           obscureText: controller.hidePassword.value,
-                          decoration:
-                              _fieldDecoration('Enter Password').copyWith(
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                controller.hidePassword.value
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                                color: Colors.grey.shade400,
-                              ),
-                              onPressed: () => controller.hidePassword.toggle(),
+                          trailing: IconButton(
+                            splashRadius: 18,
+                            icon: Icon(
+                              controller.hidePassword.value
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: Colors.white54,
+                              size: 20,
                             ),
+                            onPressed: () => controller.hidePassword.toggle(),
                           ),
                         ),
                       ),
@@ -153,145 +94,140 @@ class LoginScreen extends StatelessWidget {
                         () => controller.errorMessage.value.isEmpty
                             ? const SizedBox.shrink()
                             : Padding(
-                                padding: const EdgeInsets.only(top: 8),
+                                padding:
+                                    const EdgeInsets.only(top: 10, left: 8),
                                 child: Text(
                                   controller.errorMessage.value,
                                   style: const TextStyle(
-                                    color: Colors.red,
+                                    color: Color(0xFFFF8A80),
                                     fontSize: 13,
                                   ),
                                 ),
                               ),
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 14),
 
-                      // Remember me + Forgot password
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Obx(
-                            () => InkWell(
-                              onTap: () => controller.rememberMe.toggle(),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    height: 22,
-                                    width: 22,
-                                    child: Checkbox(
-                                      value: controller.rememberMe.value,
-                                      activeColor: AppColors.themeColor,
-                                      materialTapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                      onChanged: (_) =>
-                                          controller.rememberMe.toggle(),
+                      // Remember me
+                      Obx(
+                        () => InkWell(
+                          onTap: () => controller.rememberMe.toggle(),
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: Checkbox(
+                                    value: controller.rememberMe.value,
+                                    activeColor: Colors.white,
+                                    checkColor: const Color(0xFF14424F),
+                                    side: const BorderSide(
+                                        color: Colors.white54, width: 1.4),
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
+                                    onChanged: (_) =>
+                                        controller.rememberMe.toggle(),
                                   ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Remember Me',
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
+                                ),
+                                const SizedBox(width: 10),
+                                const Text(
+                                  'Remember Me',
+                                  style: TextStyle(
+                                      color: Colors.white70, fontSize: 13),
+                                ),
+                              ],
                             ),
-                          ),
-                          TextButton(
-                            onPressed: () {},
-                            child: Text(
-                              'Forgot Password ?',
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Sign in button
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Obx(
-                          () => ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.themeColor,
-                              minimumSize: const Size(double.infinity, 48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            onPressed: controller.isLoading.value
-                                ? null
-                                : () => controller.login(),
-                            child: controller.isLoading.value
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  )
-                                : const Text(
-                                    'SIGN IN',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-
-                      Center(
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text(
-                            'Register',
-                            style: TextStyle(color: Colors.blue),
                           ),
                         ),
                       ),
 
                       const SizedBox(height: 24),
-                      Column(
-                        children: [
-                          const Text(
-                            'Powered by',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: AppColors.themeColor,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Image.asset(
-                              'asset/images/ic_sidialogo1.png',
-                              height: 22,
-                              errorBuilder: (context, error, stackTrace) {
-                                debugPrint(
-                                    "🔴 [LoginScreen] Failed to load ic_sidialogo1.png (footer): $error");
-                                return const Text(
-                                  'Logo not found',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 11),
-                                );
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
+
+                      // ── LOGIN button — solid dark pill, glossy top highlight ──
+                      Obx(
+                        () => _GlossyButton(
+                          isLoading: controller.isLoading.value,
+                          onPressed: controller.isLoading.value
+                              ? null
+                              : () => controller.login(),
+                        ),
                       ),
+
+                      const SizedBox(height: 40),
+
+                      // Center(
+                      //   child: Column(
+                      //     children: [
+                      //       Text(
+                      //         'Powered by',
+                      //         style: TextStyle(
+                      //             color: Colors.white.withOpacity(0.4),
+                      //             fontSize: 11),
+                      //       ),
+                      //       const SizedBox(height: 8),
+                      //       Image.asset(
+                      //         'asset/images/icon_simpson.png',
+                      //         height: 20,
+                      //         color: Colors.white.withOpacity(0.6),
+                      //         colorBlendMode: BlendMode.srcIn,
+                      //         errorBuilder: (context, error, stackTrace) =>
+                      //             Text(
+                      //           'SIMPSON',
+                      //           style: TextStyle(
+                      //             color: Colors.white.withOpacity(0.5),
+                      //             fontSize: 12,
+                      //             letterSpacing: 2,
+                      //           ),
+                      //         ),
+                      //       ),
+                      //     ],
+                      //   ),
+                      // ),
+                      Center(
+  child: Column(
+    children: [
+      Text(
+        'Powered by',
+        style: TextStyle(
+            color: Colors.white.withOpacity(0.4),
+            fontSize: 11),
+      ),
+      const SizedBox(height: 8),
+      Image.asset(
+        'asset/images/icon_simpson.png',
+        height: 20,
+        color: Colors.white.withOpacity(0.6),
+        colorBlendMode: BlendMode.srcIn,
+        errorBuilder: (context, error, stackTrace) => Text(
+          'SIMPSON',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 12,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Obx(
+        () => Text(
+          controller.appVersion.value,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.35),
+            fontSize: 10,
+          ),
+        ),
+      ),
+    ],
+  ),
+),
                     ],
                   ),
                 ),
@@ -302,28 +238,134 @@ class LoginScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  InputDecoration _fieldDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: TextStyle(
-        color: Colors.grey.shade600,
-        fontFamily: "Roboto-Regular",
-        fontSize: 15,
+/// One glossy, pill-shaped input field — leading icon, frosted-glass
+/// fill, soft top highlight to read as "glossy" rather than flat.
+class _GlassPillField extends StatelessWidget {
+  const _GlassPillField({
+    required this.icon,
+    required this.hint,
+    required this.controller,
+    this.obscureText = false,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String hint;
+  final TextEditingController controller;
+  final bool obscureText;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFF3D7887).withOpacity(0.55),
+            const Color(0xFF2A6272).withOpacity(0.45),
+          ],
+        ),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: Colors.grey.shade400),
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          textSelectionTheme: TextSelectionThemeData(
+            selectionColor: Colors.white.withOpacity(0.3),
+            selectionHandleColor: Colors.white,
+          ),
+        ),
+        child: TextField(
+          controller: controller,
+          obscureText: obscureText,
+          cursorColor: Colors.white,
+          style: const TextStyle(color: Colors.white, fontSize: 15),
+          decoration: InputDecoration(
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            isDense: true,
+            hintText: hint,
+            hintStyle: TextStyle(color: Colors.white.withOpacity(0.55)),
+            prefixIcon: Icon(icon, color: Colors.white70, size: 20),
+            suffixIcon: trailing,
+            contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+        ),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: Colors.grey.shade400),
+    );
+  }
+}
+
+/// The dark, glossy LOGIN button — near-black fill with a subtle
+/// lighter sheen along the top edge for a pressed-glass look.
+class _GlossyButton extends StatelessWidget {
+  const _GlossyButton({required this.isLoading, required this.onPressed});
+
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: onPressed,
+        child: Container(
+          height: 56,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF16333B),
+                Color(0xFF0C2126),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: isLoading
+              ? const SizedBox(
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : const Text(
+                  'LOGIN',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+        ),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(6),
-        borderSide: BorderSide(color: AppColors.themeColor, width: 2),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
     );
   }
 }
