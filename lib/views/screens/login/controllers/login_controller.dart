@@ -38,7 +38,7 @@ class LoginController extends GetxController {
     _loadAppVersion();
   }
 
-   Future<void> _loadAppVersion() async {
+  Future<void> _loadAppVersion() async {
     final info = await PackageInfo.fromPlatform();
     appVersion.value = '${info.version}';
     // or just 'v${info.version}' if you don't want the build number shown
@@ -123,31 +123,27 @@ class LoginController extends GetxController {
       final station = user.stationData?.firstOrNull;
       final stationType = station?.stationType?.trim();
 
-            final dongleEntries = (station?.prodbudDongles ?? [])
-          .map((d) {
-            final ecuStations = d.ecuStation ?? [];
-            final ecuIds = ecuStations
-                .map((e) => e.ecu?.id)
-                .whereType<int>()
-                .toList();
+      final dongleEntries = (station?.prodbudDongles ?? []).map((d) {
+        final ecuStations = d.ecuStation ?? [];
+        final ecuIds =
+            ecuStations.map((e) => e.ecu?.id).whereType<int>().toList();
 
-            final ecuName = ecuStations
-                .map((e) => e.ecu?.name)
-                .firstWhere((n) => n != null && n.isNotEmpty, orElse: () => null);
+        final ecuName = ecuStations
+            .map((e) => e.ecu?.name)
+            .firstWhere((n) => n != null && n.isNotEmpty, orElse: () => null);
 
-            return {
-              'mac_id': d.macId,
-              'ip': d.ip,
-              'is_active': d.isActive,
-              'ecu_ids': ecuIds,
-              'ecuId': ecuIds.firstOrNull,
-              'ecuName': ecuName,
-              'dongleDbId': d.id,
-              'indicator_reg_addr': d.indicatorRegAddr,
-              'ecu_reg_addr': d.ecuRegAddr,
-            };
-          })
-          .toList();
+        return {
+          'mac_id': d.macId,
+          'ip': d.ip,
+          'is_active': d.isActive,
+          'ecu_ids': ecuIds,
+          'ecuId': ecuIds.firstOrNull,
+          'ecuName': ecuName,
+          'dongleDbId': d.id,
+          'indicator_reg_addr': d.indicatorRegAddr,
+          'ecu_reg_addr': d.ecuRegAddr,
+        };
+      }).toList();
       debugPrint("🔵 [Login] dongle_entries=$dongleEntries");
 
       final plcIp = station?.plcIp;
@@ -160,10 +156,31 @@ class LoginController extends GetxController {
       await SecureStorageService.savePlcPort(plcPort?.toString());
 
       if (stationType == 'Testing') {
-        Get.offAllNamed(Routes.HOME_PAGE, arguments: station?.stationType);
+        Get.offAllNamed(
+          Routes.HOME_PAGE,
+          arguments: station?.stationType,
+        );
+      } else if (stationType == 'PFS') {
+        Get.offAllNamed(
+          Routes.PSF_HOME_SCREEN,
+          arguments: station?.stationType,
+        );
       } else {
-        Get.offAllNamed(Routes.PSF_HOME_SCREEN,
-            arguments: station?.stationType);
+        Get.dialog(
+          AlertDialog(
+            title: const Text('The station type is not recognized.',
+                style: TextStyle(fontSize: 15,fontWeight: FontWeight.bold)),
+            content: const Text(
+              'Please assign a valid station type.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Get.back(),
+                child: const Text('OK', style: TextStyle(color: Colors.blue)),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e, stackTrace) {
       debugPrint("🔴 [Login] Failed: $e");

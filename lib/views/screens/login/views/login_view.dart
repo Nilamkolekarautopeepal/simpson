@@ -20,7 +20,7 @@ class LoginScreen extends StatelessWidget {
               color: const Color(0xFF12414D),
               alignment: Alignment.center,
               child: Padding(
-                padding: const EdgeInsets.only(right:1),
+                padding: const EdgeInsets.only(right: 1),
                 child: Image.asset(
                   'asset/images/simpsons_engine_img.png',
                   width: 1100,
@@ -192,42 +192,43 @@ class LoginScreen extends StatelessWidget {
                       //   ),
                       // ),
                       Center(
-  child: Column(
-    children: [
-      Text(
-        'Powered by',
-        style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
-            fontSize: 11),
-      ),
-      const SizedBox(height: 8),
-      Image.asset(
-        'asset/images/icon_simpson.png',
-        height: 20,
-        color: Colors.white.withOpacity(0.6),
-        colorBlendMode: BlendMode.srcIn,
-        errorBuilder: (context, error, stackTrace) => Text(
-          'SIMPSON',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
-            fontSize: 12,
-            letterSpacing: 2,
-          ),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Obx(
-        () => Text(
-          controller.appVersion.value,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.35),
-            fontSize: 10,
-          ),
-        ),
-      ),
-    ],
-  ),
-),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Powered by',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.4),
+                                  fontSize: 11),
+                            ),
+                            const SizedBox(height: 8),
+                            Image.asset(
+                              'asset/images/icon_simpson.png',
+                              height: 20,
+                              color: Colors.white.withOpacity(0.6),
+                              colorBlendMode: BlendMode.srcIn,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
+                                'SIMPSON',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 12,
+                                  letterSpacing: 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Obx(
+                              () => Text(
+                                controller.appVersion.value,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.35),
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
