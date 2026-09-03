@@ -14,6 +14,9 @@ import 'package:simpson/modals/pidDataset.model.dart'
     show Code, MessageType, PiCodeVariables;
 import 'package:simpson/views/screens/psf_homeScreen/views/activity_log_tag.dart';
 
+  int? indicatorRegAddr;
+  int? ecuRegAddr;
+
  class PsfLane {
   PsfLane(
     this.laneNumber, {
@@ -223,6 +226,8 @@ Future<bool> saveActivityLog() async {
       resolvedDatasetType; // "D Dataset" or "T Dataset" — the actual label the server now expects
   String? resolvedDatasetFileName;
   int? dongleDbId;
+    int? indicatorRegAddr;
+  int? ecuRegAddr;
   DateTime? flashCycleStartTime;
   // ===============================
   // PLC / HARNESS STATUS

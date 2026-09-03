@@ -153,7 +153,7 @@ class PsfHomeScreenController extends GetxController {
     });
   }
 
-  Future<void> _sendPartialSessionReport(int laneIndex, String reason) async {
+   Future<void> _sendPartialSessionReport(int laneIndex, String reason) async {
     final lane = lanes[laneIndex];
     final key = lane.currentSessionKey;
     if (key == null) return;
@@ -165,6 +165,15 @@ class PsfHomeScreenController extends GetxController {
         lane.resolvedDatasetFileName!.isEmpty) {
       return;
     }
+
+    if (lane.dongleDbId == null) {
+      lane.logActivity(
+          '❌ Session report NOT sent ($reason) — dongleDbId is missing for this lane. '
+          'Server requires a valid dongle id. Contact admin to check this dongle\'s '
+          'record in the login data.');
+      return;
+    }
+
     lane.sessionReportSent = true;
 
     lane.logActivity('Sending session report to server ($reason)...');
@@ -391,13 +400,15 @@ class PsfHomeScreenController extends GetxController {
         final ecuIdRaw = entry['ecuId'];
         final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
 
-        final lane = PsfLane(
+              final lane = PsfLane(
           i + 1,
           dongleIpFromLogin: entry['ip'] as String?,
           expectedEcuId: ecuId,
           macIdFromLogin: entry['macId'] as String?,
         );
         lane.dongleDbId = entry['dongleDbId'] as int?;
+        print('   [Lane ${lane.laneNumber}] raw dongleDbId from login JSON: ${entry['dongleDbId']} (type: ${entry['dongleDbId']?.runtimeType})');
+        lane.ecuRegAddr = entry['ecu_reg_addr'] as int?;
 
         final ecuNameFromLogin = entry['ecuName'] as String?;
         if (ecuNameFromLogin != null && ecuNameFromLogin.isNotEmpty) {
@@ -725,6 +736,10 @@ class PsfHomeScreenController extends GetxController {
         'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
     lane.sessionReportSent = false;
     lane.logActivity('Session started for ESN $esn (key: ${lane.currentSessionKey})');
+    lane.logActivity(
+        'Dongle matched — indicator_reg_addr: ${lane.indicatorRegAddr}, ecu_reg_addr: ${lane.ecuRegAddr}');
+    unawaited(_setLaneRelay(lane, 1));
+  
     lane.ecuModelName.value = ecuEntry.ecu?.name ?? 'Unknown Model';
     lane.dtcDatasetId.value = ecuEntry.datasets?.firstOrNull?.id;
     lane.pidDatasetId.value = ecuEntry.pidDatasets?.firstOrNull?.id;
@@ -1301,7 +1316,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     unawaited(connectDongleForLane(laneIndex));
   }
 
-  Future<void> onStartFlash(
+    Future<void> onStartFlash(
     int index,
   ) async {
     final lane = lanes[index];
@@ -1376,203 +1391,235 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-    lane.isFlashing.value = true;
-    lane.flashStatus.value = "Flashing Started";
-    lane.flashProgress.value = 0;
-    lane.flashElapsedSeconds.value = 0;
-    lane.flashStopwatch?.cancel();
-    lane.flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
-      lane.flashElapsedSeconds.value++;
-    });
+        try {
+      lane.isFlashing.value = true;
+      lane.flashStatus.value = "Flashing Started";
+      lane.flashProgress.value = 0;
+      lane.flashElapsedSeconds.value = 0;
+      lane.flashStopwatch?.cancel();
+      lane.flashStopwatch = Timer.periodic(const Duration(seconds: 1), (_) {
+        lane.flashElapsedSeconds.value++;
+      });
 
-    String? result;
+      String? result;
 
-    try {
-      final hexUrl = lane.resolvedFlashFileUrl.value!;
-      final ecuEntry = lane.matchedEcu;
+      try {
+        final hexUrl = lane.resolvedFlashFileUrl.value!;
+        final ecuEntry = lane.matchedEcu;
 
-      if (ecuEntry == null || ecuEntry.flashFile == null) {
-        throw Exception("Flash file configuration missing");
+        if (ecuEntry == null || ecuEntry.flashFile == null) {
+          throw Exception("Flash file configuration missing");
+        }
+
+        final flashConfig = ecuEntry.flashFile!;
+
+        print(
+            '   ECU: ${ecuEntry.ecu?.name}  protocol: ${ecuEntry.ecu?.protocol?.name}');
+        print('   Downloading sequence file + firmware hex in parallel…');
+        final results = await Future.wait([
+          _downloadAsRawStringFast(flashConfig.sequenceFile!),
+          _downloadAsRawStringFast(hexUrl),
+        ]);
+        final sequenceContent = results[0];
+        final hexContent = results[1];
+
+        var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
+        if (ecuMapFiles.isEmpty) {
+          ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
+        }
+        if (ecuMapFiles.isEmpty) {
+          throw Exception("ECU MAP FILE missing — cannot generate flash JSON.");
+        }
+        print('   ECU map file entries: ${ecuMapFiles.length}');
+
+        final flashJson = await _readJson(
+          ecuMapFiles,
+          flashConfig.flashCheckSumType?.toString() ?? '',
+          Uint8List.fromList(hexContent.codeUnits),
+        );
+
+        if (flashJson.isEmpty) {
+          throw Exception("Flash JSON generation failed");
+        }
+        print(
+            '   Flash JSON generated (${flashJson.length} chars) — starting flash on its own isolate…');
+
+        print('   Releasing main-isolate connection before handoff to isolate…');
+        await releaseDongleForLane(index);
+        await Future.delayed(const Duration(seconds: 2));
+
+        result = await _runFlashInIsolate(
+          laneNumber: lane.laneNumber,
+          host: ip,
+          port: _dongleFlashPort,
+          protocolName: ecuEntry.ecu?.protocol?.name ?? '',
+          protocolHex: ecuEntry.ecu?.protocol?.autopeepal ?? '',
+          txHeader: ecuEntry.ecu?.txHeader ?? '',
+          rxHeader: ecuEntry.ecu?.rxHeader ?? '',
+          flashJson: flashJson,
+          interpreter: sequenceContent,
+          seedKeyAlgo: ecuEntry.ecu?.seedkeyalgoFnIndex?.value ?? '',
+          onProgress: (percent) {
+            lane.flashProgress.value = percent;
+          },
+        );
+        print('   [Lane ${lane.laneNumber}] isolate flash result: $result');
+      } catch (e) {
+        print('   ❌ Flash exception: $e');
+        result = e.toString();
       }
 
-      final flashConfig = ecuEntry.flashFile!;
+      lane.flashStopwatch?.cancel();
+      lane.isFlashing.value = false;
+      print(
+          '   🔹 [Lane ${lane.laneNumber}] isFlashing set false — checking pending close signals');
+      _trySendProceedSignals();
+
+      if (result == null || result.isEmpty || result != 'NOERROR') {
+        print('   ❌ Flash FAILED: $result  (elapsed ${lane.formattedElapsed})');
+        print(
+            '   ⚠️ Lane ${lane.laneNumber}\'s dongle was released before flashing — reconnecting');
+        lane.dongleConnected.value = false;
+        lane.dllFunctions = null;
+        _startDongleRetryTimer(index);
+
+        print('══════════════════════════════════════════');
+        lane.flashStatus.value = "Flash Failed: $result";
+        lane.logActivity(
+            'SESSION SUMMARY — Flash: Fail ($result)  |  IQA: Fail  |  DTC: Fail');
+
+        lane.draftFlashStatus = 'Fail';
+        lane.draftIqaStatus = 'Fail';
+        lane.draftDtcStatus = 'Fail';
+        await _persistSessionDraft(index);
+        await _sendPartialSessionReport(index, 'flash failed: $result');
+
+        lane.isDongleBusy = false;
+        return;
+      }
 
       print(
-          '   ECU: ${ecuEntry.ecu?.name}  protocol: ${ecuEntry.ecu?.protocol?.name}');
-      print('   Downloading sequence file + firmware hex in parallel…');
-      final results = await Future.wait([
-        _downloadAsRawStringFast(flashConfig.sequenceFile!),
-        _downloadAsRawStringFast(hexUrl),
-      ]);
-      final sequenceContent = results[0];
-      final hexContent = results[1];
+          '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — letting dongle settle before reconnecting…');
+      print('══════════════════════════════════════════');
+      lane.flashProgress.value = 1;
+      lane.flashStatus.value = "Flash Completed";
 
-      var ecuMapFiles = flashConfig.ecuMapFile ?? <all_ds.EcuMapFile>[];
-      if (ecuMapFiles.isEmpty) {
-        ecuMapFiles = _parseEcuMapFilesFromSequence(sequenceContent);
+      lane.isPostFlashProcessing.value = true;
+      lane.isReconnectingAfterFlash.value = true;
+
+      final teardown = _laneFlashTeardownCompleters[lane.laneNumber];
+      if (teardown != null && !teardown.isCompleted) {
+        print(
+            '   ⏳ [Lane ${lane.laneNumber}] waiting for its own flash socket to close gracefully before reconnecting...');
+        final waitStart = DateTime.now();
+        await teardown.future;
+        final waited = DateTime.now().difference(waitStart).inSeconds;
+        if (waited > 0) {
+          print(
+              '   ⏳ [Lane ${lane.laneNumber}] waited ${waited}s for its flash socket to close');
+        }
       }
-      if (ecuMapFiles.isEmpty) {
-        throw Exception("ECU MAP FILE missing — cannot generate flash JSON.");
-      }
-      print('   ECU map file entries: ${ecuMapFiles.length}');
 
-      final flashJson = await _readJson(
-        ecuMapFiles,
-        flashConfig.flashCheckSumType?.toString() ?? '',
-        Uint8List.fromList(hexContent.codeUnits),
-      );
-
-      if (flashJson.isEmpty) {
-        throw Exception("Flash JSON generation failed");
-      }
-      print(
-          '   Flash JSON generated (${flashJson.length} chars) — starting flash on its own isolate…');
-
-      print('   Releasing main-isolate connection before handoff to isolate…');
-      await releaseDongleForLane(index);
       await Future.delayed(const Duration(seconds: 2));
 
-      result = await _runFlashInIsolate(
-        laneNumber: lane.laneNumber,
-        host: ip,
-        port: _dongleFlashPort,
-        protocolName: ecuEntry.ecu?.protocol?.name ?? '',
-        protocolHex: ecuEntry.ecu?.protocol?.autopeepal ?? '',
-        txHeader: ecuEntry.ecu?.txHeader ?? '',
-        rxHeader: ecuEntry.ecu?.rxHeader ?? '',
-        flashJson: flashJson,
-        interpreter: sequenceContent,
-        seedKeyAlgo: ecuEntry.ecu?.seedkeyalgoFnIndex?.value ?? '',
-        onProgress: (percent) {
-          lane.flashProgress.value = percent;
-        },
-      );
-      print('   [Lane ${lane.laneNumber}] isolate flash result: $result');
-    } catch (e) {
-      print('   ❌ Flash exception: $e');
-      result = e.toString();
-    }
-
-    lane.flashStopwatch?.cancel();
-    lane.isFlashing.value = false;
-    print(
-        '   🔹 [Lane ${lane.laneNumber}] isFlashing set false — checking pending close signals');
-    _trySendProceedSignals();
-
-    if (result == null || result.isEmpty || result != 'NOERROR') {
-      print('   ❌ Flash FAILED: $result  (elapsed ${lane.formattedElapsed})');
-      print(
-          '   ⚠️ Lane ${lane.laneNumber}\'s dongle was released before flashing — reconnecting');
-      lane.dongleConnected.value = false;
-      lane.dllFunctions = null;
-      _startDongleRetryTimer(index);
-
-      print('══════════════════════════════════════════');
-      lane.flashStatus.value = "Flash Failed: $result";
-      lane.logActivity(
-          'SESSION SUMMARY — Flash: Fail ($result)  |  IQA: Fail  |  DTC: Fail');
-
-      lane.draftFlashStatus = 'Fail';
-      lane.draftIqaStatus = 'Fail';
-      lane.draftDtcStatus = 'Fail';
-      await _persistSessionDraft(index);
-      await _sendPartialSessionReport(index, 'flash failed: $result');
-
       lane.isDongleBusy = false;
-      return;
-    }
 
-    print(
-        '   ✅ Flash COMPLETED in ${lane.formattedElapsed} — letting dongle settle before reconnecting…');
-    print('══════════════════════════════════════════');
-    lane.flashProgress.value = 1;
-    lane.flashStatus.value = "Flash Completed";
-
-    lane.isPostFlashProcessing.value = true;
-    lane.isReconnectingAfterFlash.value = true;
-
-    final teardown = _laneFlashTeardownCompleters[lane.laneNumber];
-    if (teardown != null && !teardown.isCompleted) {
-      print(
-          '   ⏳ [Lane ${lane.laneNumber}] waiting for its own flash socket to close gracefully before reconnecting...');
-      final waitStart = DateTime.now();
-      await teardown.future;
-      final waited = DateTime.now().difference(waitStart).inSeconds;
-      if (waited > 0) {
+      int attempt = 0;
+      final reconnectDeadline = DateTime.now().add(const Duration(minutes: 3));
+      while (DateTime.now().isBefore(reconnectDeadline)) {
+        attempt++;
+        await connectDongleForLane(index);
+        if (lane.dongleConnected.value && lane.dllFunctions != null) {
+          print(
+              '   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
+          break;
+        }
         print(
-            '   ⏳ [Lane ${lane.laneNumber}] waited ${waited}s for its flash socket to close');
+            '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+        await Future.delayed(const Duration(seconds: 5));
       }
-    }
 
-    await Future.delayed(const Duration(seconds: 2));
+      lane.isDongleBusy = true;
+      lane.isReconnectingAfterFlash.value = false;
 
-    lane.isDongleBusy = false;
-
-    int attempt = 0;
-    final reconnectDeadline = DateTime.now().add(const Duration(minutes: 3));
-    while (DateTime.now().isBefore(reconnectDeadline)) {
-      attempt++;
-      await connectDongleForLane(index);
-      if (lane.dongleConnected.value && lane.dllFunctions != null) {
+      if (!lane.dongleConnected.value || lane.dllFunctions == null) {
         print(
-            '   ✅ [Lane ${lane.laneNumber}] reconnected after flash on attempt $attempt');
-        break;
+            '   ⚠️ [Lane ${lane.laneNumber}] could not reconnect after flash — skipping DTC/PID/IQA steps');
+        lane.flashStatus.value = "Flash Completed (reconnect failed)";
+        lane.isPostFlashProcessing.value = false;
+        lane.isDongleBusy = false;
+        return;
       }
-      print(
-          '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
-      await Future.delayed(const Duration(seconds: 5));
-    }
 
-    lane.isDongleBusy = true;
-    lane.isReconnectingAfterFlash.value = false;
+      lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
 
-    if (!lane.dongleConnected.value || lane.dllFunctions == null) {
-      print(
-          '   ⚠️ [Lane ${lane.laneNumber}] could not reconnect after flash — skipping DTC/PID/IQA steps');
-      lane.flashStatus.value = "Flash Completed (reconnect failed)";
+      await Future.delayed(const Duration(milliseconds: 500));
+      await readLiveDtcForLane(index);
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      await loadPidForLane(index);
+
       lane.isPostFlashProcessing.value = false;
+      final flashPassed = result == 'NOERROR';
+      final iqaPassed =
+          lane.iqaWriteStatus.value.toLowerCase().contains('successful');
+      final dtcPassed = lane.dtcError.value.isEmpty;
+      final continutyPassed = lane.isHarnessConnected.value;
+
+      final startTime = lane.flashCycleStartTime ?? DateTime.now();
+      final endTime = DateTime.now();
+      String fmtTime(DateTime t) =>
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
+
+      lane.logActivity(
+        'SESSION SUMMARY — Start ${fmtTime(startTime)}  End ${fmtTime(endTime)}  |  '
+        'Flash: ${flashPassed ? "Pass" : "Fail"}  '
+        'IQA: ${iqaPassed ? "Pass" : "Fail"}  '
+        'DTC: ${dtcPassed ? "Pass" : "Fail"}  '
+        'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
+      );
+
+      lane.draftFlashStatus = flashPassed ? 'Pass' : 'Fail';
+      lane.draftIqaStatus = iqaPassed ? 'Pass' : 'Fail';
+      lane.draftDtcStatus = dtcPassed ? 'Pass' : 'Fail';
+      await _persistSessionDraft(index);
+
+      await _sendPartialSessionReport(index, 'flash cycle completed');
+
       lane.isDongleBusy = false;
-      return;
+    } finally {
+      await _setLaneRelay(lane, 0);
     }
-
-       lane.iqaWriteStatus.value = await autoWriteIqaValuesForLane(index);
-
-    await Future.delayed(const Duration(milliseconds: 500));
-    await readLiveDtcForLane(index);
-
-    await Future.delayed(const Duration(milliseconds: 300));
-    await loadPidForLane(index);
-
-    lane.isPostFlashProcessing.value = false;
-    final flashPassed = result == 'NOERROR';
-    final iqaPassed =
-        lane.iqaWriteStatus.value.toLowerCase().contains('successful');
-    final dtcPassed = lane.dtcError.value.isEmpty;
-    final continutyPassed = lane.isHarnessConnected.value;
-
-    final startTime = lane.flashCycleStartTime ?? DateTime.now();
-    final endTime = DateTime.now();
-    String fmtTime(DateTime t) =>
-        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:${t.second.toString().padLeft(2, '0')}';
-
-    lane.logActivity(
-      'SESSION SUMMARY — Start ${fmtTime(startTime)}  End ${fmtTime(endTime)}  |  '
-      'Flash: ${flashPassed ? "Pass" : "Fail"}  '
-      'IQA: ${iqaPassed ? "Pass" : "Fail"}  '
-      'DTC: ${dtcPassed ? "Pass" : "Fail"}  '
-      'Continuity: ${continutyPassed ? "Pass" : "Fail"}',
-    );
-
-    lane.draftFlashStatus = flashPassed ? 'Pass' : 'Fail';
-    lane.draftIqaStatus = iqaPassed ? 'Pass' : 'Fail';
-    lane.draftDtcStatus = dtcPassed ? 'Pass' : 'Fail';
-    await _persistSessionDraft(index);
-
-    await _sendPartialSessionReport(index, 'flash cycle completed');
-
-    lane.isDongleBusy = false;
   }
 
+
+       Future<void> _setLaneRelay(PsfLane lane, int value) async {
+    if (!plcService.isConnected.value) {
+      lane.logActivity('Relay write pending — PLC not connected yet, will retry once connected (value=$value)');
+      const maxWaitSeconds = 30;
+      int waited = 0;
+      while (!plcService.isConnected.value && waited < maxWaitSeconds) {
+        await Future.delayed(const Duration(seconds: 1));
+        waited++;
+      }
+      if (!plcService.isConnected.value) {
+        lane.logActivity('Relay write skipped — PLC still not connected after ${maxWaitSeconds}s (value=$value)');
+        return;
+      }
+    }
+    try {
+      if (lane.indicatorRegAddr != null) {
+        await plcService.writeRegister(lane.indicatorRegAddr!, value);
+      }
+      if (lane.ecuRegAddr != null) {
+        await plcService.writeRegister(lane.ecuRegAddr!, value);
+      }
+      lane.logActivity(
+          'RELAY IS ${value == 1 ? "ON" : "OFF"} — indicator_reg_addr: ${lane.indicatorRegAddr}, ecu_reg_addr: ${lane.ecuRegAddr}');
+    } catch (e) {
+      lane.logActivity('❌ Relay write failed (value=$value): $e');
+    }
+  }
 
   List<all_ds.EcuMapFile> _parseEcuMapFilesFromSequence(
       String sequenceContent) {

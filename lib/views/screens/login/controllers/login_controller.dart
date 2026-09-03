@@ -11,6 +11,7 @@ import 'package:simpson/modals/user.model.dart';
 import 'package:simpson/routes/app_pages.dart';
 import 'package:simpson/services/androidOperationservice.dart';
 import 'package:simpson/services/apiServices.dart';
+import 'package:simpson/views/screens/psf_homeScreen/controllers/pfs_lane.dart';
 
 class LoginController extends GetxController {
   final AuthService _authService = AuthService();
@@ -122,7 +123,7 @@ class LoginController extends GetxController {
       final station = user.stationData?.firstOrNull;
       final stationType = station?.stationType?.trim();
 
-      final dongleEntries = (station?.prodbudDongles ?? [])
+            final dongleEntries = (station?.prodbudDongles ?? [])
           .map((d) {
             final ecuStations = d.ecuStation ?? [];
             final ecuIds = ecuStations
@@ -142,6 +143,8 @@ class LoginController extends GetxController {
               'ecuId': ecuIds.firstOrNull,
               'ecuName': ecuName,
               'dongleDbId': d.id,
+              'indicator_reg_addr': d.indicatorRegAddr,
+              'ecu_reg_addr': d.ecuRegAddr,
             };
           })
           .toList();
