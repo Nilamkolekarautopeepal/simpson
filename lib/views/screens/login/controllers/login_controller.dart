@@ -142,6 +142,7 @@ class LoginController extends GetxController {
           'dongleDbId': d.id,
           'indicator_reg_addr': d.indicatorRegAddr,
           'ecu_reg_addr': d.ecuRegAddr,
+          'priority': d.priority,
         };
       }).toList();
       debugPrint("🔵 [Login] dongle_entries=$dongleEntries");

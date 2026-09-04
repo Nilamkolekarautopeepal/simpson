@@ -1,3 +1,4 @@
+//prathmesh girme
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:simpson/common_widgets/custom_app_bar.dart';
@@ -73,7 +74,7 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonAppBar(
-        title: controller.station ?? '',
+        title: "PFS Station",
         actions: [
           Obx(
             () => Padding(

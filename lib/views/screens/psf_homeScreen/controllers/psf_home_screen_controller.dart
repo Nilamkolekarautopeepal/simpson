@@ -153,7 +153,7 @@ class PsfHomeScreenController extends GetxController {
     });
   }
 
-   Future<void> _sendPartialSessionReport(int laneIndex, String reason) async {
+  Future<void> _sendPartialSessionReport(int laneIndex, String reason) async {
     final lane = lanes[laneIndex];
     final key = lane.currentSessionKey;
     if (key == null) return;
@@ -165,15 +165,6 @@ class PsfHomeScreenController extends GetxController {
         lane.resolvedDatasetFileName!.isEmpty) {
       return;
     }
-
-    if (lane.dongleDbId == null) {
-      lane.logActivity(
-          '❌ Session report NOT sent ($reason) — dongleDbId is missing for this lane. '
-          'Server requires a valid dongle id. Contact admin to check this dongle\'s '
-          'record in the login data.');
-      return;
-    }
-
     lane.sessionReportSent = true;
 
     lane.logActivity('Sending session report to server ($reason)...');
@@ -206,6 +197,7 @@ class PsfHomeScreenController extends GetxController {
   final RxList<PsfLane> lanes = <PsfLane>[].obs;
   final AuthService _authService = AuthService();
   String? _accessToken;
+  String? _loggedInUsername;
   final PlcService plcService = Get.find<PlcService>();
   all_ds.AllModel? _modelsCache;
   list_ds.ListNumber? _variantListCache;
@@ -372,61 +364,119 @@ class PsfHomeScreenController extends GetxController {
   final Rx<int?> currentWritingSensorId = Rx<int?>(null);
   final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
 
-  @override
+     @override
   void onInit() {
     super.onInit();
     station = Get.arguments is String ? Get.arguments : "PFS Station";
-    _loadLanesFromDongleList();
-    _loadAccessToken();
+
+    Future.wait([
+      _loadLanesFromDongleList(),
+      _loadAccessToken(),
+    ]).then((_) {
+      _logToAllLanes(
+          'Session started — Station: ${station ?? "Unknown Station"}  |  User: ${_loggedInUsername ?? "Unknown User"}');
+    });
+
     _loadPlcConfig().then((_) => _autoConnectPlc());
     PendingSessionStorage.init().then((_) => _resendPendingSessions());
+
+    // Log any unexpected PLC disconnect (not just the initial connect
+    // attempt) — this catches the socket dropping mid-session too.
+    ever(plcService.isConnected, (bool connected) {
+      if (!connected) {
+        _logToAllLanes('PLC disconnected (${_plcIp ?? "unknown IP"})');
+      }
+    });
 
     debugPrint("PFS Controller Loaded");
   }
 
-  Future<void> _loadLanesFromDongleList() async {
+    Future<void> _loadLanesFromDongleList() async {
     final raw = await SecureStorageService.getDongleList();
     if (raw == null || raw.isEmpty) {
       debugPrint("PFS: no dongle list found from login — no lanes to show.");
       return;
     }
 
-    try {
+    debugPrint("PFS: raw stored dongle list JSON: $raw");
+
+    // try {
+    //   final List<dynamic> decoded = jsonDecode(raw);
+    //   final built = <PsfLane>[];
+
+    //   for (int i = 0; i < decoded.length; i++) {
+    //     try {
+    //       final entry = decoded[i] as Map<String, dynamic>;
+        try {
       final List<dynamic> decoded = jsonDecode(raw);
+
+      // Sort by priority ascending BEFORE building lanes — priority 1
+      // should always appear first, regardless of what order the
+      // server happened to list them in.
+      decoded.sort((a, b) {
+        final priorityA = (a as Map<String, dynamic>)['priority'];
+        final priorityB = (b as Map<String, dynamic>)['priority'];
+        final numA = priorityA is int ? priorityA : int.tryParse('$priorityA') ?? 999999;
+        final numB = priorityB is int ? priorityB : int.tryParse('$priorityB') ?? 999999;
+        return numA.compareTo(numB);
+      });
+
       final built = <PsfLane>[];
 
       for (int i = 0; i < decoded.length; i++) {
-        final entry = decoded[i] as Map<String, dynamic>;
-        final ecuIdRaw = entry['ecuId'];
-        final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
+        try {
+          final entry = decoded[i] as Map<String, dynamic>;
 
-              final lane = PsfLane(
-          i + 1,
-          dongleIpFromLogin: entry['ip'] as String?,
-          expectedEcuId: ecuId,
-          macIdFromLogin: entry['macId'] as String?,
-        );
-        lane.dongleDbId = entry['dongleDbId'] as int?;
-        print('   [Lane ${lane.laneNumber}] raw dongleDbId from login JSON: ${entry['dongleDbId']} (type: ${entry['dongleDbId']?.runtimeType})');
-        lane.ecuRegAddr = entry['ecu_reg_addr'] as int?;
+          debugPrint("PFS: [entry $i] raw values: "
+              "ecuId=${entry['ecuId']} (${entry['ecuId']?.runtimeType}) "
+              "dongleDbId=${entry['dongleDbId']} (${entry['dongleDbId']?.runtimeType}) "
+              "indicator_reg_addr=${entry['indicator_reg_addr']} (${entry['indicator_reg_addr']?.runtimeType}) "
+              "ecu_reg_addr=${entry['ecu_reg_addr']} (${entry['ecu_reg_addr']?.runtimeType})");
 
-        final ecuNameFromLogin = entry['ecuName'] as String?;
-        if (ecuNameFromLogin != null && ecuNameFromLogin.isNotEmpty) {
-          lane.ecuModelName.value = ecuNameFromLogin;
+          final ecuIdRaw = entry['ecuId'];
+          final ecuId = ecuIdRaw is int ? ecuIdRaw : int.tryParse('$ecuIdRaw');
+
+          final lane = PsfLane(
+            i + 1,
+            dongleIpFromLogin: entry['ip']?.toString(),
+            expectedEcuId: ecuId,
+            macIdFromLogin: entry['macId']?.toString(),
+          );
+
+          final dongleDbIdRaw = entry['dongleDbId'];
+          lane.dongleDbId =
+              dongleDbIdRaw is int ? dongleDbIdRaw : int.tryParse('$dongleDbIdRaw');
+
+          // Stored as-is (dynamic) — no cast, so it can never throw here
+          // regardless of whether the value is a number, string, or null.
+          lane.indicatorRegAddr = entry['indicator_reg_addr'];
+          lane.ecuRegAddr = entry['ecu_reg_addr'];
+
+          final ecuNameFromLogin = entry['ecuName']?.toString();
+          if (ecuNameFromLogin != null && ecuNameFromLogin.isNotEmpty) {
+            lane.ecuModelName.value = ecuNameFromLogin;
+          }
+
+          built.add(lane);
+        } catch (entryError, entryStack) {
+          debugPrint("PFS: failed to parse dongle entry $i: $entryError");
+          debugPrint("$entryStack");
+          // Skip this one entry instead of aborting the whole list.
+          continue;
         }
-
-        built.add(lane);
       }
       lanes.assignAll(built);
       debugPrint(
           "PFS Controller Loaded : ${lanes.length} lane(s) from login dongle list");
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint("PFS: failed to parse saved dongle list: $e");
+      debugPrint("$stack");
     }
   }
 
-  Future<void> _loadAccessToken() async {
+    Future<void> _loadAccessToken() async {
     _accessToken = await SecureStorageService.getAccessToken();
+    _loggedInUsername = await SecureStorageService.getSavedUsername();
   }
 
   @override
@@ -455,15 +505,27 @@ class PsfHomeScreenController extends GetxController {
     _plcPort = int.tryParse(portStr ?? '') ?? 502;
   }
 
+    void _logToAllLanes(String message) {
+    for (final lane in lanes) {
+      lane.logActivity(message);
+    }
+  }
+
   Future<void> _autoConnectPlc() async {
     if (plcService.isConnected.value || plcService.isConnecting.value) return;
-    if (_plcIp == null || _plcIp!.isEmpty) return;
+    if (_plcIp == null || _plcIp!.isEmpty) {
+      _logToAllLanes('PLC: no IP on record from login — cannot connect');
+      return;
+    }
+    _logToAllLanes('PLC: connecting to $_plcIp:$_plcPort...');
     try {
       await plcService.connect(_plcIp!, port: _plcPort);
+      _logToAllLanes('PLC connected ($_plcIp:$_plcPort)');
       _plcRetryTimer?.cancel();
     } catch (e) {
       debugPrint(
           "PLC connection failed: $e — will keep retrying in the background");
+      _logToAllLanes('PLC connection failed: $e — will retry in the background');
       _startPlcRetryTimer();
     }
   }
@@ -487,8 +549,9 @@ class PsfHomeScreenController extends GetxController {
     });
   }
 
-  void onPlcButtonTapped() {
+   void onPlcButtonTapped() {
     if (isPlcConnected.value) return;
+    _logToAllLanes('PLC: manual reconnect requested by operator');
     _autoConnectPlc();
   }
 
@@ -732,10 +795,11 @@ class PsfHomeScreenController extends GetxController {
     lane.resolvedFlashFileName.value = identified.flashFileUrl?.split('/').last;
     lane.resolvedDatasetFileName = identified.flashFileUrl?.split('/').last;
     lane.flashCycleStartTime = DateTime.now();
-       lane.currentSessionKey =
+           lane.currentSessionKey =
         'pfs_lane${lane.laneNumber}_esn${identified.esnRecordId}_${lane.flashCycleStartTime!.millisecondsSinceEpoch}';
     lane.sessionReportSent = false;
-    lane.logActivity('Session started for ESN $esn (key: ${lane.currentSessionKey})');
+      //  lane.logActivity(
+      //   'Session started — Station: ${station ?? "Unknown Station"}  |  User: ${_loggedInUsername ?? "Unknown User"}');
     lane.logActivity(
         'Dongle matched — indicator_reg_addr: ${lane.indicatorRegAddr}, ecu_reg_addr: ${lane.ecuRegAddr}');
     unawaited(_setLaneRelay(lane, 1));
@@ -801,14 +865,14 @@ class PsfHomeScreenController extends GetxController {
     if (!plcService.isConnected.value) return;
 
     writeInFlightSensorIds.add(id);
-    try {
+        try {
       final confirmed = await plcService.writeRegister(reg, value);
       if (!confirmed) return;
       final raw = await plcService.readRegister(reg);
       livePlcValues[id] =
           _applySensorFormula(sensor.type, raw).toStringAsFixed(2);
-    } catch (_) {
-      // leave as-is on failure; UI shows last-known value
+    } catch (e) {
+      print('   ❌ HIL sensor write failed (${sensor.sensorName}, reg $reg): $e');
     } finally {
       writeInFlightSensorIds.remove(id);
     }
@@ -1464,8 +1528,9 @@ Future<void> releaseDongleForLane(int laneIndex) async {
           },
         );
         print('   [Lane ${lane.laneNumber}] isolate flash result: $result');
-      } catch (e) {
+            } catch (e) {
         print('   ❌ Flash exception: $e');
+        lane.logActivity('❌ Unexpected error during flash: $e');
         result = e.toString();
       }
 
@@ -1593,9 +1658,10 @@ Future<void> releaseDongleForLane(int laneIndex) async {
   }
 
 
-       Future<void> _setLaneRelay(PsfLane lane, int value) async {
+     Future<void> _setLaneRelay(PsfLane lane, int value) async {
     if (!plcService.isConnected.value) {
       lane.logActivity('Relay write pending — PLC not connected yet, will retry once connected (value=$value)');
+      // Wait up to 30s for the PLC to come online, checking every second.
       const maxWaitSeconds = 30;
       int waited = 0;
       while (!plcService.isConnected.value && waited < maxWaitSeconds) {
@@ -1607,19 +1673,29 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         return;
       }
     }
-    try {
-      if (lane.indicatorRegAddr != null) {
-        await plcService.writeRegister(lane.indicatorRegAddr!, value);
+        try {
+      final indicatorNum = lane.indicatorRegAddrNum;
+      final ecuNum = lane.ecuRegAddrNum;
+
+      if (indicatorNum != null) {
+        await plcService.writeRegister(indicatorNum, value);
+      } else if (lane.indicatorRegAddr != null) {
+        lane.logActivity('⚠️ indicator_reg_addr "${lane.indicatorRegAddr}" is not a valid number — skipped');
       }
-      if (lane.ecuRegAddr != null) {
-        await plcService.writeRegister(lane.ecuRegAddr!, value);
+
+      if (ecuNum != null) {
+        await plcService.writeRegister(ecuNum, value);
+      } else if (lane.ecuRegAddr != null) {
+        lane.logActivity('⚠️ ecu_reg_addr "${lane.ecuRegAddr}" is not a valid number — skipped');
       }
+
       lane.logActivity(
           'RELAY IS ${value == 1 ? "ON" : "OFF"} — indicator_reg_addr: ${lane.indicatorRegAddr}, ecu_reg_addr: ${lane.ecuRegAddr}');
     } catch (e) {
       lane.logActivity('❌ Relay write failed (value=$value): $e');
     }
   }
+
 
   List<all_ds.EcuMapFile> _parseEcuMapFilesFromSequence(
       String sequenceContent) {
@@ -2030,11 +2106,11 @@ Future<void> releaseDongleForLane(int laneIndex) async {
           print('══════════════════════════════════════════');
           return 'IQA write: Successful';
         }
-
         if (status != null && status.contains('REQUIREDTIMEDELAYNOTEXPIRED')) {
           print(
               '   ⏳ ECU not ready yet — waiting ${delay.inSeconds}s before retry '
               '${attempt + 1}/$maxRetries');
+          lane.logActivity('IQA write: ECU busy, retrying in ${delay.inSeconds}s (attempt ${attempt + 1}/$maxRetries)');
           await Future.delayed(delay);
           delay *= 2;
           continue;
@@ -2182,9 +2258,9 @@ Future<void> releaseDongleForLane(int laneIndex) async {
 
       if (responses == null) {
         print('   ❌ Live PID read: no response from ECU');
+        lane.logActivity('❌ Live Parameter read: no response from ECU');
         return false;
       }
-
       for (final resp in responses) {
         final code = codes.firstWhereOrNull((c) => c.id == resp.pidId);
         if (code == null) continue;
@@ -2210,8 +2286,9 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       }
 
       return true;
-    } catch (e) {
+        } catch (e) {
       print('   ❌ Live PID read error: $e');
+      lane.logActivity('❌ Live Parameter read error: $e');
       return false;
     }
   }

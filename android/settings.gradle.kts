@@ -18,7 +18,11 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
+<<<<<<< Updated upstream
     id("com.android.application") version "8.11.1" apply false
+=======
+   id("com.android.application") version "8.11.1" apply false
+>>>>>>> Stashed changes
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
 }
 

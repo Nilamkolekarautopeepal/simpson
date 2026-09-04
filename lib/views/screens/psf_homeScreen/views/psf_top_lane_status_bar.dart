@@ -1,3 +1,4 @@
+//prathmesh girme
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter/gestures.dart';
@@ -68,7 +69,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             itemCount: controller.lanes.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            separatorBuilder: (_, __) => const SizedBox(width: 5),
             itemBuilder: (context, i) => _laneChip(i),
           ),
         ),
@@ -128,7 +129,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
           onTap: () => controller.expandLane(index),
           child: Container(
             width: 190,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: isExpanded
                   ? _StationColors.tealLight

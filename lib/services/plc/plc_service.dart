@@ -605,7 +605,25 @@ class PlcService extends GetxService {
     }
   }
 
-  void _handleFrame(List<int> frame) {
+  // void _handleFrame(List<int> frame) {
+  //   if (frame.length < 8) return;
+  //   final txId = (frame[0] << 8) | frame[1];
+  //   final completer = _pending[txId];
+  //   if (completer == null || completer.isCompleted) return;
+
+  //   final functionCode = frame[7];
+  //   if (functionCode & 0x80 != 0) {
+  //     final exceptionCode = frame.length > 8 ? frame[8] : -1;
+  //     completer.completeError('Modbus exception code $exceptionCode');
+  //     return;
+  //   }
+  //   completer.complete(frame);
+  // }
+
+
+    void _handleFrame(List<int> frame) {
+    print('[MODBUS RX] bytes=$frame');
+
     if (frame.length < 8) return;
     final txId = (frame[0] << 8) | frame[1];
     final completer = _pending[txId];
@@ -614,9 +632,11 @@ class PlcService extends GetxService {
     final functionCode = frame[7];
     if (functionCode & 0x80 != 0) {
       final exceptionCode = frame.length > 8 ? frame[8] : -1;
+      print('[MODBUS RX] ❌ Exception response — code $exceptionCode (txId=$txId)');
       completer.completeError('Modbus exception code $exceptionCode');
       return;
     }
+    print('[MODBUS RX] ✅ Success response (txId=$txId, fn=0x${functionCode.toRadixString(16)})');
     completer.complete(frame);
   }
 

@@ -18,8 +18,15 @@ plugins {
 
 android {
     namespace = "example.simpson.com"
+<<<<<<< Updated upstream
     compileSdk = 36
     ndkVersion = "28.2.13676358"
+=======
+
+    compileSdk = 36
+
+    ndkVersion = "28.2.13676358" 
+>>>>>>> Stashed changes
     defaultConfig {
         applicationId = "example.simpson.com"
         minSdk = flutter.minSdkVersion
@@ -29,7 +36,9 @@ android {
     }
 
      signingConfigs {
+    if (keystorePropertiesFile.exists()) {
         create("release") {
+<<<<<<< Updated upstream
         if (keystorePropertiesFile.exists()) {
             storeFile = file(keystoreProperties["storeFile"] as String)
             storePassword = keystoreProperties["storePassword"] as String
@@ -38,14 +47,39 @@ android {
         }
     }
 }
-buildTypes {
-        getByName("release") {
-            signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
-            // proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+=======
+            storeFile = file(
+                keystoreProperties["storeFile"]?.toString()
+                    ?: error("storeFile missing in key.properties")
+            )
+
+            storePassword =
+                keystoreProperties["storePassword"]?.toString()
+                    ?: error("storePassword missing in key.properties")
+
+            keyAlias =
+                keystoreProperties["keyAlias"]?.toString()
+                    ?: error("keyAlias missing in key.properties")
+
+            keyPassword =
+                keystoreProperties["keyPassword"]?.toString()
+                    ?: error("keyPassword missing in key.properties")
         }
     }
+}
+
+>>>>>>> Stashed changes
+buildTypes {
+    getByName("release") {
+        if (keystorePropertiesFile.exists()) {
+            signingConfig =
+                signingConfigs.getByName("release")
+        }
+
+        isMinifyEnabled = false
+        isShrinkResources = false
+    }
+}
 
 
     // Required when using multiple flavors

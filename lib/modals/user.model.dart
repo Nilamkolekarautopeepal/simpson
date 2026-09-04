@@ -385,8 +385,8 @@ class ProdbudDongle {
     int? station;
     int? priority;
     bool? isActive;
-    int? indicatorRegAddr;
-    int? ecuRegAddr;
+    dynamic indicatorRegAddr;
+    dynamic ecuRegAddr;
     List<EcuStation>? ecuStation;
 
     ProdbudDongle({
@@ -412,12 +412,8 @@ class ProdbudDongle {
         station: json["station"],
         priority: json["priority"],
         isActive: json["is_active"],
-              indicatorRegAddr: json["indicator_reg_addr"] is String
-            ? int.tryParse(json["indicator_reg_addr"])
-            : json["indicator_reg_addr"],
-        ecuRegAddr: json["ecu_reg_addr"] is String
-            ? int.tryParse(json["ecu_reg_addr"])
-            : json["ecu_reg_addr"],
+        indicatorRegAddr: json["indicator_reg_addr"],
+        ecuRegAddr: json["ecu_reg_addr"],
         ecuStation: json["ecu_station"] == null ? [] : List<EcuStation>.from(json["ecu_station"]!.map((x) => EcuStation.fromJson(x))),
     );
 
