@@ -62,6 +62,7 @@ class LoginController extends GetxController {
       passwordController.value.text = savedPassword;
     }
   }
+  
 
   Future<void> login() async {
     debugPrint("🔵 [Login] Button pressed");
@@ -120,8 +121,18 @@ class LoginController extends GetxController {
       debugPrint(
           "🔵 [Login] rememberMe=${rememberMe.value}, credentials/tokens/user data saved");
 
-      final station = user.stationData?.firstOrNull;
+           final station = user.stationData?.firstOrNull;
       final stationType = station?.stationType?.trim();
+      final stationsId = station?.stationsId;
+      final plantsId = station?.plants?.plantsId;
+      final combinedStationTitle = [stationsId, plantsId]
+          .where((s) => s != null && s.isNotEmpty)
+          .join(' ');
+      // // final stationsId = station?.stationsId;
+      // // final plantsId = station?.plants?.plantsId;
+      // // final combinedStationTitle = [stationsId, plantsId]
+      //     .where((s) => s != null && s.isNotEmpty)
+      //     .join(' ');
 
       final dongleEntries = (station?.prodbudDongles ?? []).map((d) {
         final ecuStations = d.ecuStation ?? [];
@@ -151,10 +162,11 @@ class LoginController extends GetxController {
       final plcPort = station?.plcPort;
 
       debugPrint("🔵 [Login] plc_ip='$plcIp' plc_port='$plcPort'");
-
       await SecureStorageService.saveDongleList(jsonEncode(dongleEntries));
       await SecureStorageService.savePlcIp(plcIp);
       await SecureStorageService.savePlcPort(plcPort?.toString());
+      await SecureStorageService.saveStationTitle(combinedStationTitle);
+      await SecureStorageService.saveStationTitle(combinedStationTitle);
 
       if (stationType == 'Testing') {
         Get.offAllNamed(

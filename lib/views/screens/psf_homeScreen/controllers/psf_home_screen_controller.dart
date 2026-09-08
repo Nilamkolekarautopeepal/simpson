@@ -193,7 +193,9 @@ class PsfHomeScreenController extends GetxController {
     }
   }
 
-  String? station;
+    final RxString stationTitle = ''.obs;
+  String? get station => stationTitle.value.isEmpty ? null : stationTitle.value;
+  set station(String? value) => stationTitle.value = value ?? '';
   final RxList<PsfLane> lanes = <PsfLane>[].obs;
   final AuthService _authService = AuthService();
   String? _accessToken;
@@ -321,10 +323,25 @@ class PsfHomeScreenController extends GetxController {
         laneNumber: laneNumber,
       );
 
+      // isolate = await Isolate.spawn(
+      //   pfsFlashIsolateEntry,
+      //   [receivePort.sendPort, args],
+      // );
+
+            final errorPort = ReceivePort();
       isolate = await Isolate.spawn(
         pfsFlashIsolateEntry,
         [receivePort.sendPort, args],
+        onError: errorPort.sendPort,
+        errorsAreFatal: false,
       );
+      errorPort.listen((error) {
+        print('   ❌ [Lane $laneNumber] ISOLATE CRASH (contained, app continues): $error');
+        if (!completer.isCompleted) {
+          completer.complete('ISOLATE_CRASHED: $error');
+        }
+        errorPort.close();
+      });
 
       return await completer.future;
     } catch (e) {
@@ -364,19 +381,17 @@ class PsfHomeScreenController extends GetxController {
   final Rx<int?> currentWritingSensorId = Rx<int?>(null);
   final RxSet<int> writeInFlightSensorIds = <int>{}.obs;
 
-     @override
+    @override
   void onInit() {
     super.onInit();
-    station = Get.arguments is String ? Get.arguments : "PFS Station";
-
-    Future.wait([
-      _loadLanesFromDongleList(),
-      _loadAccessToken(),
-    ]).then((_) {
-      _logToAllLanes(
-          'Session started — Station: ${station ?? "Unknown Station"}  |  User: ${_loggedInUsername ?? "Unknown User"}');
+        station = Get.arguments is String ? Get.arguments : "PFS Station";
+    SecureStorageService.getStationTitle().then((title) {
+      if (title != null && title.isNotEmpty) {
+        station = title;
+      }
     });
-
+    _loadLanesFromDongleList();
+    _loadAccessToken();
     _loadPlcConfig().then((_) => _autoConnectPlc());
     PendingSessionStorage.init().then((_) => _resendPendingSessions());
 
@@ -1371,16 +1386,17 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     }
   }
 
-  void resetLane(int laneIndex) async {
+   void resetLane(int laneIndex) async {
     final lane = lanes[laneIndex];
+    lane.logActivity('Lane reset for next engine');
+    await _setLaneRelay(lane, 0);
     lane.resetToUnlockedIdle();
 
     await releaseDongleForLane(laneIndex);
     await Future.delayed(const Duration(seconds: 2));
     unawaited(connectDongleForLane(laneIndex));
   }
-
-    Future<void> onStartFlash(
+Future<void> onStartFlash(
     int index,
   ) async {
     final lane = lanes[index];
@@ -1455,7 +1471,11 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
-        try {
+    // Relay ON/OFF for the whole cycle is handled elsewhere:
+    //  - ON  fires right after ESN scan resolves the dongle (applyLane())
+    //  - OFF is guaranteed here via finally, no matter how this method
+    //    ends (success, failure, exception, or reconnect failure).
+       {
       lane.isFlashing.value = true;
       lane.flashStatus.value = "Flashing Started";
       lane.flashProgress.value = 0;
@@ -1480,6 +1500,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         print(
             '   ECU: ${ecuEntry.ecu?.name}  protocol: ${ecuEntry.ecu?.protocol?.name}');
         print('   Downloading sequence file + firmware hex in parallel…');
+        lane.flashStatus.value = "Downloading Dataset...";
         final results = await Future.wait([
           _downloadAsRawStringFast(flashConfig.sequenceFile!),
           _downloadAsRawStringFast(hexUrl),
@@ -1512,6 +1533,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         await releaseDongleForLane(index);
         await Future.delayed(const Duration(seconds: 2));
 
+        lane.flashStatus.value = "Flashing ECU...";
         result = await _runFlashInIsolate(
           laneNumber: lane.laneNumber,
           host: ip,
@@ -1528,7 +1550,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
           },
         );
         print('   [Lane ${lane.laneNumber}] isolate flash result: $result');
-            } catch (e) {
+      } catch (e) {
         print('   ❌ Flash exception: $e');
         lane.logActivity('❌ Unexpected error during flash: $e');
         result = e.toString();
@@ -1601,6 +1623,7 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         }
         print(
             '   ⚠️ [Lane ${lane.laneNumber}] reconnect attempt $attempt failed — retrying in 5s...');
+        lane.logActivity('Reconnect attempt $attempt failed — retrying...');
         await Future.delayed(const Duration(seconds: 5));
       }
 
@@ -1648,15 +1671,11 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       lane.draftIqaStatus = iqaPassed ? 'Pass' : 'Fail';
       lane.draftDtcStatus = dtcPassed ? 'Pass' : 'Fail';
       await _persistSessionDraft(index);
-
       await _sendPartialSessionReport(index, 'flash cycle completed');
 
       lane.isDongleBusy = false;
-    } finally {
-      await _setLaneRelay(lane, 0);
     }
   }
-
 
      Future<void> _setLaneRelay(PsfLane lane, int value) async {
     if (!plcService.isConnected.value) {
@@ -1672,21 +1691,26 @@ Future<void> releaseDongleForLane(int laneIndex) async {
         lane.logActivity('Relay write skipped — PLC still not connected after ${maxWaitSeconds}s (value=$value)');
         return;
       }
-    }
-        try {
-      final indicatorNum = lane.indicatorRegAddrNum;
-      final ecuNum = lane.ecuRegAddrNum;
+    }    try {
+      final indicatorRegs = lane.indicatorRegAddrList;
+      final ecuRegs = lane.ecuRegAddrList;
 
-      if (indicatorNum != null) {
-        await plcService.writeRegister(indicatorNum, value);
-      } else if (lane.indicatorRegAddr != null) {
-        lane.logActivity('⚠️ indicator_reg_addr "${lane.indicatorRegAddr}" is not a valid number — skipped');
+      if (indicatorRegs.isEmpty && lane.indicatorRegAddr != null) {
+        lane.logActivity('⚠️ indicator_reg_addr "${lane.indicatorRegAddr}" has no valid register(s) — skipped');
+      }
+      for (final reg in indicatorRegs) {
+        await plcService.writeRegister(reg, value);
+        lane.logActivity(
+            'Command sent to PLC — reg=$reg value=$value  |  HEX: ${plcService.lastSentHex.value}');
       }
 
-      if (ecuNum != null) {
-        await plcService.writeRegister(ecuNum, value);
-      } else if (lane.ecuRegAddr != null) {
-        lane.logActivity('⚠️ ecu_reg_addr "${lane.ecuRegAddr}" is not a valid number — skipped');
+      if (ecuRegs.isEmpty && lane.ecuRegAddr != null) {
+        lane.logActivity('⚠️ ecu_reg_addr "${lane.ecuRegAddr}" has no valid register(s) — skipped');
+      }
+      for (final reg in ecuRegs) {
+        await plcService.writeRegister(reg, value);
+        lane.logActivity(
+            'Command sent to PLC — reg=$reg value=$value  |  HEX: ${plcService.lastSentHex.value}');
       }
 
       lane.logActivity(
@@ -2353,11 +2377,15 @@ Future<void> releaseDongleForLane(int laneIndex) async {
       return;
     }
 
+        // Make sure every lane's relay is off before disconnecting the PLC.
+    for (final lane in lanes) {
+      unawaited(_setLaneRelay(lane, 0));
+    }
+
     // Release the PLC connection (and its lock register) so the next
     // station/session can claim it cleanly, instead of leaving this
     // session's ownership token sitting in the lock register.
     unawaited(plcService.disconnect());
-
     Get.offAllNamed("/login");
 
     Get.delete<PsfHomeScreenController>(force: true);

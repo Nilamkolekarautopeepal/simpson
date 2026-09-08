@@ -293,10 +293,11 @@ class PlcService extends GetxService {
   static const _ipKey = 'plc_ip';
   static const _portKey = 'plc_port';
 
-  final RxBool isConnected = false.obs;
+   final RxBool isConnected = false.obs;
   final RxBool isConnecting = false.obs;
   final RxString status = 'Idle'.obs;
   final RxString lastIp = ''.obs;
+  final RxString lastSentHex = ''.obs;
 
   Socket? _socket;
   StreamSubscription<List<int>>? _sub;
@@ -569,8 +570,11 @@ class PlcService extends GetxService {
       ...pdu,
     ];
 
-    final completer = Completer<List<int>>();
+        final completer = Completer<List<int>>();
     _pending[txId] = completer;
+    lastSentHex.value = packet
+        .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+        .join(' ');
     print('[MODBUS TX] fn=0x${functionCode.toRadixString(16)} '
         'reg=$registerAddress txId=$txId bytes=$packet');
     _socket!.add(packet);

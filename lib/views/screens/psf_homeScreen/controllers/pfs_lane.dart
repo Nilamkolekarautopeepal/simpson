@@ -230,14 +230,23 @@ Future<bool> saveActivityLog() async {
   dynamic ecuRegAddr;
   DateTime? flashCycleStartTime;
 
+  // Supports either a single register ("101") or multiple comma-
+  // separated registers ("101,102") — always returns a list, empty if
+  // nothing valid was found.
+  List<int> get indicatorRegAddrList => _parseRegList(indicatorRegAddr);
+  List<int> get ecuRegAddrList => _parseRegList(ecuRegAddr);
 
-    int? get indicatorRegAddrNum => indicatorRegAddr is int
-      ? indicatorRegAddr as int
-      : int.tryParse(indicatorRegAddr?.toString() ?? '');
-
-  int? get ecuRegAddrNum => ecuRegAddr is int
-      ? ecuRegAddr as int
-      : int.tryParse(ecuRegAddr?.toString() ?? '');
+  List<int> _parseRegList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is int) return [raw];
+    final parts = raw.toString().split(',');
+    final result = <int>[];
+    for (final part in parts) {
+      final n = int.tryParse(part.trim());
+      if (n != null) result.add(n);
+    }
+    return result;
+  }
   // ===============================
   // PLC / HARNESS STATUS
   // ===============================

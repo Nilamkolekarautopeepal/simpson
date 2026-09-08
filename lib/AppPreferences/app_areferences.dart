@@ -11,6 +11,17 @@ class SecureStorageService {
   static const _refreshTokenKey = 'refresh_token';
   static const _rememberMeKey = 'remember_me';
 
+    static const _stationTitleKey = 'station_title';
+
+  static Future<void> saveStationTitle(String? title) async {
+    if (title == null || title.isEmpty) return;
+    await _storage.write(key: _stationTitleKey, value: title);
+  }
+
+  static Future<String?> getStationTitle() async {
+    return await _storage.read(key: _stationTitleKey);
+  }
+
   // ── Remember Me flag ──
 
   static const _dongleIpKey = 'dongle_ip';
@@ -62,6 +73,17 @@ class SecureStorageService {
     final value = await _storage.read(key: _rememberMeKey);
     return value == 'true';
   }
+
+  // static const _stationTitleKey = 'station_title';
+
+  // static Future<void> saveStationTitle(String? title) async {
+  //   if (title == null || title.isEmpty) return;
+  //   await _storage.write(key: _stationTitleKey, value: title);
+  // }
+
+  // static Future<String?> getStationTitle() async {
+  //   return await _storage.read(key: _stationTitleKey);
+  // }
 
   // ── Credentials (for pre-filling the login form / optional auto-login) ──
 

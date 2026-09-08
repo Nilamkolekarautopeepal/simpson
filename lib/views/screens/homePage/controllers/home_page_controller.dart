@@ -3016,6 +3016,7 @@ class ScanStep {
 
 class HomePageController extends GetxController with WidgetsBindingObserver {
   late final String station;
+  final RxString stationTitle = ''.obs;
   final List<ScanStep> steps = [
     ScanStep('esn', 'ESN'),
     ScanStep('iqa', 'IQA', type: StepType.iqaGroup),
@@ -3098,6 +3099,8 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
   String? _resolvedDatasetType;
   String? _resolvedDatasetFileName;
   int? _dongleDbId;
+    List<int> _indicatorRegAddrList = [];
+  List<int> _ecuRegAddrList = [];
   DateTime? _flashCycleStartTime;
 
   Future<void> _autoConnectPlc() async {
@@ -3222,9 +3225,13 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     super.onInit();
     WidgetsBinding.instance
         .addObserver(this); // ✅ observe app lifecycle for exit-flush
-
-    station =
+        station =
         (Get.arguments is String) ? Get.arguments as String : 'Unknown Station';
+    SecureStorageService.getStationTitle().then((title) {
+      if (title != null && title.isNotEmpty) {
+        stationTitle.value = title;
+      }
+    });
 
     stepControllers =
         List.generate(steps.length, (_) => TextEditingController());
@@ -3360,14 +3367,18 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     }
     try {
       final List<dynamic> decoded = jsonDecode(raw);
-      _dongleEntries = decoded.map((d) {
+            _dongleEntries = decoded.map((d) {
         final ecuIdsRaw = (d['ecu_ids'] as List?) ?? [];
         return _DongleEntry(
           macId: d['mac_id'] as String?,
           ip: d['ip'] as String?,
           isActive: d['is_active'] == true,
           ecuIds: ecuIdsRaw.whereType<num>().map((n) => n.toInt()).toList(),
-          dongleDbId: d['dongleDbId'] as int?,
+          dongleDbId: d['dongleDbId'] is int
+              ? d['dongleDbId'] as int
+              : int.tryParse('${d['dongleDbId']}'),
+          indicatorRegAddr: d['indicator_reg_addr'],
+          ecuRegAddr: d['ecu_reg_addr'],
         );
       }).toList();
       _log('Dongle: loaded ${_dongleEntries.length} dongle(s) from login data');
@@ -3880,15 +3891,51 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
     _dongleIp = matchedDongle.ip;
     dongleIp.value = matchedDongle.ip!;
     _dongleDbId = matchedDongle.dongleDbId;
+    _indicatorRegAddrList = matchedDongle.indicatorRegAddrList;
+    _ecuRegAddrList = matchedDongle.ecuRegAddrList;
 
     _log('----------------------------------------');
     _log('Matching Dongle Found');
+    _log('indicator_reg_addr: ${matchedDongle.indicatorRegAddr}, ecu_reg_addr: ${matchedDongle.ecuRegAddr}');
     _log('MAC : ${matchedDongle.macId}');
     _log('IP  : ${matchedDongle.ip}');
     _log('Matched ECU IDs : ${matchedDongle.ecuIds.join(", ")}');
-    _log('----------------------------------------');
+        _log('----------------------------------------');
 
+    unawaited(_setRelay(1));
     _autoConnectDongle();
+  }
+
+
+  //send plc data realy on off
+
+    Future<void> _setRelay(int value) async {
+    if (!plcService.isConnected.value) {
+      _log('Relay write pending — PLC not connected yet, will retry once connected (value=$value)');
+      const maxWaitSeconds = 30;
+      int waited = 0;
+      while (!plcService.isConnected.value && waited < maxWaitSeconds) {
+        await Future.delayed(const Duration(seconds: 1));
+        waited++;
+      }
+      if (!plcService.isConnected.value) {
+        _log('Relay write skipped — PLC still not connected after ${maxWaitSeconds}s (value=$value)');
+        return;
+      }
+    }
+    try {
+      for (final reg in _indicatorRegAddrList) {
+        await plcService.writeRegister(reg, value);
+        _log('Command sent to PLC — reg=$reg value=$value  |  HEX: ${plcService.lastSentHex.value}');
+      }
+      for (final reg in _ecuRegAddrList) {
+        await plcService.writeRegister(reg, value);
+        _log('Command sent to PLC — reg=$reg value=$value  |  HEX: ${plcService.lastSentHex.value}');
+      }
+      _log('RELAY IS ${value == 1 ? "ON" : "OFF"} — indicator_reg_addr: ${_indicatorRegAddrList.join(",")}, ecu_reg_addr: ${_ecuRegAddrList.join(",")}');
+    } catch (e) {
+      _log('❌ Relay write failed (value=$value): $e');
+    }
   }
 
   Future<String> _autoWriteIqaValues() async {
@@ -5470,9 +5517,10 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
             _showReconnectPopup();
           }
 
-          flashErrorMessage.value = result ?? 'Unknown error';
+                   flashErrorMessage.value = result ?? 'Unknown error';
 
           unawaited(_sendPartialSessionReport('flashing failed'));
+          await _setRelay(0);
           return;
         }
 
@@ -5563,7 +5611,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
           if (sessionKeyForSend != null) {
             await PendingSessionStorage.removeDraft(sessionKeyForSend);
           }
-        }).catchError((e) {
+               }).catchError((e) {
           // Send failed — allow a later event (heartbeat, exit flush, next
           // launch resend) to retry it instead of leaving it stuck locked.
           _sessionReportSent = false;
@@ -5573,6 +5621,7 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
         flashInProgress.value = false;
       });
     } finally {
+      await _setRelay(0);
       await WakelockPlus.disable();
     }
   }
@@ -6281,11 +6330,31 @@ class _DongleEntry {
   final bool isActive;
   final List<int> ecuIds;
   final int? dongleDbId;
+  final dynamic indicatorRegAddr;
+  final dynamic ecuRegAddr;
   _DongleEntry({
     this.macId,
     this.ip,
     this.isActive = false,
     this.ecuIds = const [],
     this.dongleDbId,
+    this.indicatorRegAddr,
+    this.ecuRegAddr,
   });
+
+  // Supports single ("101") or comma-separated ("101,102") registers.
+  List<int> get indicatorRegAddrList => _parseRegList(indicatorRegAddr);
+  List<int> get ecuRegAddrList => _parseRegList(ecuRegAddr);
+
+  static List<int> _parseRegList(dynamic raw) {
+    if (raw == null) return [];
+    if (raw is int) return [raw];
+    final parts = raw.toString().split(',');
+    final result = <int>[];
+    for (final part in parts) {
+      final n = int.tryParse(part.trim());
+      if (n != null) result.add(n);
+    }
+    return result;
+  }
 }

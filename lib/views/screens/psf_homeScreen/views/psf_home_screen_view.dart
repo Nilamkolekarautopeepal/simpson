@@ -73,9 +73,13 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CommonAppBar(
-        title: "PFS Station",
-        actions: [
+               appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: Obx(() => CommonAppBar(
+          title: controller.stationTitle.value.isEmpty
+              ? (controller.station ?? '')
+              : controller.stationTitle.value,
+          actions: [
           Obx(
             () => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 6),
@@ -113,13 +117,14 @@ class PsfHomeScreenView extends GetView<PsfHomeScreenController> {
               ),
             ),
           ),
-          const SizedBox(width: 4),
+                   const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: controller.logout,
             tooltip: 'Logout',
           ),
         ],
+      )),
       ),
       backgroundColor: Color(0xFF16232C),
       body: Column(

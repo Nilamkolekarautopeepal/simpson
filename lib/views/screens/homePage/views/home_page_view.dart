@@ -29,134 +29,45 @@ class HomePageView extends GetView<HomePageController> {
   const HomePageView({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: CommonAppBar(
-        title: controller.station,
-        actions: [
-          Obx(() {
-            final connecting = controller.isPlcConnecting.value;
-            final connected = controller.isPlcConnected.value;
-            final color = connecting
-                ? _StationColors.brightGreen
-                : (connected ? _StationColors.brightGreen : _StationColors.red);
-            return InkWell(
-              onTap: controller.retryPlcConnection,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: color.withOpacity(0.5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (connecting)
-                        Padding(
-                          padding: const EdgeInsets.all(1),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints.tightFor(
-                                width: 15, height: 15),
-                            child: CircularProgressIndicator(
-                                strokeWidth: 1.2, color: color),
-                          ),
-                        )
-                      else
-                        Icon(Icons.circle, size: 10, color: color),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(
-                          connecting ? 'Connecting…' : 'PLC',
-                          style: TextStyle(
-                              color: color,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+         return Scaffold(
+      backgroundColor: _StationColors.navy,
+      appBar: _buildAppBar(),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 1,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: _buildSidebar(),
               ),
-            );
-          }),
-          Obx(() {
-            if (!controller.canConnectDongle.value) {
-              return const Padding(padding: EdgeInsets.zero);
-            }
-            final connecting = controller.dongleConnecting.value;
-            final connected = controller.dongleConnected.value;
-            final color = connecting
-                ? _StationColors.brightGreen
-                : (connected ? _StationColors.brightGreen : _StationColors.red);
-            return InkWell(
-              onTap: controller.retryDongleConnection,
-              borderRadius: BorderRadius.circular(20),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: color.withOpacity(0.5)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (connecting)
-                        Padding(
-                          padding: const EdgeInsets.all(1),
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints.tightFor(
-                                width: 15, height: 15),
-                            child: CircularProgressIndicator(
-                                strokeWidth: 1.2, color: color),
-                          ),
-                        )
-                      else
-                        Icon(Icons.circle, size: 10, color: color),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(
-                          connecting ? 'Connecting…' : 'Dongle',
-                          style: TextStyle(
-                              color: color,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: controller.logout,
-            tooltip: 'Logout',
+            ),
+            const SizedBox(width: 12),
+            Expanded(flex: 5, child: _buildMainContent()),
+          ],
+        ),
+      ),
+    );
+    
+  }
+
+    Widget _buildSidebar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _StationColors.teal,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _StationColors.slateBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      backgroundColor: _StationColors.navy,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(flex: 1, child: _buildSidebar()),
-          Expanded(flex: 5, child: _buildMainContent()),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSidebar() {
-    return Container(
-      color: _StationColors.teal,
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2386,6 +2297,118 @@ Widget _buildDtcCard(String raw) {
           ),
         ],
       ),
+    );
+  }
+    PreferredSizeWidget _buildAppBar() {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(64),
+      child: Obx(() => CommonAppBar(
+            title: controller.stationTitle.value.isEmpty
+                ? controller.station
+                : controller.stationTitle.value,
+            actions: [
+              Obx(() {
+                final connecting = controller.isPlcConnecting.value;
+                final connected = controller.isPlcConnected.value;
+                final color = connecting
+                    ? _StationColors.brightGreen
+                    : (connected ? _StationColors.brightGreen : _StationColors.red);
+                return InkWell(
+                  onTap: controller.retryPlcConnection,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (connecting)
+                            Padding(
+                              padding: const EdgeInsets.all(1),
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints.tightFor(width: 15, height: 15),
+                                child: CircularProgressIndicator(strokeWidth: 1.2, color: color),
+                              ),
+                            )
+                          else
+                            Icon(Icons.circle, size: 10, color: color),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              connecting ? 'Connecting…' : 'PLC',
+                              style: TextStyle(
+                                  color: color, fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              Obx(() {
+                if (!controller.canConnectDongle.value) {
+                  return const Padding(padding: EdgeInsets.zero);
+                }
+                final connecting = controller.dongleConnecting.value;
+                final connected = controller.dongleConnected.value;
+                final color = connecting
+                    ? _StationColors.brightGreen
+                    : (connected ? _StationColors.brightGreen : _StationColors.red);
+                return InkWell(
+                  onTap: controller.retryDongleConnection,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: color.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (connecting)
+                            Padding(
+                              padding: const EdgeInsets.all(1),
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints.tightFor(width: 15, height: 15),
+                                child: CircularProgressIndicator(strokeWidth: 1.2, color: color),
+                              ),
+                            )
+                          else
+                            Icon(Icons.circle, size: 10, color: color),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              connecting ? 'Connecting…' : 'Dongle',
+                              style: TextStyle(
+                                  color: color, fontSize: 12.5, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              IconButton(
+                icon: const Icon(Icons.logout, color: Colors.white),
+                onPressed: controller.logout,
+                tooltip: 'Logout',
+              ),
+            ],
+          )),
     );
   }
 
