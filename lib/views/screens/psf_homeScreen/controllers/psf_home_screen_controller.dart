@@ -1386,11 +1386,15 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     }
   }
 
-   void resetLane(int laneIndex) async {
+  void resetLane(int laneIndex) async {
     final lane = lanes[laneIndex];
     lane.logActivity('Lane reset for next engine');
-    await _setLaneRelay(lane, 0);
+
+    // Reset the UI/lane state immediately — don't make the operator
+    // wait on the PLC relay write, which can take up to 30s if the
+    // PLC happens to be reconnecting at that moment.
     lane.resetToUnlockedIdle();
+    unawaited(_setLaneRelay(lane, 0));
 
     await releaseDongleForLane(laneIndex);
     await Future.delayed(const Duration(seconds: 2));

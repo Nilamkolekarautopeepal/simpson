@@ -3145,14 +3145,44 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
       final pingReg = harnessReceipes.isNotEmpty
           ? (harnessReceipes.first.regAddress ?? 4)
           : 4;
+////--------------------------old code plc connection
+      // try {
+      //   await plcService
+      //       .readRegister(pingReg)
+      //       .timeout(const Duration(milliseconds: 800));
+      //   return; // first attempt succeeded, all good
+      // } catch (_) {
+      //   // fall through to retry below
+      // }
 
-      try {
+      // try {
+      //   await Future.delayed(const Duration(milliseconds: 150));
+      //   await plcService
+      //       .readRegister(pingReg)
+      //       .timeout(const Duration(milliseconds: 800));
+      //   // second attempt succeeded — connection is fine, no action needed
+      // } catch (e) {
+      //   _log('❌ PLC heartbeat failed (twice) — connection lost: $e');
+      //   plcService.isConnected.value = false;
+      //   _startPlcRetryTimer();
+      // }
+//------new code 
+           try {
         await plcService
             .readRegister(pingReg)
             .timeout(const Duration(milliseconds: 800));
         return; // first attempt succeeded, all good
-      } catch (_) {
-        // fall through to retry below
+      } catch (e) {
+        // A genuine Modbus exception response means the PLC IS alive
+        // and responding — it just rejected this specific register.
+        // That's a config problem, not a dead connection, so don't
+        // tear down the connection for it.
+        if (e.toString().contains('Modbus exception')) {
+          _log('⚠️ PLC heartbeat register rejected ($e) — PLC is alive, '
+              'but register $pingReg may be misconfigured for this device');
+          return;
+        }
+        // fall through to retry below for genuine timeouts/disconnects
       }
 
       try {
@@ -3162,10 +3192,17 @@ class HomePageController extends GetxController with WidgetsBindingObserver {
             .timeout(const Duration(milliseconds: 800));
         // second attempt succeeded — connection is fine, no action needed
       } catch (e) {
+        if (e.toString().contains('Modbus exception')) {
+          _log('⚠️ PLC heartbeat register rejected twice ($e) — PLC is alive, '
+              'but register $pingReg may be misconfigured for this device');
+          return;
+        }
         _log('❌ PLC heartbeat failed (twice) — connection lost: $e');
         plcService.isConnected.value = false;
         _startPlcRetryTimer();
       }
+
+
     });
   }
 
