@@ -1,5 +1,4 @@
 import 'package:get/get.dart';
-
 import '../views/screens/homePage/bindings/home_page_binding.dart';
 import '../views/screens/homePage/views/home_page_view.dart';
 import '../views/screens/login/bindings/login_binding.dart';
@@ -29,14 +28,14 @@ class AppPages {
     ),
     GetPage(
       name: _Paths.HOME_PAGE,
-      page: () => const HomePageView(),
+      page: () =>  HomePageView(),
       binding: HomePageBinding(),
     ),
-    
     GetPage(
       name: _Paths.PSF_HOME_SCREEN,
       page: () => const PsfHomeScreenView(),
       binding: PsfHomeScreenBinding(),
     ),
+  
   ];
 }

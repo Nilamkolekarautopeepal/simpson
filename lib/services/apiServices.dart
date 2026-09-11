@@ -1,11 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:simpson/api/app_urls.dart';
 import 'package:simpson/modals/all.models.dart';
 import 'package:simpson/modals/esn.model.dart' as esn_ds;
 import 'package:simpson/modals/flashRecord.model.dart';
-import 'package:simpson/modals/harness.model.dart';
 import 'package:simpson/modals/listNumber.model.dart';
 import 'package:simpson/modals/pidDataset.model.dart'; // adjust to wherever PidDataset actually lives
 import 'package:simpson/modals/dtcDataset.model.dart'; // adjust to wherever DtcDataset actually lives
@@ -23,7 +24,22 @@ class AuthService {
                 receiveTimeout: const Duration(seconds: 15),
                 headers: {"Accept": "application/json"},
               ),
-            )..interceptors.add(ApiLogInterceptor()));
+            )
+              ..interceptors.add(ApiLogInterceptor())
+              ..httpClientAdapter = IOHttpClientAdapter(
+                createHttpClient: () {
+                  final client = HttpClient();
+                  if (kDebugMode) {
+                    client.badCertificateCallback =
+                        (X509Certificate cert, String host, int port) {
+                      debugPrint(
+                          "🟡 [AuthService] Bypassing bad certificate for $host:$port (debug mode only)");
+                      return true;
+                    };
+                  }
+                  return client;
+                },
+              ));
 
   Future<User> login({
     required String username,
@@ -391,22 +407,160 @@ class AuthService {
     }
   }
 
-  Future<HarnessName> getHarnessList({
-    required String harnessName,
+  //------------------------test bed session and eol session apis-----------------------------
+  Future<void> createTestBedSession({
+    required int? esnId,
+    required int? dongleId,
+    required String? datasetType,
+    required String? datafileName,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String flashStatus,
+    required String iqaStatus,
+    required String dtcStatus,
+    required List<String> activityLog,
     String? accessToken,
   }) async {
-    final response = await _dio.get(
-      ApiUrls.harnessNumber,
-      queryParameters: {'name': harnessName},
-      options: Options(
-        headers: {'Authorization': 'JWT $accessToken'},
-      ),
-    );
-    print('🔵 [HarnessService] GET ${response.requestOptions.uri}');
-    print('🔵 [HarnessService] statusCode=${response.statusCode}');
-    print('🔵 [HarnessService] response.data=${response.data}');
-    return HarnessName.fromJson(response.data);
+    try {
+      final activityText = activityLog.join('\n');
+      final activityBytes = utf8.encode(activityText);
+
+      final formData = FormData.fromMap({
+        "esn_id": esnId?.toString() ?? '',
+        "dongle_id": dongleId?.toString() ?? '',
+        "dataset_type": datasetType ?? '',
+        "datafile_name": datafileName ?? '',
+        "start_date": startDate.toIso8601String(),
+        "end_date": endDate.toIso8601String(),
+        "flash_status": flashStatus,
+        "iqa_status": iqaStatus,
+        "dtc_status": dtcStatus,
+        "activity_report": MultipartFile.fromBytes(
+          activityBytes,
+          filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
+        ),
+      });
+      debugPrint(
+          "🔵 [TestBedSessionService] POST ${ApiUrls.createTestBedSession}");
+      debugPrint(
+          "🔵 [TestBedSessionService] esn_id=$esnId dongle_id=$dongleId dataset_type=$datasetType "
+          "flash=$flashStatus iqa=$iqaStatus dtc=$dtcStatus");
+
+      final response = await _dio.post(
+        ApiUrls.createTestBedSession,
+        data: formData,
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint(
+          "🔵 [TestBedSessionService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [TestBedSessionService] response.data=${response.data}");
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [TestBedSessionService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint(
+          "🔴 [TestBedSessionService] response.data=${e.response?.data}");
+      rethrow;
+    }
   }
+
+  //=================================eol session apis-----------------------------
+  Future<void> createEolSession({
+    required int? esnId,
+    required int? dongleId,
+    required String? datasetType,
+    required String? datafileName,
+    required DateTime startDate,
+    required DateTime endDate,
+    required String continutyStatus,
+    required String flashStatus,
+    required String iqaStatus,
+    required String dtcStatus,
+    required List<String> activityLog,
+    String? accessToken,
+  }) async {
+    try {
+      final activityText = activityLog.join('\n');
+      final activityBytes = utf8.encode(activityText);
+
+      final formData = FormData.fromMap({
+        "esn_id": esnId?.toString() ?? '',
+        "dongle_id": dongleId?.toString() ?? '',
+        "dataset_type": datasetType ?? '',
+        "datafile_name": datafileName ?? '',
+        "start_date": startDate.toIso8601String(),
+        "end_date": endDate.toIso8601String(),
+        "continuty_status": continutyStatus,
+        "flash_status": flashStatus,
+        "iqa_status": iqaStatus,
+        "dtc_status": dtcStatus,
+        "activity_report": MultipartFile.fromBytes(
+          activityBytes,
+          filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
+        ),
+      });
+
+      debugPrint("🔵 [EolSessionService] POST ${ApiUrls.createEolSession}");
+      debugPrint(
+          "🔵 [EolSessionService] esn_id=$esnId dongle_id=$dongleId dataset_type=$datasetType "
+          "flash=$flashStatus iqa=$iqaStatus dtc=$dtcStatus continuty=$continutyStatus");
+
+      final response = await _dio.post(
+        ApiUrls.createEolSession,
+        data: formData,
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint("🔵 [EolSessionService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [EolSessionService] response.data=${response.data}");
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [EolSessionService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint("🔴 [EolSessionService] response.data=${e.response?.data}");
+      rethrow; // let the caller (activity log) know it actually failed
+    }
+  }
+
+  Future<Map<String, dynamic>> getSessionHistory({
+    required String esn,
+    String? accessToken,
+  }) async {
+    try {
+      debugPrint(
+          "🔵 [SessionHistoryService] GET ${ApiUrls.sessionByEsn}?esn=$esn");
+
+      final response = await _dio.get(
+        ApiUrls.sessionByEsn,
+        queryParameters: {"esn": esn},
+        options: Options(
+          headers: accessToken != null
+              ? {"Authorization": "JWT $accessToken"}
+              : null,
+        ),
+      );
+
+      debugPrint(
+          "🔵 [SessionHistoryService] statusCode=${response.statusCode}");
+      debugPrint("🔵 [SessionHistoryService] response.data=${response.data}");
+
+      return response.data is Map ? _asMap(response.data) : {};
+    } on DioException catch (e) {
+      debugPrint(
+          "🔴 [SessionHistoryService] DioException: ${e.type} statusCode=${e.response?.statusCode}");
+      debugPrint(
+          "🔴 [SessionHistoryService] response.data=${e.response?.data}");
+      return {};
+    }
+  }
+  //================================
 
   String _friendlyMessage(DioException e) {
     final statusCode = e.response?.statusCode;
@@ -435,25 +589,46 @@ class AuthService {
         return "The server took too long to respond. Please try again.";
       case DioExceptionType.connectionError:
         return "Could not connect to the server. Check your internet connection.";
+      case DioExceptionType.badCertificate:
+        return "Could not establish a secure connection to the server (certificate error).";
+      case DioExceptionType.cancel:
+        return "Request was cancelled.";
+      case DioExceptionType.unknown:
+        debugPrint(
+            "🔴 [AuthService] Underlying error: ${e.error} (${e.error.runtimeType})");
+        debugPrint("🔴 [AuthService] Message: ${e.message}");
+        final underlying = e.error;
+        if (underlying is SocketException) {
+          if (underlying.osError?.errorCode == 11001 ||
+              underlying.message.toLowerCase().contains('lookup') ||
+              underlying.message.toLowerCase().contains('resolve')) {
+            return "Could not reach the server. Please check the server address or your DNS/network settings.";
+          }
+          return "Could not connect to the server. Check your internet connection or firewall settings.";
+        }
+        if (underlying != null &&
+            underlying.toString().toLowerCase().contains('handshake')) {
+          return "Could not establish a secure connection to the server (SSL/TLS handshake failed).";
+        }
+        return "Could not connect to the server. Please check your network connection and try again.";
       default:
         return "Something went wrong. Please try again.";
     }
   }
 
   Map<String, dynamic> _asMap(dynamic data) {
-    if (data is Map<String, dynamic>) return data;
-    if (data is String) {
+    if (data is Map<String, dynamic>) {
+      return data;
+    } else if (data is String) {
       try {
         final decoded = jsonDecode(data);
-        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map<String, dynamic>) {
+          return decoded;
+        }
       } catch (_) {
-        final preview = data.length > 120 ? data.substring(0, 120) : data;
-        throw Exception(
-          "Server did not return JSON (got: $preview...). "
-          "Check that ApiUrls.baseUrl / the endpoint path is correct.",
-        );
+        // Not a JSON string, fall through
       }
     }
-    throw Exception("Unexpected response format from server");
+    throw Exception("Unexpected response format: ${data.runtimeType}");
   }
 }

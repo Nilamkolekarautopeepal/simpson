@@ -72,6 +72,7 @@ class DtcCode {
   int? pageNo;
   dynamic environmentSnapshot;
   dynamic environmentSnapshot2;
+  String? relatedSensor; // NEW — backend sends this as a plain string, e.g. "EGR"
 
   DtcCode({
     this.id,
@@ -81,6 +82,7 @@ class DtcCode {
     this.pageNo,
     this.environmentSnapshot,
     this.environmentSnapshot2,
+    this.relatedSensor, // NEW
   });
 
   factory DtcCode.fromJson(Map<String, dynamic> json) => DtcCode(
@@ -91,6 +93,7 @@ class DtcCode {
         pageNo: json["page_no"],
         environmentSnapshot: json["environment_snapshot"],
         environmentSnapshot2: json["environment_snapshot2"],
+        relatedSensor: json["related_sensor"] as String?, // NEW — plain string, no .map()
       );
 
   Map<String, dynamic> toJson() => {
@@ -101,5 +104,6 @@ class DtcCode {
         "page_no": pageNo,
         "environment_snapshot": environmentSnapshot,
         "environment_snapshot2": environmentSnapshot2,
+        "related_sensor": relatedSensor, // NEW
       };
 }

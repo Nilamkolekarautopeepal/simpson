@@ -22,7 +22,7 @@ class ConnectionManagerController extends GetxController {
   Future<void> getConnectivityType() async {
     late ConnectivityResult connectivityResult;
     try {
-      connectivityResult = (await (_connectivity.checkConnectivity())) as ConnectivityResult;
+      connectivityResult = (await (_connectivity.checkConnectivity()));
     } on PlatformException {}
     return _updateState(connectivityResult);
   }

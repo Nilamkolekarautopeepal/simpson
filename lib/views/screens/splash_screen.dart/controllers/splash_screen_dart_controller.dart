@@ -1,27 +1,10 @@
-
 import 'package:simpson/utils/app_constants.dart';
 import 'package:simpson/routes/app_pages.dart';
-// import 'package:simpson/utils/app_constants.dart';
 import 'package:get/get.dart';
-
-// class SplashScreenDartController extends GetxController {
-//   @override
-//   void onInit() {
-//     Future.delayed(Duration(seconds: Constants.splashDelay), () {
-//       getScreen();
-//     });
-//     super.onInit();
-//   }
-
-//   Future<void> getScreen() async { 
-//        Get.offAndToNamed(Routes.LOGIN);
-//     }
-     
-//   }
 
 class SplashScreenDartController extends GetxController {
   @override
-  void onReady() {                          // ✅ use onReady, not onInit
+  void onReady() {                         
     super.onReady();
     Future.delayed(Duration(seconds: Constants.splashDelay), () {
       getScreen();
@@ -29,6 +12,6 @@ class SplashScreenDartController extends GetxController {
   }
 
   Future<void> getScreen() async {
-    Get.offAllNamed(Routes.LOGIN);          // ✅ offAllNamed clears the stack
+    Get.offAllNamed(Routes.LOGIN);          
   }
 }

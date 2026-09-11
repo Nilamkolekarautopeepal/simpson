@@ -1,11 +1,5 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Wraps flutter_secure_storage for anything sensitive: username, password,
-/// access token, refresh token. Unlike SharedPreferences (used in
-/// AppPreferences for non-sensitive cached data), this is encrypted at rest.
-///
-/// Add to pubspec.yaml:
-///   flutter_secure_storage: ^9.0.0
 class SecureStorageService {
   SecureStorageService._();
 
@@ -17,7 +11,60 @@ class SecureStorageService {
   static const _refreshTokenKey = 'refresh_token';
   static const _rememberMeKey = 'remember_me';
 
+    static const _stationTitleKey = 'station_title';
+
+  static Future<void> saveStationTitle(String? title) async {
+    if (title == null || title.isEmpty) return;
+    await _storage.write(key: _stationTitleKey, value: title);
+  }
+
+  static Future<String?> getStationTitle() async {
+    return await _storage.read(key: _stationTitleKey);
+  }
+
   // ── Remember Me flag ──
+
+  static const _dongleIpKey = 'dongle_ip';
+  static const _plcIpKey = 'plc_ip';
+  static const _plcPortKey = 'plc_port';
+
+  static Future<void> saveDongleIp(String? ip) async {
+    if (ip == null || ip.isEmpty) return;
+    await _storage.write(key: _dongleIpKey, value: ip);
+  }
+
+  static Future<void> savePlcIp(String? ip) async {
+    if (ip == null || ip.isEmpty) return;
+    await _storage.write(key: _plcIpKey, value: ip);
+  }
+
+  static const _dongleListKey = 'dongle_list';
+
+  static Future<void> saveDongleList(String? json) async {
+    if (json == null) return;
+    await _storage.write(key: _dongleListKey, value: json);
+  }
+
+  static Future<String?> getDongleList() async {
+    return await _storage.read(key: _dongleListKey);
+  }
+
+  static Future<void> savePlcPort(String? port) async {
+    if (port == null || port.isEmpty) return;
+    await _storage.write(key: _plcPortKey, value: port);
+  }
+
+  static Future<String?> getDongleIp() async {
+    return await _storage.read(key: _dongleIpKey);
+  }
+
+  static Future<String?> getPlcIp() async {
+    return await _storage.read(key: _plcIpKey);
+  }
+
+  static Future<String?> getPlcPort() async {
+    return await _storage.read(key: _plcPortKey);
+  }
 
   static Future<void> setRememberMe(bool value) =>
       _storage.write(key: _rememberMeKey, value: value.toString());
@@ -26,6 +73,17 @@ class SecureStorageService {
     final value = await _storage.read(key: _rememberMeKey);
     return value == 'true';
   }
+
+  // static const _stationTitleKey = 'station_title';
+
+  // static Future<void> saveStationTitle(String? title) async {
+  //   if (title == null || title.isEmpty) return;
+  //   await _storage.write(key: _stationTitleKey, value: title);
+  // }
+
+  // static Future<String?> getStationTitle() async {
+  //   return await _storage.read(key: _stationTitleKey);
+  // }
 
   // ── Credentials (for pre-filling the login form / optional auto-login) ──
 
@@ -37,11 +95,9 @@ class SecureStorageService {
     await _storage.write(key: _passwordKey, value: password);
   }
 
-  static Future<String?> getSavedUsername() =>
-      _storage.read(key: _usernameKey);
+  static Future<String?> getSavedUsername() => _storage.read(key: _usernameKey);
 
-  static Future<String?> getSavedPassword() =>
-      _storage.read(key: _passwordKey);
+  static Future<String?> getSavedPassword() => _storage.read(key: _passwordKey);
 
   static Future<void> clearCredentials() async {
     await _storage.delete(key: _usernameKey);
@@ -75,8 +131,8 @@ class SecureStorageService {
 
   /// Call on logout.
   static Future<void> clearAll() async {
-    await clearCredentials();
+    //await clearCredentials();
     await clearTokens();
-    await _storage.delete(key: _rememberMeKey);
+    //await _storage.delete(key: _rememberMeKey);
   }
 }

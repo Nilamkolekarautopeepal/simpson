@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:simpson/themes/app_colors.dart';
+
 
 class CustomPopup extends StatelessWidget {
   final String title;
