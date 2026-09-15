@@ -1347,10 +1347,14 @@ Future<void> releaseDongleForLane(int laneIndex) async {
     });
   }
 
-  void _submitIqaField(int laneIndex, int iqaIndex) {
+   void _submitIqaField(int laneIndex, int iqaIndex) {
     final lane = lanes[laneIndex];
     final value = lane.iqaControllers[iqaIndex].text.trim();
-    if (value.isEmpty) return;
+
+    // Only move on once exactly 7 characters have been entered —
+    // any shorter value stays in this field for correction, no
+    // matter what characters (letters/numbers) were typed.
+    if (value.length != 7) return;
 
     print('🔹 [Lane ${lane.laneNumber}] IQA ${iqaIndex + 1} entered: "$value"  '
         '(${lane.filledIqaCount.value}/${lane.iqaControllers.length} filled)');
@@ -2039,14 +2043,9 @@ Future<void> onStartFlash(
         }
       }
 
-      List<pid_ds.PiCodeVariables> variables =
+           List<pid_ds.PiCodeVariables> variables =
           List<pid_ds.PiCodeVariables>.from(iqaPid.piCodeVariable ?? []);
       variables.sort((a, b) => (a.priority ?? 0).compareTo(b.priority ?? 0));
-
-      final order = lane.firingOrder;
-      if (order != null && order.length == variables.length) {
-        variables = order.map((e) => variables[int.parse(e) - 1]).toList();
-      }
 
       final writeInput = Uint8List(iqaPid.totalLen ?? 0);
       final List<VariantDataLists> variantList = [];

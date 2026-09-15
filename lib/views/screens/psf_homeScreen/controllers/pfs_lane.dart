@@ -363,11 +363,7 @@ Future<bool> saveActivityLog() async {
     });
   }
 
-  String iqaLabelFor(int i) {
-    final order = firingOrder;
-    if (order != null && i < order.length) {
-      return 'IQA (Cyl ${order[i]})';
-    }
+    String iqaLabelFor(int i) {
     return 'IQA ${i + 1}';
   }
 

@@ -408,7 +408,7 @@ class AuthService {
   }
 
   //------------------------test bed session and eol session apis-----------------------------
-  Future<void> createTestBedSession({
+   Future<void> createTestBedSession({
     required int? esnId,
     required int? dongleId,
     required String? datasetType,
@@ -419,6 +419,7 @@ class AuthService {
     required String iqaStatus,
     required String dtcStatus,
     required List<String> activityLog,
+    String? ecuSerialNo,
     String? accessToken,
   }) async {
     try {
@@ -435,6 +436,7 @@ class AuthService {
         "flash_status": flashStatus,
         "iqa_status": iqaStatus,
         "dtc_status": dtcStatus,
+        "ecu_serial_no": ecuSerialNo ?? '',
         "activity_report": MultipartFile.fromBytes(
           activityBytes,
           filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',
@@ -469,7 +471,7 @@ class AuthService {
   }
 
   //=================================eol session apis-----------------------------
-  Future<void> createEolSession({
+   Future<void> createEolSession({
     required int? esnId,
     required int? dongleId,
     required String? datasetType,
@@ -481,6 +483,7 @@ class AuthService {
     required String iqaStatus,
     required String dtcStatus,
     required List<String> activityLog,
+    String? ecuSerialNo,
     String? accessToken,
   }) async {
     try {
@@ -498,6 +501,7 @@ class AuthService {
         "flash_status": flashStatus,
         "iqa_status": iqaStatus,
         "dtc_status": dtcStatus,
+        "ecu_serial_no": ecuSerialNo ?? '',
         "activity_report": MultipartFile.fromBytes(
           activityBytes,
           filename: 'activity_log_${DateTime.now().millisecondsSinceEpoch}.txt',

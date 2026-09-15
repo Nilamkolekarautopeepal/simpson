@@ -370,7 +370,7 @@ class HomePageView extends GetView<HomePageController> {
                 style: TextStyle(
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   color: Colors.white,
-                  fontSize: 13,
+                  fontSize: 15,
                 ),
               ),
             ],
@@ -999,7 +999,7 @@ class HomePageView extends GetView<HomePageController> {
                   style: TextStyle(
                     color: Colors.black87,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -1078,7 +1078,7 @@ class HomePageView extends GetView<HomePageController> {
                   style: TextStyle(
                     color: Colors.black87,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -1365,7 +1365,7 @@ class HomePageView extends GetView<HomePageController> {
                 style: TextStyle(
                   color: Colors.black87,
                   fontWeight: FontWeight.w700,
-                  fontSize: 13,
+                  fontSize: 15,
                 ),
               ),
             ),

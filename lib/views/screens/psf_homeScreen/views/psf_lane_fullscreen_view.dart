@@ -47,18 +47,21 @@ class PsfLaneFullScreenView extends StatefulWidget {
   State<PsfLaneFullScreenView> createState() => _PsfLaneFullScreenViewState();
 }
 
-class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
+class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView>
+    with SingleTickerProviderStateMixin {
   bool _flashExpanded = true;
   bool _dtcExpanded = false;
   bool _pidExpanded = false;
   String? _activityFilter;
+  late final TabController _tabController;
   int get laneIndex => widget.laneIndex;
   PsfLane get lane => widget.lane;
   PsfHomeScreenController get controller => widget.controller;
 
-  @override
+    @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.onOpenLiveParameter(laneIndex);
       controller.onOpenDtc(laneIndex);
@@ -121,7 +124,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
   //   });
   // }
 
-    @override
+      @override
   Widget build(BuildContext context) {
     return Container(
       color: _StationColors.slateBg,
@@ -183,7 +186,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
         child: Text(
           tag,
           style: TextStyle(
-            fontSize: 9.5,
+            fontSize: 12.5,
             fontWeight: FontWeight.bold,
             color: selected ? Colors.white : Colors.white.withOpacity(0.75),
             letterSpacing: 0.3,
@@ -282,7 +285,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   const SizedBox(height: 18),
 
                   // ── ESN ──
-                  Text('ESN NUMBER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
+                  Text('ESN NUMBER', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
                   const SizedBox(height: 6),
                   Obx(() {
                     final resolved = lane.esn.value.isNotEmpty;
@@ -307,7 +310,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                           controller: lane.esnController,
                           focusNode: lane.esnFocusNode,
                           enabled: !lane.isLookingUpEsn.value,
-                          style: const TextStyle(fontSize: 13, color: Colors.white),
+                          style: const TextStyle(fontSize: 15, color: Colors.white),
                           decoration: _fieldDecoration(hint: 'e.g. 111111111111111', validated: resolved),
                           onChanged: (_) => controller.onEsnFieldChanged(laneIndex),
                           onSubmitted: (_) => controller.onScanEsnForLane(laneIndex),
@@ -319,7 +322,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                       ? const SizedBox.shrink()
                       : Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(lane.esnError.value, style: const TextStyle(fontSize: 11, color: _StationColors.red)),
+                          child: Text(lane.esnError.value, style: const TextStyle(fontSize: 12, color: _StationColors.red)),
                         )),
                   const SizedBox(height: 16),
 
@@ -330,12 +333,12 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('LIST NUMBER', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
+                            Text('LIST NUMBER', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
                             const SizedBox(height: 6),
                             TextField(
                               readOnly: true,
                               controller: TextEditingController(text: lane.listNumber.value),
-                              style: const TextStyle(fontSize: 13, color: Colors.white),
+                              style: const TextStyle(fontSize: 15, color: Colors.white),
                               decoration: _fieldDecoration(hint: '', validated: true),
                             ),
                             const SizedBox(height: 16),
@@ -350,7 +353,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('IQA NUMBERS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
+                            Text('IQA NUMBERS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.55), letterSpacing: 0.5)),
                             const SizedBox(height: 10),
                             Column(
                               children: List.generate(lane.iqaControllers.length, (i) {
@@ -363,7 +366,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                       return Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(lane.iqaLabelFor(i), style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.45))),
+                                          Text(lane.iqaLabelFor(i), style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.45))),
                                           const SizedBox(height: 2),
                                           SizedBox(
                                             height: 44,
@@ -390,7 +393,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                                                   focusNode: lane.iqaFocusNodes[i],
                                                   enabled: true,
                                                   maxLength: 7,
-                                                  style: const TextStyle(fontSize: 13, color: Colors.white),
+                                                  style: const TextStyle(fontSize: 15, color: Colors.white),
                                                   decoration: _fieldDecoration(hint: 'Scan ${lane.iqaLabelFor(i)}', validated: filled),
                                                   onChanged: (_) => controller.onIqaFieldChanged(laneIndex, i),
                                                   onSubmitted: (_) {
@@ -413,7 +416,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                             Obx(
                               () => Text(
                                 'IQA STATUS  ${lane.filledIqaCount.value} / ${lane.iqaControllers.length} scanned',
-                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.9)),
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: const Color.fromARGB(255, 255, 255, 255).withOpacity(0.9)),
                               ),
                             ),
                           ],
@@ -432,7 +435,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                 children: [
                   const Icon(Icons.list_alt, size: 18, color: Colors.white),
                   const SizedBox(width: 10),
-                  const Text('HIL Setup', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.white)),
+                  const Text('HIL Setup', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.white)),
                   const Spacer(),
                   Obx(
                     () => controller.harnessReceipes.isEmpty
@@ -440,7 +443,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                         : Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
-                            child: Text('${controller.harnessReceipes.length}', style: const TextStyle(fontSize: 11, color: Colors.white)),
+                            child: Text('${controller.harnessReceipes.length}', style: const TextStyle(fontSize: 12, color: Colors.white)),
                           ),
                   ),
                 ],
@@ -856,7 +859,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   Text(title,
                       style: const TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 13,
+                          fontSize: 15,
                           color: _StationColors.charcoal)),
                   const Spacer(),
                   if (trailing != null) ...[
@@ -905,7 +908,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
             const SizedBox(width: 6),
                       const Text('Successful',
                 style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 12,
                     color: _StationColors.brightGreen,
                     fontWeight: FontWeight.bold)),
           ],
@@ -918,14 +921,14 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               borderRadius: BorderRadius.circular(12)),
           child: Text('${(lane.flashProgress.value * 100).toStringAsFixed(0)}%',
               style: const TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 12,
                   color: _StationColors.brightGreen,
                   fontWeight: FontWeight.bold)),
         );
       } else if (failed) {
         trailing = const Text('Failed',
             style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 color: _StationColors.red,
                 fontWeight: FontWeight.bold));
       }
@@ -976,7 +979,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 child: const Text('Start Flashing',
-                    style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 13)),
+                    style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ],
           ),
@@ -1122,7 +1125,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
               child: const Text('Start Flashing',
-                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 13)),
+                  style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
           ),
         ],
@@ -1619,7 +1622,7 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
               const Text('Activity',
                   style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontSize: 15,
                       color: _StationColors.charcoal)),
               const Spacer(),
               IconButton(
@@ -1905,65 +1908,435 @@ class _PsfLaneFullScreenViewState extends State<PsfLaneFullScreenView> {
     );
   }
 
-  Widget _mainArea(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
-            child: Obx(() {
-              if (!lane.iqaAllFilled.value) {
-                return SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.6,
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: const BoxDecoration(
-                              color: _StationColors.tealBg,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.checklist_rtl_rounded,
-                              color: Color.fromARGB(255, 254, 254, 254), size: 34),
+    Widget _mainArea(BuildContext context) {
+    return Obx(() {
+      if (!lane.iqaAllFilled.value) {
+        return Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: const BoxDecoration(
+                          color: _StationColors.tealBg, shape: BoxShape.circle),
+                      child: const Icon(Icons.checklist_rtl_rounded,
+                          color: Colors.white, size: 34),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Waiting for scan',
+                        style: TextStyle(
+                            color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Complete ESN and all\nIQA fields to continue.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: _StationColors.slate, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            _activityLogSection(),
+          ],
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: _StationColors.teal,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _StationColors.slateBorder),
+            ),
+            margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: _StationColors.brightGreen,
+              indicatorWeight: 3,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white.withOpacity(0.5),
+              labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+              tabs: const [
+                Tab(text: 'Connectivity Test'),
+                Tab(text: 'Flashing'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // ── Tab 1: Connectivity Testing — fills the entire right area ──
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  child: _connectivityTestingBody(),
+                ),
+                // ── Tab 2: Flashing — the original screen, unchanged ──
+                SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _flashSection(),
+                      const SizedBox(height: 14),
+                      _dtcSection(),
+                      const SizedBox(height: 14),
+                      _pidSection(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _activityLogSection(),
+        ],
+      );
+    });
+  }
+    // ── CONNECTIVITY TESTING (prominent DTC panel, with fullscreen) ──
+
+  // Widget _connectivityTestingSection() {
+  //   return Container(
+  //     decoration: BoxDecoration(
+  //       color: _StationColors.teal,
+  //       borderRadius: BorderRadius.circular(10),
+  //       border: Border.all(color: _StationColors.slateBorder),
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: Colors.black.withOpacity(0.2),
+  //           blurRadius: 10,
+  //           offset: const Offset(0, 3),
+  //         ),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         Padding(
+  //           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //           child: Row(
+  //             children: [
+  //               const Icon(Icons.wifi_tethering, size: 18, color: Colors.white),
+  //               const SizedBox(width: 8),
+  //               const Text('Connectivity Testing',
+  //                   style: TextStyle(
+  //                       fontWeight: FontWeight.w800,
+  //                       fontSize: 15,
+  //                       color: Colors.white)),
+  //               const SizedBox(width: 12),
+  //               Obx(() => Container(
+  //                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+  //                     decoration: BoxDecoration(
+  //                         color: _StationColors.brightGreen.withOpacity(0.18),
+  //                         borderRadius: BorderRadius.circular(12)),
+  //                     child: Text('Count: ${lane.dtcReadResults.length}',
+  //                         style: const TextStyle(
+  //                             fontSize: 11.5,
+  //                             fontWeight: FontWeight.bold,
+  //                             color: _StationColors.brightGreen)),
+  //                   )),
+  //               const Spacer(),
+  //               Obx(() {
+  //                 final busy = lane.isReadingDtc.value;
+  //                 final canRead = lane.dongleConnected.value && !busy;
+  //                 final canClear = canRead && lane.dtcReadResults.isNotEmpty;
+  //                 return Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     InkWell(
+  //                       borderRadius: BorderRadius.circular(20),
+  //                       onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
+  //                       child: Padding(
+  //                         padding: const EdgeInsets.all(4),
+  //                         child: busy
+  //                             ? const SizedBox(
+  //                                 width: 16,
+  //                                 height: 16,
+  //                                 child: CircularProgressIndicator(strokeWidth: 1.6, color: _StationColors.amber))
+  //                             : Icon(Icons.refresh,
+  //                                 size: 18, color: canRead ? Colors.white : Colors.white.withOpacity(0.3)),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 4),
+  //                     InkWell(
+  //                       borderRadius: BorderRadius.circular(6),
+  //                       onTap: canClear ? () => controller.clearDtcForLane(laneIndex) : null,
+  //                       child: Container(
+  //                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  //                         decoration: BoxDecoration(
+  //                             borderRadius: BorderRadius.circular(6),
+  //                             border: Border.all(
+  //                                 color: canClear ? _StationColors.red : _StationColors.slateBorder)),
+  //                         child: Row(mainAxisSize: MainAxisSize.min, children: [
+  //                           Icon(Icons.delete_sweep_rounded,
+  //                               size: 14, color: canClear ? _StationColors.red : _StationColors.slate),
+  //                           const SizedBox(width: 5),
+  //                           Text('Clear DTC',
+  //                               style: TextStyle(
+  //                                   fontSize: 11,
+  //                                   fontWeight: FontWeight.w600,
+  //                                   color: canClear ? _StationColors.red : _StationColors.slate)),
+  //                         ]),
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 6),
+  //                     IconButton(
+  //                       icon: const Icon(Icons.fullscreen, size: 20, color: Colors.white),
+  //                       tooltip: 'Open full screen',
+  //                       visualDensity: VisualDensity.compact,
+  //                       onPressed: () => setState(() => _connectivityFullscreen = true),
+  //                     ),
+  //                   ],
+  //                 );
+  //               }),
+  //             ],
+  //           ),
+  //         ),
+  //         Padding(
+  //           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+  //           child: _connectivityBody(),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _connectivityTestingBody() {
+    return Obx(() {
+      final busy = lane.isReadingDtc.value;
+      final canRead = lane.dongleConnected.value && !busy;
+      final canClear = canRead && lane.dtcReadResults.isNotEmpty;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.wifi_tethering, size: 18, color: Colors.white),
+              const SizedBox(width: 8),
+              const Text(
+                'Connectivity Testing',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _StationColors.brightGreen.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Count: ${lane.dtcReadResults.length}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: _StationColors.brightGreen,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: busy
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.6,
+                            color: _StationColors.amber,
+                          ),
+                        )
+                      : Icon(
+                          Icons.refresh,
+                          size: 20,
+                          color: canRead ? Colors.white : Colors.white.withOpacity(0.3),
                         ),
-                        const SizedBox(height: 20),
-                        const Text('Waiting for scan',
-                            style: TextStyle(
-                                color: _StationColors.charcoal,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Complete ESN and all\nIQA fields to continue.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              color: _StationColors.slate, fontSize: 13),
-                        ),
-                      ],
+                ),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                borderRadius: BorderRadius.circular(6),
+                onTap: canClear ? () => controller.clearDtcForLane(laneIndex) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: canClear ? _StationColors.red : _StationColors.slateBorder,
                     ),
                   ),
-                );
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _flashSection(),
-                  const SizedBox(height: 14),
-                  _dtcSection(),
-                  const SizedBox(height: 14),
-                  _pidSection(),
-                ],
-              );
-            }),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.delete_sweep_rounded,
+                        size: 15,
+                        color: canClear ? _StationColors.red : _StationColors.slate,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Clear DTC',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: canClear ? _StationColors.red : _StationColors.slate,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-        _activityLogSection(),
-      ],
-    );
+          const SizedBox(height: 12),
+          _connectivityBody(),
+        ],
+      );
+    });
   }
+
+   Widget _connectivityBody() {
+    return Obx(() {
+      if (lane.dtcError.value.isNotEmpty) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _StationColors.redBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _StationColors.red.withOpacity(0.5)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.error_outline, size: 18, color: _StationColors.red),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  lane.dtcError.value,
+                  style: const TextStyle(
+                      fontSize: 13, color: _StationColors.red, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (lane.dtcReadResults.isEmpty) {
+        return const Text('No data yet',
+            style: TextStyle(color: _StationColors.slate, fontSize: 13));
+      }
+      return Column(children: lane.dtcReadResults.map(_dtcTile).toList());
+    });
+  }
+  //   Widget _connectivityFullscreenOverlay() {
+  //   return Material(
+  //     color: _StationColors.navy,
+  //     child: SafeArea(
+  //       child: Column(
+  //         crossAxisAlignment: CrossAxisAlignment.stretch,
+  //         children: [
+  //           Container(
+  //             color: _StationColors.teal,
+  //             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+  //             child: Row(
+  //               children: [
+  //                 const Icon(Icons.wifi_tethering, size: 20, color: Colors.white),
+  //                 const SizedBox(width: 8),
+  //                 const Text('Connectivity Testing',
+  //                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: Colors.white)),
+  //                 const SizedBox(width: 12),
+  //                 Obx(() => Container(
+  //                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+  //                       decoration: BoxDecoration(
+  //                           color: _StationColors.brightGreen.withOpacity(0.18),
+  //                           borderRadius: BorderRadius.circular(12)),
+  //                       child: Text('Count: ${lane.dtcReadResults.length}',
+  //                           style: const TextStyle(
+  //                               fontSize: 12,
+  //                               fontWeight: FontWeight.bold,
+  //                               color: _StationColors.brightGreen)),
+  //                     )),
+  //                 const Spacer(),
+  //                 Obx(() {
+  //                   final busy = lane.isReadingDtc.value;
+  //                   final canRead = lane.dongleConnected.value && !busy;
+  //                   final canClear = canRead && lane.dtcReadResults.isNotEmpty;
+  //                   return Row(
+  //                     mainAxisSize: MainAxisSize.min,
+  //                     children: [
+  //                       InkWell(
+  //                         borderRadius: BorderRadius.circular(20),
+  //                         onTap: canRead ? () => controller.readLiveDtcForLane(laneIndex) : null,
+  //                         child: Padding(
+  //                           padding: const EdgeInsets.all(6),
+  //                           child: busy
+  //                               ? const SizedBox(
+  //                                   width: 18,
+  //                                   height: 18,
+  //                                   child: CircularProgressIndicator(strokeWidth: 1.8, color: _StationColors.amber))
+  //                               : Icon(Icons.refresh,
+  //                                   size: 20, color: canRead ? Colors.white : Colors.white.withOpacity(0.3)),
+  //                         ),
+  //                       ),
+  //                       const SizedBox(width: 6),
+  //                       InkWell(
+  //                         borderRadius: BorderRadius.circular(6),
+  //                         onTap: canClear ? () => controller.clearDtcForLane(laneIndex) : null,
+  //                         child: Container(
+  //                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+  //                           decoration: BoxDecoration(
+  //                               borderRadius: BorderRadius.circular(6),
+  //                               border: Border.all(
+  //                                   color: canClear ? _StationColors.red : _StationColors.slateBorder)),
+  //                           child: Row(mainAxisSize: MainAxisSize.min, children: [
+  //                             Icon(Icons.delete_sweep_rounded,
+  //                                 size: 16, color: canClear ? _StationColors.red : _StationColors.slate),
+  //                             const SizedBox(width: 6),
+  //                             Text('Clear DTC',
+  //                                 style: TextStyle(
+  //                                     fontSize: 12.5,
+  //                                     fontWeight: FontWeight.w600,
+  //                                     color: canClear ? _StationColors.red : _StationColors.slate)),
+  //                           ]),
+  //                         ),
+  //                       ),
+  //                       const SizedBox(width: 8),
+  //                       IconButton(
+  //                         icon: const Icon(Icons.fullscreen_exit, size: 22, color: Colors.white),
+  //                         tooltip: 'Minimize',
+  //                         onPressed: () => setState(() => _connectivityFullscreen = false),
+  //                       ),
+  //                     ],
+  //                   );
+  //                 }),
+  //               ],
+  //             ),
+  //           ),
+  //           Expanded(
+  //             child: SingleChildScrollView(
+  //               padding: const EdgeInsets.all(20),
+  //               child: _connectivityBody(),
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 }
+
 
 class _SensorWriteAction extends StatefulWidget {
   const _SensorWriteAction({required this.sensor, required this.controller});

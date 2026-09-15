@@ -339,7 +339,7 @@ class CommonAppBar extends StatelessWidget implements PreferredSizeWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w600,
               ),
             ),

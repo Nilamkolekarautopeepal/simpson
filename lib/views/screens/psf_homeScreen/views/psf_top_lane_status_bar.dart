@@ -160,7 +160,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
                         textAlign: TextAlign.start,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 18,
                           height: 1.05,
                           fontWeight: FontWeight.w800,
                           color: isExpanded
@@ -173,7 +173,7 @@ class PsfTopLaneStatusBar extends StatelessWidget {
                         textAlign: TextAlign.start,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 12,
                           height: 1.0,
                           color: isExpanded ? Colors.white70 : Colors.white38,
                         ),
